@@ -53,9 +53,9 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
         return (
             <div className="text-center">
                 <p className="text-sm text-muted-foreground">현재 상태</p>
-                <p className="font-bold text-lg text-primary flex items-center justify-center gap-2">
+                <p className="font-bold text-lg text-primary flex items-center justify-center gap-2 h-7">
                     {hasProgress && <Trophy className="w-5 h-5"/>}
-                    {progress || '미달성'}
+                    {progress}
                 </p>
             </div>
         );

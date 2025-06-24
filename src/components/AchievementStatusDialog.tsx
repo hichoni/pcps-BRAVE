@@ -51,8 +51,8 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
         return (
              <div className="py-4 text-center">
                 <div className="text-lg text-muted-foreground">현재 달성 상태</div>
-                <div className="text-4xl font-bold text-primary my-2">
-                   {progress || "미달성"}
+                <div className="text-4xl font-bold text-primary my-2 h-12 flex items-center justify-center">
+                   {progress ? progress : <span className="text-lg text-muted-foreground font-normal">선택 없음</span>}
                 </div>
                 <div className="text-sm text-muted-foreground mt-4">선택 가능 {unit}:</div>
                 <div className="flex flex-wrap gap-2 justify-center mt-2">
