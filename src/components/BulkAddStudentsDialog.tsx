@@ -36,7 +36,6 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
     const csvHeader = "학년,반,번호,이름";
     const csvExample = "4,1,1,김철수\n4,1,2,이영희\n5,2,3,박바둑";
     const csvContent = `${csvHeader}\n${csvExample}`;
-    // Add BOM for Excel to recognize UTF-8 encoding correctly
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
@@ -54,7 +53,7 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
       const file = event.target.files[0];
       if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
         toast({ variant: 'destructive', title: '파일 형식 오류', description: 'CSV 파일만 업로드할 수 있습니다.' });
-        event.target.value = ''; // Reset file input
+        event.target.value = '';
         setSelectedFile(null);
         return;
       }
@@ -81,26 +80,23 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
             return;
         }
 
-        // Remove BOM (Byte Order Mark) if present
         if (text.charCodeAt(0) === 0xFEFF) {
             text = text.substring(1);
         }
         
-        // Normalize line endings, then split into lines and filter out empty ones
-        const lines = text.replace(/\r\n|\r/g, '\n').split('\n');
-        const dataLines = lines.filter(line => line.trim() !== '');
+        const lines = text.replace(/\r\n|\r/g, '\n').split('\n').filter(line => line.trim() !== '');
 
-        if (dataLines.length === 0) {
+        if (lines.length === 0) {
             toast({ variant: 'destructive', title: '파일 오류', description: '파일이 비어있거나 내용이 없습니다.' });
             setLoading(false);
             return;
         }
         
         let headerIndex = -1;
-        if (dataLines[0].includes('학년')) {
+        if (lines[0].includes('학년') || lines[0].includes('이름')) {
             headerIndex = 0;
         }
-        const studentDataLines = headerIndex === 0 ? dataLines.slice(1) : dataLines;
+        const studentDataLines = headerIndex === 0 ? lines.slice(1) : lines;
         
         if (studentDataLines.length === 0) {
             toast({ variant: 'destructive', title: '데이터 오류', description: '헤더만 있고 학생 데이터가 없습니다.' });
@@ -108,16 +104,23 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
             return;
         }
 
-        const delimiter = studentDataLines[0].includes(';') ? ';' : ',';
-
         const studentsToAdd: StudentData[] = [];
         const parseErrors: string[] = [];
+        
+        const parseLine = (line: string): string[] => {
+            for (const delimiter of [',', ';', '\t']) {
+                if (line.includes(delimiter)) {
+                    return line.split(delimiter).map(p => p.trim().replace(/^"|"$/g, ''));
+                }
+            }
+            return line.split(/\s+/).filter(Boolean).map(p => p.trim().replace(/^"|"$/g, ''));
+        }
 
         studentDataLines.forEach((line, index) => {
             const lineNumber = headerIndex === 0 ? index + 2 : index + 1;
-            const parts = line.split(delimiter).map(p => p.trim().replace(/^"|"$/g, ''));
+            const parts = parseLine(line);
             
-            if (parts.length !== 4) {
+            if (parts.length < 4) {
                 parseErrors.push(`[${lineNumber}번째 줄] 형식 오류: 4개 항목(학년,반,번호,이름)이 필요하지만, ${parts.length}개가 있습니다. 줄 내용: "${line}"`);
                 return;
             }
@@ -159,7 +162,8 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
                 duration: 30000,
                 description: (
                     <div className="text-sm">
-                        <p>파일 처리 중 오류를 발견했습니다. 아래 내용을 수정 후 다시 시도해주세요:</p>
+                        <p>파일 처리 중 오류를 발견했습니다. 아래 내용을 수정 후 다시 시도해주세요.</p>
+                        <p className="mt-2 text-xs">💡 <strong>팁:</strong> 엑셀에서 저장하실 때, 파일 형식을 <strong>"CSV UTF-8"</strong>로 선택하시면 대부분의 문제가 해결됩니다.</p>
                         <ul className="list-disc pl-5 mt-2 max-h-60 overflow-y-auto font-mono text-xs bg-destructive-foreground/10 p-2 rounded-md">
                             {parseErrors.map((e, i) => <li key={i}>{e}</li>)}
                         </ul>
@@ -219,7 +223,7 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
         toast({ 
             variant: 'destructive', 
             title: '파일 읽기 오류', 
-            description: '파일을 읽는 중 오류가 발생했습니다. 파일이 손상되었거나 다른 프로그램에서 사용 중인지 확인해주세요. 또는 파일을 "CSV(UTF-8)" 형식으로 저장한 후 다시 시도해보세요.'
+            description: '파일을 읽는 중 오류가 발생했습니다. 파일이 손상되었거나 다른 프로그램에서 사용 중인지 확인해주세요.'
         });
         setLoading(false);
     };
@@ -247,11 +251,12 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
-            <Alert>
+            <Alert variant="destructive">
                 <Info className="h-4 w-4" />
-                <AlertTitle>파일 형식 안내</AlertTitle>
+                <AlertTitle>중요: 파일 저장 형식 안내</AlertTitle>
                 <AlertDescription>
-                    <p>엑셀, 구글 시트 등에서 예시 파일과 같이 4개 열(학년, 반, 번호, 이름)을 작성한 후, CSV 형식으로 저장하여 업로드해주세요.</p>
+                  <p>학생 명단을 수정한 뒤 저장할 때, 반드시 파일 형식을 <strong className="font-bold">'CSV UTF-8 (쉼표로 분리)'</strong>로 선택해주세요.</p>
+                  <p className="mt-1">다른 형식으로 저장하면 글자가 깨지거나 등록에 실패할 수 있습니다.</p>
                 </AlertDescription>
             </Alert>
             
