@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import { Providers } from '@/components/Providers';
@@ -7,10 +7,13 @@ export const metadata: Metadata = {
   title: '풍천풍서초등학교 학교장 인증제',
   description: '도전! 꿈 성취 학교장 인증제를 통해 나의 성장을 기록하고 인증받아보세요.',
   manifest: '/manifest.json',
-  themeColor: '#2f5c88',
   icons: {
     apple: '/icons/icon-192x192.png',
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#2f5c88',
 };
 
 export default function RootLayout({
