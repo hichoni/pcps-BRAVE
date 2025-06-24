@@ -25,12 +25,6 @@ export function Header() {
                     도전! 꿈 성취 학교장 인증제
                 </h1>
             </div>
-             <div className="text-4xl font-bold font-headline text-primary/70 flex flex-col tracking-wider">
-                <span>2</span>
-                <span>0</span>
-                <span>2</span>
-                <span>5</span>
-             </div>
         </div>
         {user && (
           <div className="absolute top-1/2 right-0 -translate-y-1/2 flex items-center gap-2">
