@@ -3,157 +3,120 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { useChallengeConfig, StoredChallengeConfig, StoredAreaConfig, ChallengeConfig } from '@/context/ChallengeConfigContext';
+import { useChallengeConfig, ChallengeConfig } from '@/context/ChallengeConfigContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, Settings, ArrowLeft } from 'lucide-react';
-import { AreaName, AREAS } from '@/lib/config';
+import { Loader2, Settings, ArrowLeft, PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { AreaName, StoredAreaConfig } from '@/lib/config';
+import { AddEditAreaDialog } from '@/components/AddEditAreaDialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
-// This is the editor component that only renders when the config is fully loaded.
-function ChallengeConfigEditor({ initialConfig }: { initialConfig: ChallengeConfig }) {
-  const router = useRouter();
-  const { updateChallengeConfig } = useChallengeConfig();
+function ChallengeList() {
+  const { challengeConfig, deleteArea, loading } = useChallengeConfig();
   const { toast } = useToast();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingArea, setEditingArea] = useState<{ id: AreaName, config: StoredAreaConfig } | null>(null);
+  const [deletingArea, setDeletingArea] = useState<{ id: AreaName, config: StoredAreaConfig } | null>(null);
+
+  const handleEdit = (areaId: AreaName, areaConfig: StoredAreaConfig) => {
+    setEditingArea({ id: areaId, config: areaConfig });
+    setDialogOpen(true);
+  };
   
-  const [localConfig, setLocalConfig] = useState<StoredChallengeConfig | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-
-  // Use an effect to safely initialize and sync the local state from props.
-  // This is a more robust pattern than using a complex function in a useState initializer,
-  // and it helps prevent potential server-client hydration mismatches.
-  useEffect(() => {
-    if (initialConfig) {
-      const editableConfig: any = {};
-      AREAS.forEach(area => {
-        const config = initialConfig[area];
-        if (config) {
-          const { icon, name, ...rest } = config;
-          // The `...rest` will contain everything from AreaConfig except icon and name,
-          // which matches the structure needed for StoredChallengeConfig (since iconName is part of the spread)
-          editableConfig[area] = rest;
-        }
-      });
-      setLocalConfig(editableConfig);
-    }
-  }, [initialConfig]);
-
-  const handleInputChange = (area: AreaName, field: keyof Omit<StoredAreaConfig, 'goal'>, value: string) => {
-    setLocalConfig(prev => {
-        if (!prev) return null;
-        const areaConf = prev[area] || {};
-        return {
-            ...prev,
-            [area]: { ...areaConf, [field]: value }
-        }
-    });
+  const handleAddNew = () => {
+    setEditingArea(null);
+    setDialogOpen(true);
   };
-
-  const handleGoalChange = (area: AreaName, grade: string, value: string) => {
-    const numValue = Number(value);
-    if (isNaN(numValue)) return;
-
-    setLocalConfig(prev => {
-        if (!prev) return null;
-        const areaConf = prev[area];
-        if (!areaConf) return prev;
-        const newGoals = { ...areaConf.goal, [grade]: numValue };
-        return { ...prev, [area]: { ...areaConf, goal: newGoals } };
-    });
-  };
-
-  const handleSaveChanges = async () => {
-    if (!localConfig) return;
-    setIsSaving(true);
+  
+  const handleDelete = async () => {
+    if (!deletingArea) return;
     try {
-      await updateChallengeConfig(localConfig);
-      toast({ title: '성공', description: '도전 영역 설정이 저장되었습니다.' });
+      await deleteArea(deletingArea.id);
+      toast({ title: '성공', description: '도전 영역이 삭제되었습니다.' });
     } catch (error) {
-      toast({ variant: 'destructive', title: '오류', description: '설정 저장에 실패했습니다.' });
+      toast({ variant: 'destructive', title: '오류', description: '삭제에 실패했습니다.' });
     } finally {
-      setIsSaving(false);
+      setDeletingArea(null);
     }
   };
 
-  // The parent component already shows a loader, but we add this as an extra guard
-  // to ensure localConfig is initialized before rendering the form. Returning null is safe
-  // because the parent loader will be visible.
-  if (!localConfig) {
-    return null; 
+  if (loading || !challengeConfig) {
+      return <div className="flex h-64 w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
-
-  const GRADES = ['4', '5', '6'];
+  
+  const challengeAreaKeys = Object.keys(challengeConfig).sort();
 
   return (
-    <>
-      <header className="flex justify-between items-center mb-8 pb-4 border-b">
-        <h1 className="text-2xl sm:text-3xl font-bold font-headline text-primary flex items-center gap-2"><Settings/> 도전 영역 관리</h1>
-        <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => router.push('/admin')}>
-                <ArrowLeft className="mr-2"/> 관리자 페이지로
-            </Button>
-            <Button onClick={handleSaveChanges} disabled={isSaving}>
-                {isSaving ? <Loader2 className="animate-spin mr-2"/> : <Save className="mr-2"/>}
-                변경사항 저장
-            </Button>
-        </div>
-      </header>
-      
+    <AlertDialog onOpenChange={(open) => !open && setDeletingArea(null)}>
+      <div className="flex justify-end mb-6">
+        <Button onClick={handleAddNew}>
+          <PlusCircle className="mr-2" /> 새 도전 영역 추가
+        </Button>
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {AREAS.map(area => {
-            const areaConfig = initialConfig[area];
-            const localAreaConfig = localConfig?.[area];
-            if (!areaConfig || !localAreaConfig) return null;
+        {challengeAreaKeys.map(areaId => {
+            const areaConfig = challengeConfig[areaId];
+            if (!areaConfig) return null;
+            const { icon, name, ...storedConfig } = areaConfig;
 
             return (
-              <Card key={area} className="shadow-md border hover:shadow-lg transition-shadow">
+              <Card key={areaId} className="shadow-md border hover:shadow-lg transition-shadow">
                   <CardHeader>
-                      <CardTitle>{areaConfig.koreanName}</CardTitle>
-                      <CardDescription>{areaConfig.name}</CardDescription>
+                      <div className="flex justify-between items-start">
+                        <CardTitle>{areaConfig.koreanName}</CardTitle>
+                        <div className="flex gap-2">
+                           <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleEdit(areaId, storedConfig)}>
+                                <Edit className="h-4 w-4" />
+                           </Button>
+                           <AlertDialogTrigger asChild>
+                               <Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => setDeletingArea({ id: areaId, config: storedConfig })}>
+                                   <Trash2 className="h-4 w-4" />
+                               </Button>
+                           </AlertDialogTrigger>
+                        </div>
+                      </div>
+                      <CardDescription>{areaConfig.challengeName}</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                          <Label htmlFor={`koreanName-${area}`}>영역 이름 (한국어)</Label>
-                          <Input id={`koreanName-${area}`} value={localAreaConfig.koreanName || ''} onChange={(e) => handleInputChange(area, 'koreanName', e.target.value)} />
-                      </div>
-                      <div className="space-y-2">
-                          <Label htmlFor={`challengeName-${area}`}>도전 과제 이름</Label>
-                          <Input id={`challengeName-${area}`} value={localAreaConfig.challengeName || ''} onChange={(e) => handleInputChange(area, 'challengeName', e.target.value)} />
-                      </div>
-                      <div className="space-y-2">
-                          <Label>목표량 (학년별)</Label>
-                          <div className="grid grid-cols-3 gap-4">
-                            {GRADES.map(grade => (
-                              <div key={grade} className="space-y-1">
-                                <Label htmlFor={`goal-${area}-${grade}`} className="text-sm font-normal">{grade}학년</Label>
-                                <Input id={`goal-${area}-${grade}`} type="number" value={localAreaConfig.goal?.[grade] ?? ''} onChange={(e) => handleGoalChange(area, grade, e.target.value)} />
-                              </div>
-                            ))}
-                          </div>
-                      </div>
-                      <div className="space-y-2">
-                          <Label htmlFor={`unit-${area}`}>단위</Label>
-                          <Input id={`unit-${area}`} value={localAreaConfig.unit || ''} onChange={(e) => handleInputChange(area, 'unit', e.target.value)} />
-                      </div>
-                      <div className="space-y-2">
-                          <Label htmlFor={`requirements-${area}`}>인증 기준 설명</Label>
-                          <Textarea id={`requirements-${area}`} value={localAreaConfig.requirements || ''} onChange={(e) => handleInputChange(area, 'requirements', e.target.value)} rows={4}/>
-                      </div>
+                  <CardContent className="space-y-3 text-sm">
+                      <p><strong>유형:</strong> {areaConfig.goalType === 'numeric' ? '숫자 목표형' : '객관식 선택형'}</p>
+                      {areaConfig.goalType === 'numeric' ? (
+                        <p><strong>학년별 목표:</strong> {Object.entries(areaConfig.goal).map(([grade, g]) => `${grade}학년(${g}${areaConfig.unit})`).join(', ')}</p>
+                      ) : (
+                        <p><strong>선택지:</strong> {areaConfig.options?.join(', ')}</p>
+                      )}
+                      <p><strong>인증 기준:</strong> {areaConfig.requirements}</p>
                   </CardContent>
               </Card>
             )
         })}
       </div>
-    </>
+      <AddEditAreaDialog 
+        open={dialogOpen} 
+        onOpenChange={setDialogOpen}
+        area={editingArea}
+      />
+      
+      <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>정말로 삭제하시겠습니까?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    {deletingArea && `'${deletingArea.config.koreanName}'`} 도전 영역을 영구적으로 삭제합니다. 이 작업은 되돌릴 수 없으며, 학생들의 관련 성취 데이터도 더 이상 표시되지 않을 수 있습니다.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>취소</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
+                    삭제
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
 export default function ChallengeConfigPage() {
   const { user, loading: authLoading } = useAuth();
-  const { challengeConfig, loading: configLoading } = useChallengeConfig();
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
 
@@ -167,13 +130,19 @@ export default function ChallengeConfigPage() {
     }
   }, [user, authLoading, router, isClient]);
 
-  if (!isClient || authLoading || configLoading || !user || !challengeConfig) {
+  if (!isClient || authLoading || !user) {
     return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
   
   return (
     <div className="container mx-auto px-4 py-8">
-      <ChallengeConfigEditor initialConfig={challengeConfig} />
+      <header className="flex justify-between items-center mb-8 pb-4 border-b">
+        <h1 className="text-2xl sm:text-3xl font-bold font-headline text-primary flex items-center gap-2"><Settings/> 도전 영역 관리</h1>
+        <Button variant="outline" onClick={() => router.push('/admin')}>
+            <ArrowLeft className="mr-2"/> 학생 관리로
+        </Button>
+      </header>
+      <ChallengeList />
     </div>
   );
 }

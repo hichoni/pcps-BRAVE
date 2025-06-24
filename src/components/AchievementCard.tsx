@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Progress } from '@/components/ui/progress';
 import { AchievementStatusDialog } from './AchievementStatusDialog';
 import { Badge } from './ui/badge';
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, Trophy } from 'lucide-react';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
 import { Skeleton } from './ui/skeleton';
 
@@ -23,7 +23,7 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
   if (!user || configLoading || !challengeConfig) {
     return (
         <div className="flex flex-col space-y-3">
-          <Skeleton className="h-[180px] w-full rounded-xl" />
+          <Skeleton className="h-[220px] w-full rounded-xl" />
           <div className="space-y-2">
             <Skeleton className="h-4 w-4/5" />
             <Skeleton className="h-4 w-3/5" />
@@ -39,12 +39,28 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
   if (!areaState || !areaConfig || !user.grade) return null;
 
   const { isCertified, progress } = areaState;
-  const goal = areaConfig.goal[user.grade];
-  if (typeof goal === 'undefined') return null;
-
-
-  const progressValue = goal > 0 ? (progress / goal) * 100 : 0;
+  
   const AreaIcon = areaConfig.icon;
+
+  const renderProgress = () => {
+    if (areaConfig.goalType === 'numeric') {
+        const goal = areaConfig.goal[user.grade ?? '4'] ?? 0;
+        const progressValue = goal > 0 ? ((progress as number || 0) / goal) * 100 : 0;
+        return <Progress value={progressValue} className="w-full h-2.5 transition-all duration-500" />;
+    }
+    if (areaConfig.goalType === 'objective') {
+        return (
+            <div className="text-center">
+                <p className="text-sm text-muted-foreground">현재 상태</p>
+                <p className="font-bold text-lg text-primary flex items-center justify-center gap-2">
+                    <Trophy className="w-5 h-5"/>
+                    {progress || '미달성'}
+                </p>
+            </div>
+        );
+    }
+    return null;
+  }
 
   return (
     <Card className="flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300 border">
@@ -59,10 +75,12 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
             {isCertified ? '인증됨' : '미인증'}
           </Badge>
         </div>
+        <CardDescription className="text-sm text-muted-foreground pt-1 !mt-0 h-10">
+          {areaConfig.challengeName}
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex-grow flex flex-col items-center justify-center">
-        <p className="font-headline text-2xl font-semibold text-center mb-4">{areaConfig.challengeName}</p>
-        <Progress value={progressValue} className="w-full h-2.5 transition-all duration-500" />
+        {renderProgress()}
       </CardContent>
       <CardFooter>
         <AchievementStatusDialog areaName={areaName} />

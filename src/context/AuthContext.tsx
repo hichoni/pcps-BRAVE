@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, MOCK_USERS, AREAS, AreaName, AchievementsState } from '@/lib/config';
+import { User, MOCK_USERS, AreaName, AchievementsState } from '@/lib/config';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, setDoc, query, where, writeBatch, deleteDoc, updateDoc, addDoc } from 'firebase/firestore';
 
@@ -35,15 +35,9 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Helper function to avoid circular dependency
+// Note: This now generates an empty object. The AchievementsContext is responsible for populating it based on the ChallengeConfig.
 const generateInitialStateForUser = (): AchievementsState => {
-    const studentAchievements = {} as AchievementsState;
-    AREAS.forEach(area => {
-        studentAchievements[area] = {
-            progress: 0,
-            isCertified: false
-        };
-    });
-    return studentAchievements;
+    return {} as AchievementsState;
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -164,25 +158,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const updatedUser = { ...user, pin: newPin };
     
-    // 1. Update the main user state and session storage immediately.
-    setUser(updatedUser);
-    sessionStorage.setItem('user', JSON.stringify(updatedUser));
-    
-    // 2. Update the full list of users to maintain consistency.
-    const currentUsers = await ensureUsersLoaded();
-    const updatedUsers = currentUsers.map(u => (u.id === user.id ? updatedUser : u));
-    setUsers(updatedUsers);
-    
-    if (!db) return;
+    if (!db) {
+        setUser(updatedUser);
+        sessionStorage.setItem('user', JSON.stringify(updatedUser));
+        setUsers(prevUsers => prevUsers.map(u => (u.id === user.id ? updatedUser : u)));
+        return;
+    }
 
     try {
         const userDocRef = doc(db, "users", String(user.id));
         await updateDoc(userDocRef, { pin: newPin });
+        
+        setUser(updatedUser);
+        sessionStorage.setItem('user', JSON.stringify(updatedUser));
+        setUsers(prevUsers => prevUsers.map(u => (u.id === user.id ? updatedUser : u)));
+
     } catch (e) {
         console.warn("Failed to update PIN in Firestore", e);
-        // Optional: Revert UI changes on failure
     }
-  }, [user, ensureUsersLoaded]);
+  }, [user]);
 
   const resetPin = useCallback(async (username: string) => {
     const currentUsers = await ensureUsersLoaded();

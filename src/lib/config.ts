@@ -1,8 +1,7 @@
-import { BookOpen, HeartHandshake, Bike, Palette, Laptop, Award, Medal, Gem, ShieldOff } from 'lucide-react';
+import { BookOpen, HeartHandshake, Bike, Palette, Laptop, Award, Medal, Gem, ShieldOff, BrainCircuit } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
-export const AREAS = ['Humanities', 'Volunteering', 'Physical Education', 'Arts', 'Information'] as const;
-export type AreaName = (typeof AREAS)[number];
+export type AreaName = string;
 
 export type Role = 'student' | 'teacher';
 
@@ -30,7 +29,7 @@ export const MOCK_USERS: User[] = [
 ];
 
 export type AreaState = {
-  progress: number;
+  progress: number | string;
   isCertified: boolean;
 };
 
@@ -51,17 +50,21 @@ export const STATUS_CONFIG: Record<CertificateStatus, { label: string; icon: Luc
   Unranked: { label: '미해당', icon: ShieldOff, color: 'text-muted-foreground' },
 };
 
+export type GoalType = 'numeric' | 'objective';
+
 export type AreaConfig = {
   name: string;
   icon: LucideIcon;
-  requirements: string;
   koreanName: string;
   challengeName: string;
-  goal: Record<string, number>; // Grade-specific goals
-  unit: string;
+  requirements: string;
+  goalType: GoalType;
+  goal: Record<string, number>; // For 'numeric' type
+  options?: string[];             // For 'objective' type
+  unit: string;                  // Unit for 'numeric', or a descriptive noun for 'objective'
 };
 
-type StoredAreaConfig = Omit<AreaConfig, 'icon' | 'name'> & { iconName: string };
+export type StoredAreaConfig = Omit<AreaConfig, 'icon' | 'name'> & { iconName: string };
 
 export const ICONS: Record<string, LucideIcon> = {
     BookOpen,
@@ -69,6 +72,10 @@ export const ICONS: Record<string, LucideIcon> = {
     Bike,
     Palette,
     Laptop,
+    BrainCircuit,
+    Award,
+    Medal,
+    Gem,
 };
 
 export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
@@ -77,6 +84,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     challengeName: '독서 마라톤 ✨',
     iconName: 'BookOpen',
     requirements: '지정된 필독서 중 1권 이상을 읽고 독후감을 제출하여 증명해야 합니다.',
+    goalType: 'numeric',
     goal: { '4': 5, '5': 5, '6': 5 },
     unit: '권',
   },
@@ -85,15 +93,18 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     challengeName: '탄소 줄임 실천 ♥',
     iconName: 'HeartHandshake',
     requirements: '최소 10시간 이상의 봉사활동을 완료했다는 증빙 자료를 제출해야 합니다. (예: 탄소중립포인트 실천 활동)',
+    goalType: 'numeric',
     goal: { '4': 10, '5': 10, '6': 10 },
     unit: '시간',
   },
-  'Physical Education': {
+  'Physical-Education': {
     koreanName: '체육',
     challengeName: '건강 체력 인증',
     iconName: 'Bike',
-    requirements: '건강체력평가(PAPS) 결과에서 상위 등급을 받았거나, 한 시즌 동안 교내 스포츠팀 활동에 참여했음을 증명해야 합니다.',
-    goal: { '4': 2, '5': 2, '6': 2 },
+    requirements: '건강체력평가(PAPS) 결과에서 목표 등급 이상을 달성해야 합니다.',
+    goalType: 'objective',
+    goal: {},
+    options: ['1등급', '2등급', '3등급', '4등급', '5등급'],
     unit: '등급',
   },
   Arts: {
@@ -101,6 +112,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     challengeName: '풍풍 쇼케이스 💥',
     iconName: 'Palette',
     requirements: '풍풍 쇼케이스 또는 교내외 예술 관련 대회/공연에 참여하여 자신의 재능을 선보여야 합니다.',
+    goalType: 'numeric',
     goal: { '4': 1, '5': 1, '6': 1 },
     unit: '회 참여',
   },
@@ -108,8 +120,10 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     koreanName: '정보',
     challengeName: '타자의 달인 •',
     iconName: 'Laptop',
-    requirements: '교내 타자 대회에서 일정 수준 이상의 성적을 거두거나, 정보 관련 자격증을 취득하여 능력을 증명해야 합니다.',
-    goal: { '4': 300, '5': 300, '6': 300 },
-    unit: '타',
+    requirements: "교내 타자 대회에서 '고수' 이상 등급을 달성해야 합니다.",
+    goalType: 'objective',
+    goal: {},
+    options: ['입문', '초보', '중수', '고수', '달인'],
+    unit: '레벨',
   },
 };

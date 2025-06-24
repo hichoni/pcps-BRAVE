@@ -3,15 +3,16 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { AreaName, AchievementsState, CertificateStatus, AREAS, CERTIFICATE_THRESHOLDS, User } from '@/lib/config';
+import { AreaName, AchievementsState, CertificateStatus, CERTIFICATE_THRESHOLDS, User } from '@/lib/config';
 import { db } from '@/lib/firebase';
 import { collection, doc, getDocs, setDoc, updateDoc, getDoc } from 'firebase/firestore';
+import { useChallengeConfig } from './ChallengeConfigContext';
 
 type AllAchievementsState = Record<string, AchievementsState>; // Keyed by username
 
 interface AchievementsContextType {
   getAchievements: (username: string) => AchievementsState;
-  updateProgress: (username: string, area: AreaName, progress: number) => Promise<void>;
+  setProgress: (username: string, area: AreaName, progress: number | string) => Promise<void>;
   toggleCertification: (username: string, area: AreaName) => Promise<void>;
   certificateStatus: (username: string) => CertificateStatus;
   loading: boolean;
@@ -19,11 +20,14 @@ interface AchievementsContextType {
 
 const AchievementsContext = createContext<AchievementsContextType | undefined>(undefined);
 
-const generateInitialStateForUser = (): AchievementsState => {
+const generateInitialStateForUser = (challengeConfig: any): AchievementsState => {
     const studentAchievements = {} as AchievementsState;
-    AREAS.forEach(area => {
+    if (!challengeConfig) return studentAchievements;
+    
+    Object.keys(challengeConfig).forEach(area => {
+        const config = challengeConfig[area];
         studentAchievements[area] = {
-            progress: 0,
+            progress: config.goalType === 'numeric' ? 0 : '',
             isCertified: false
         };
     });
@@ -34,18 +38,15 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
   const [allAchievements, setAllAchievements] = useState<AllAchievementsState | null>(null);
   const [loading, setLoading] = useState(true);
   const { user, loading: authLoading } = useAuth();
+  const { challengeConfig, loading: configLoading } = useChallengeConfig();
 
   useEffect(() => {
     const loadData = async () => {
-      // Wait for authentication to be resolved before doing anything.
-      if (authLoading) {
-        return;
-      }
+      if (authLoading || configLoading) return;
 
       setLoading(true);
       try {
-        // If there is no user, we are done. Set empty state.
-        if (!user) {
+        if (!user || !challengeConfig) {
           setAllAchievements({});
           return;
         }
@@ -53,13 +54,13 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
         const fetchedAchievements: AllAchievementsState = {};
         if (!db) {
           console.warn("Firebase is not configured. No achievements will be loaded.");
-          fetchedAchievements[user.username] = generateInitialStateForUser();
+          fetchedAchievements[user.username] = generateInitialStateForUser(challengeConfig);
         } else {
           if (user.role === 'teacher') {
             const querySnapshot = await getDocs(collection(db, 'achievements'));
             querySnapshot.forEach(doc => {
                 const data = doc.data();
-                const achievements = generateInitialStateForUser();
+                const achievements = generateInitialStateForUser(challengeConfig);
                 Object.keys(achievements).forEach(key => {
                     const area = key as AreaName;
                     if (data[area]) {
@@ -73,7 +74,7 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
               const docSnap = await getDoc(studentDocRef);
               if (docSnap.exists()) {
                   const data = docSnap.data();
-                  const achievements = generateInitialStateForUser();
+                  const achievements = generateInitialStateForUser(challengeConfig);
                   Object.keys(achievements).forEach(key => {
                       const area = key as AreaName;
                       if (data[area]) {
@@ -82,7 +83,7 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
                   });
                   fetchedAchievements[user.username] = achievements;
               } else {
-                  fetchedAchievements[user.username] = generateInitialStateForUser();
+                  fetchedAchievements[user.username] = generateInitialStateForUser(challengeConfig);
               }
           }
         }
@@ -96,19 +97,30 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
     };
 
     loadData();
-  }, [user, authLoading]);
+  }, [user, authLoading, challengeConfig, configLoading]);
 
 
   const getAchievements = useCallback((username: string): AchievementsState => {
-    if (!allAchievements) return generateInitialStateForUser(); // Return default if not loaded
-    return allAchievements[username] || generateInitialStateForUser();
-  }, [allAchievements]);
+    if (!allAchievements || !challengeConfig) return generateInitialStateForUser(challengeConfig);
+    
+    // Ensure all areas from current config exist for the user
+    const userAchievements = allAchievements[username] || {};
+    const defaultState = generateInitialStateForUser(challengeConfig);
+    const finalState: AchievementsState = { ...defaultState };
 
-  const updateProgress = useCallback(async (username: string, area: AreaName, progress: number) => {
-    // Optimistic UI update
+    for (const area in defaultState) {
+        if (userAchievements[area]) {
+            finalState[area] = userAchievements[area];
+        }
+    }
+    return finalState;
+
+  }, [allAchievements, challengeConfig]);
+
+  const setProgress = useCallback(async (username: string, area: AreaName, progress: number | string) => {
     setAllAchievements(prev => {
       if (!prev) return null;
-      const userAchievements = prev[username] || generateInitialStateForUser();
+      const userAchievements = prev[username] || generateInitialStateForUser(challengeConfig);
       return {
         ...prev,
         [username]: {
@@ -118,28 +130,24 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
       };
     });
 
-    if (!db) {
-        return;
-    }
+    if (!db) return;
 
     try {
         const achievementDocRef = doc(db, 'achievements', username);
         const fieldPath = `${area}.progress`;
-        await updateDoc(achievementDocRef, { [fieldPath]: progress });
+        await setDoc(achievementDocRef, { [area]: { progress } }, { merge: true });
     } catch(e) {
         console.warn("Failed to update progress in Firestore", e);
-        // Here you could add logic to revert the optimistic update
     }
-  }, []);
+  }, [challengeConfig]);
 
   const toggleCertification = useCallback(async (username: string, area: AreaName) => {
     const currentIsCertified = allAchievements?.[username]?.[area]?.isCertified ?? false;
     const newIsCertified = !currentIsCertified;
 
-    // Optimistic UI update
     setAllAchievements(prev => {
       if (!prev) return null;
-      const userAchievements = prev[username] || generateInitialStateForUser();
+      const userAchievements = prev[username] || generateInitialStateForUser(challengeConfig);
       return {
         ...prev,
         [username]: {
@@ -149,35 +157,32 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
       };
     });
 
-    if (!db) {
-        return;
-    }
+    if (!db) return;
 
     try {
         const achievementDocRef = doc(db, 'achievements', username);
         const fieldPath = `${area}.isCertified`;
-        await updateDoc(achievementDocRef, { [fieldPath]: newIsCertified });
+        await setDoc(achievementDocRef, { [area]: { isCertified: newIsCertified } }, { merge: true });
     } catch (e) {
         console.warn("Failed to toggle certification in Firestore", e);
-        // Here you could add logic to revert the optimistic update
     }
 
-  }, [allAchievements]);
+  }, [allAchievements, challengeConfig]);
   
   const certificateStatus = useCallback((username: string): CertificateStatus => {
     if (!allAchievements || !allAchievements[username]) return 'Unranked';
     
-    const userAchievements = allAchievements[username];
+    const userAchievements = getAchievements(username);
     const certifiedCount = Object.values(userAchievements).filter(a => a.isCertified).length;
     
     if (certifiedCount >= CERTIFICATE_THRESHOLDS.GOLD) return 'Gold';
     if (certifiedCount >= CERTIFICATE_THRESHOLDS.SILVER) return 'Silver';
     if (certifiedCount >= CERTIFICATE_THRESHOLDS.BRONZE) return 'Bronze';
     return 'Unranked';
-  }, [allAchievements]);
+  }, [allAchievements, getAchievements]);
 
   return (
-    <AchievementsContext.Provider value={{ getAchievements, updateProgress, toggleCertification, certificateStatus, loading }}>
+    <AchievementsContext.Provider value={{ getAchievements, setProgress, toggleCertification, certificateStatus, loading }}>
       {children}
     </AchievementsContext.Provider>
   );

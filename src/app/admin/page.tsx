@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useAchievements } from '@/context/AchievementsContext';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
-import { User, AREAS, AreaName } from '@/lib/config';
+import { User, AreaName } from '@/lib/config';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -21,7 +21,7 @@ import { BulkAddStudentsDialog } from '@/components/BulkAddStudentsDialog';
 
 export default function AdminPage() {
   const { user, users, loading: authLoading, logout, resetPin, deleteUser } = useAuth();
-  const { getAchievements, updateProgress, toggleCertification, loading: achievementsLoading } = useAchievements();
+  const { getAchievements, setProgress, toggleCertification, loading: achievementsLoading } = useAchievements();
   const { challengeConfig, loading: configLoading } = useChallengeConfig();
   const router = useRouter();
   const { toast } = useToast();
@@ -50,12 +50,9 @@ export default function AdminPage() {
     }
   }, [gradeFilter, isClient]);
 
-  const handleProgressUpdate = async (username: string, area: AreaName, change: number) => {
-    const studentAchievements = getAchievements(username);
-    const currentProgress = studentAchievements[area].progress || 0;
-    const newProgress = Math.max(0, currentProgress + change);
+  const handleProgressUpdate = async (username: string, area: AreaName, value: number | string) => {
     try {
-        await updateProgress(username, area, newProgress);
+        await setProgress(username, area, value);
     } catch (error) {
         toast({ variant: 'destructive', title: '오류', description: '업데이트에 실패했습니다.' });
     }
@@ -114,6 +111,8 @@ export default function AdminPage() {
         if (a.classNum !== b.classNum) return (a.classNum ?? 0) - (b.classNum ?? 0);
         return (a.studentNum ?? 0) - (b.studentNum ?? 0);
     });
+    
+  const challengeAreaKeys = Object.keys(challengeConfig).sort();
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -184,14 +183,13 @@ export default function AdminPage() {
                 </div>
             </CardHeader>
             <CardContent>
-              <Table>
+              <div className="overflow-x-auto">
+              <Table className="min-w-full">
                   <TableHeader>
                       <TableRow>
-                          <TableHead className="w-[220px]">학생 정보</TableHead>
-                          {AREAS.map(area => (
-                              challengeConfig[area] ? 
-                              <TableHead key={area} className="text-center">{challengeConfig[area].koreanName}</TableHead>
-                              : null
+                          <TableHead className="w-[220px] sticky left-0 bg-card z-10">학생 정보</TableHead>
+                          {challengeAreaKeys.map(area => (
+                              <TableHead key={area} className="text-center min-w-[180px]">{challengeConfig[area].koreanName}</TableHead>
                           ))}
                           <TableHead className="text-center w-[220px]">관리</TableHead>
                       </TableRow>
@@ -201,23 +199,43 @@ export default function AdminPage() {
                           const studentAchievements = getAchievements(student.username);
                           return (
                               <TableRow key={student.id}>
-                                  <TableCell className="font-medium whitespace-nowrap">
+                                  <TableCell className="font-medium whitespace-nowrap sticky left-0 bg-card z-10">
                                       {`${student.grade}학년 ${student.classNum}반 ${student.studentNum}번 ${student.name}`}
                                   </TableCell>
-                                  {AREAS.map(area => {
-                                      if (!challengeConfig[area]) return null;
-                                      const progress = studentAchievements[area].progress;
-                                      const isCertified = studentAchievements[area].isCertified;
+                                  {challengeAreaKeys.map(area => {
+                                      const areaConfig = challengeConfig[area];
+                                      if (!areaConfig) return null;
+                                      const progress = studentAchievements[area]?.progress ?? (areaConfig.goalType === 'numeric' ? 0 : '');
+                                      const isCertified = studentAchievements[area]?.isCertified ?? false;
                                       return (
                                           <TableCell key={area}>
                                               <div className="flex items-center justify-center gap-1">
-                                                  <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => handleProgressUpdate(student.username, area, -1)}>
-                                                      <Minus className="h-3 w-3"/>
-                                                  </Button>
-                                                  <span className="font-mono w-8 text-center text-base">{progress}</span>
-                                                  <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => handleProgressUpdate(student.username, area, 1)}>
-                                                      <Plus className="h-3 w-3"/>
-                                                  </Button>
+                                                  {areaConfig.goalType === 'numeric' ? (
+                                                      <>
+                                                          <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => handleProgressUpdate(student.username, area, Math.max(0, (progress as number || 0) - 1))}>
+                                                              <Minus className="h-3 w-3"/>
+                                                          </Button>
+                                                          <span className="font-mono w-8 text-center text-base">{progress as number || 0}</span>
+                                                          <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => handleProgressUpdate(student.username, area, (progress as number || 0) + 1)}>
+                                                              <Plus className="h-3 w-3"/>
+                                                          </Button>
+                                                      </>
+                                                  ) : (
+                                                      <Select
+                                                        value={progress as string || ''}
+                                                        onValueChange={(value) => handleProgressUpdate(student.username, area, value)}
+                                                      >
+                                                        <SelectTrigger className="w-[120px] h-8">
+                                                            <SelectValue placeholder="선택" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="">미선택</SelectItem>
+                                                            {areaConfig.options?.map(option => (
+                                                                <SelectItem key={option} value={option}>{option}</SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                      </Select>
+                                                  )}
                                                   <Button
                                                     variant={isCertified ? 'default' : 'outline'}
                                                     size="icon"
@@ -247,6 +265,7 @@ export default function AdminPage() {
                       })}
                   </TableBody>
               </Table>
+              </div>
             </CardContent>
         </Card>
 
