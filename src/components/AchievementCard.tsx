@@ -23,12 +23,9 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
     <Card className="flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300">
       <CardHeader>
         <div className="flex justify-between items-start">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <areaConfig.icon className="w-8 h-8 text-primary" />
-              <CardTitle className="font-headline text-xl">{areaConfig.koreanName}</CardTitle>
-            </div>
-            <CardDescription className="text-sm">{areaConfig.name}</CardDescription>
+          <div className="flex items-center gap-3 mb-2">
+            <areaConfig.icon className="w-8 h-8 text-primary" />
+            <CardTitle className="font-headline text-xl">{areaConfig.koreanName}</CardTitle>
           </div>
           <Badge variant={isCertified ? 'default' : 'secondary'} className="shrink-0">
             {isCertified ? <CheckCircle2 className="mr-1 h-4 w-4" /> : <XCircle className="mr-1 h-4 w-4" />}
@@ -36,8 +33,8 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="flex-grow">
-        <p className="text-sm text-muted-foreground mb-4">{areaConfig.requirements}</p>
+      <CardContent className="flex-grow flex flex-col items-center justify-center">
+        <p className="font-headline text-2xl font-semibold text-center mb-4">{areaConfig.challengeName}</p>
         <Progress value={progressValue} className="w-full h-3 transition-all duration-500" />
       </CardContent>
       <CardFooter>

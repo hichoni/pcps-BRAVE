@@ -5,8 +5,8 @@ import { AchievementsProvider } from '@/context/AchievementsContext';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
-  title: '장학생 성취 트래커',
-  description: '학교장 인증을 향한 진행 상황을 추적하세요.',
+  title: '풍천풍서초등학교 학교장 인증제',
+  description: '도전! 꿈 성취 학교장 인증제를 통해 나의 성장을 기록하고 인증받아보세요.',
 };
 
 export default function RootLayout({
