@@ -158,20 +158,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw new Error("Cannot update PIN: user is not logged in.");
     }
   
-    // Step 1: Try to update the database first.
+    // Step 1: Update the database first. This is the most critical step.
     if (db) {
+      const userDocRef = doc(db, "users", String(user.id));
       try {
-        const userDocRef = doc(db, "users", String(user.id));
-        await setDoc(userDocRef, { pin: newPin }, { merge: true });
-      } catch (e) {
-        console.error("Failed to update PIN in Firestore.", e);
+        await updateDoc(userDocRef, { pin: newPin });
+      } catch (error) {
+        console.error("Failed to update PIN in Firestore. User ID:", user.id, "Error:", error);
         // If the database operation fails, throw an error immediately.
         // The UI will catch this and show an error message.
-        throw e;
+        throw error;
       }
     }
   
-    // Step 2: If the database update was successful, update all local state.
+    // Step 2: Only if the database update was successful, update all local states.
     const updatedUser = { ...user, pin: newPin };
     
     // Update the main user object for the current session
@@ -182,7 +182,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     // Update the global list of users so other components see the change
     setUsers(prevUsers => prevUsers.map(u => (u.id === user.id ? updatedUser : u)));
-
   }, [user, setUsers]);
 
 
@@ -191,41 +190,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const targetUser = currentUsers.find(u => u.username === username);
     if (!targetUser) return;
 
+    if (db) {
+        try {
+            const userDocRef = doc(db, "users", String(targetUser.id));
+            await updateDoc(userDocRef, { pin: '0000' });
+        } catch (e) {
+            console.warn("Failed to reset PIN in Firestore", e);
+            throw e; // re-throw to notify the caller
+        }
+    }
+    
     const updatedUsers = currentUsers.map(u => u.username === username ? { ...u, pin: '0000' } : u);
     setUsers(updatedUsers);
-    
-    if (!db) return;
 
-    try {
-        const userDocRef = doc(db, "users", String(targetUser.id));
-        await updateDoc(userDocRef, { pin: '0000' });
-    } catch (e) {
-        console.warn("Failed to reset PIN in Firestore", e);
-    }
   }, [ensureUsersLoaded]);
 
   const deleteUser = useCallback(async (username: string) => {
     const currentUsers = await ensureUsersLoaded();
     const targetUser = currentUsers.find(u => u.username === username);
     if (!targetUser) return;
+    
+    if (db) {
+        try {
+            const batch = writeBatch(db);
+            const userDocRef = doc(db, "users", String(targetUser.id));
+            batch.delete(userDocRef);
+            
+            const achievementDocRef = doc(db, 'achievements', username);
+            batch.delete(achievementDocRef);
+
+            await batch.commit();
+        } catch (e) {
+            console.warn("Failed to delete user and achievements from Firestore", e);
+            throw e;
+        }
+    }
 
     const updatedUsers = currentUsers.filter(u => u.username !== username);
     setUsers(updatedUsers);
-    
-    if (!db) return;
-
-    try {
-        const batch = writeBatch(db);
-        const userDocRef = doc(db, "users", String(targetUser.id));
-        batch.delete(userDocRef);
-        
-        const achievementDocRef = doc(db, 'achievements', username);
-        batch.delete(achievementDocRef);
-
-        await batch.commit();
-    } catch (e) {
-        console.warn("Failed to delete user and achievements from Firestore", e);
-    }
   }, [ensureUsersLoaded]);
 
   const addUser = useCallback(async (studentData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>): Promise<{ success: boolean; message: string }> => {
@@ -257,26 +259,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       name,
     };
     
-    setUsers(prev => [...prev, newUser]);
+    if (db) {
+        try {
+            const batch = writeBatch(db);
+            const userDocRef = doc(db, "users", String(newUser.id));
+            batch.set(userDocRef, newUser);
+            
+            const achievementDocRef = doc(db, 'achievements', newUser.username);
+            batch.set(achievementDocRef, generateInitialStateForUser());
+            
+            await batch.commit();
+
+        } catch (e) {
+            console.warn("Failed to add user and achievements to Firestore", e);
+            return { success: false, message: '데이터베이스 저장에 실패했습니다.' };
+        }
+    }
     
-    if (!db) {
-        return { success: true, message: `${name} 학생이 추가되었습니다. (DB 연결 안됨)` };
-    }
-
-    try {
-        const batch = writeBatch(db);
-        const userDocRef = doc(db, "users", String(newUser.id));
-        batch.set(userDocRef, newUser);
-        
-        const achievementDocRef = doc(db, 'achievements', newUser.username);
-        batch.set(achievementDocRef, generateInitialStateForUser());
-        
-        await batch.commit();
-
-    } catch (e) {
-        console.warn("Failed to add user and achievements to Firestore", e);
-    }
-
+    setUsers(prev => [...prev, newUser]);
     return { success: true, message: `${name} 학생이 추가되었습니다.` };
   }, [ensureUsersLoaded]);
 
@@ -329,14 +329,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     if (newUsers.length > 0) {
-      setUsers(prev => [...prev, ...newUsers].sort((a,b) => a.id - b.id));
       if (batch) {
           try {
             await batch.commit();
           } catch(e) {
             console.warn("Failed to bulk add users and achievements to Firestore", e);
+            // If DB write fails, don't update local state.
+            return { successCount: 0, failCount: studentsData.length, errors: ['데이터베이스에 일괄 등록하는 데 실패했습니다.'] };
           }
       }
+      setUsers(prev => [...prev, ...newUsers].sort((a,b) => a.id - b.id));
     }
     
     return { successCount, failCount, errors };
