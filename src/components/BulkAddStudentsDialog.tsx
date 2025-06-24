@@ -118,7 +118,7 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
             const parts = line.split(delimiter).map(p => p.trim().replace(/^"|"$/g, ''));
             
             if (parts.length !== 4) {
-                parseErrors.push(`[${lineNumber}번째 줄] 형식 오류: '학년,반,번호,이름' 4개 항목이 필요합니다. (입력된 내용: "${line}")`);
+                parseErrors.push(`[${lineNumber}번째 줄] 형식 오류: 4개 항목(학년,반,번호,이름)이 필요하지만, ${parts.length}개가 있습니다. 줄 내용: "${line}"`);
                 return;
             }
 
@@ -126,24 +126,41 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
             const grade = parseInt(gradeStr, 10);
             const classNum = parseInt(classNumStr, 10);
             const studentNum = parseInt(studentNumStr, 10);
+            
+            let lineError = false;
+            if (isNaN(grade)) {
+                parseErrors.push(`[${lineNumber}번째 줄] '학년'은 숫자여야 합니다 (입력값: "${gradeStr}").`);
+                lineError = true;
+            }
+            if (isNaN(classNum)) {
+                parseErrors.push(`[${lineNumber}번째 줄] '반'은 숫자여야 합니다 (입력값: "${classNumStr}").`);
+                lineError = true;
+            }
+            if (isNaN(studentNum)) {
+                parseErrors.push(`[${lineNumber}번째 줄] '번호'는 숫자여야 합니다 (입력값: "${studentNumStr}").`);
+                lineError = true;
+            }
+            if (!name || !name.trim()) {
+                 parseErrors.push(`[${lineNumber}번째 줄] '이름'이 비어있습니다.`);
+                 lineError = true;
+            }
 
-            if (isNaN(grade) || isNaN(classNum) || isNaN(studentNum) || !name.trim()) {
-                parseErrors.push(`[${lineNumber}번째 줄] 데이터 오류: 학년, 반, 번호가 숫자인지, 이름이 비어있지 않은지 확인해주세요. (입력된 내용: "${line}")`);
+            if(lineError) {
                 return;
             }
             
-            studentsToAdd.push({ grade, classNum, studentNum, name });
+            studentsToAdd.push({ grade, classNum, studentNum, name: name.trim() });
         });
 
         if (parseErrors.length > 0) {
             toast({
                 variant: 'destructive',
-                title: '입력 데이터 오류',
-                duration: 15000,
+                title: `입력 데이터 오류 (${parseErrors.length}건)`,
+                duration: 30000,
                 description: (
                     <div className="text-sm">
-                        <p>CSV 파일 처리 중 오류가 발생했습니다. 아래 내용을 수정 후 다시 시도해주세요:</p>
-                        <ul className="list-disc pl-5 mt-2 max-h-40 overflow-y-auto font-mono text-xs">
+                        <p>파일 처리 중 오류를 발견했습니다. 아래 내용을 수정 후 다시 시도해주세요:</p>
+                        <ul className="list-disc pl-5 mt-2 max-h-60 overflow-y-auto font-mono text-xs bg-destructive-foreground/10 p-2 rounded-md">
                             {parseErrors.map((e, i) => <li key={i}>{e}</li>)}
                         </ul>
                     </div>
@@ -199,7 +216,11 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
     };
 
     reader.onerror = () => {
-        toast({ variant: 'destructive', title: '파일 오류', description: '파일을 읽는 중에 오류가 발생했습니다.' });
+        toast({ 
+            variant: 'destructive', 
+            title: '파일 읽기 오류', 
+            description: '파일을 읽는 중 오류가 발생했습니다. 파일이 손상되었거나 다른 프로그램에서 사용 중인지 확인해주세요. 또는 파일을 UTF-8 형식으로 저장한 후 다시 시도해보세요.'
+        });
         setLoading(false);
     };
 
