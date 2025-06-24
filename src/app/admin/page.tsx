@@ -12,7 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Loader2, Users, Undo, LogOut, Settings, Plus, Minus, Check, Trash2 } from 'lucide-react';
+import { Loader2, Users, Undo, LogOut, Settings, Plus, Minus, Check, Trash2, PlusCircle, Upload } from 'lucide-react';
+import { AddStudentDialog } from '@/components/AddStudentDialog';
+import { BulkAddStudentsDialog } from '@/components/BulkAddStudentsDialog';
 
 export default function AdminPage() {
   const { user, users, loading: authLoading, logout, resetPin, deleteUser } = useAuth();
@@ -21,6 +23,8 @@ export default function AdminPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [studentToDelete, setStudentToDelete] = useState<User | null>(null);
+  const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
+  const [isBulkAddDialogOpen, setIsBulkAddDialogOpen] = useState(false);
 
 
   useEffect(() => {
@@ -100,8 +104,20 @@ export default function AdminPage() {
       <AlertDialog onOpenChange={(open) => !open && setStudentToDelete(null)}>
         <Card>
             <CardHeader>
-                <CardTitle>학생 명렬표</CardTitle>
-                <CardDescription>학생들의 도전과제 성취 현황을 관리하고 PIN을 초기화하거나 학생 정보를 삭제할 수 있습니다.</CardDescription>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <CardTitle>학생 명렬표</CardTitle>
+                        <CardDescription>학생들의 도전과제 성취 현황을 관리하고 학생 정보를 추가, 수정, 삭제할 수 있습니다.</CardDescription>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button onClick={() => setIsAddStudentDialogOpen(true)}>
+                            <PlusCircle className="mr-2"/> 학생 등록
+                        </Button>
+                        <Button variant="outline" onClick={() => setIsBulkAddDialogOpen(true)}>
+                            <Upload className="mr-2"/> 일괄 등록
+                        </Button>
+                    </div>
+                </div>
             </CardHeader>
             <CardContent>
               <Table>
@@ -182,6 +198,9 @@ export default function AdminPage() {
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AddStudentDialog open={isAddStudentDialogOpen} onOpenChange={setIsAddStudentDialogOpen} />
+      <BulkAddStudentsDialog open={isBulkAddDialogOpen} onOpenChange={setIsBulkAddDialogOpen} />
     </div>
   );
 }

@@ -12,6 +12,8 @@ interface LoginCredentials {
   studentNum?: number; // For student
 }
 
+export type { User };
+
 interface AuthContextType {
   user: User | null;
   users: User[];
@@ -21,6 +23,8 @@ interface AuthContextType {
   updatePin: (newPin: string) => Promise<void>;
   resetPin: (username: string) => Promise<void>;
   deleteUser: (username: string) => Promise<void>;
+  addUser: (studentData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>) => Promise<{ success: boolean; message: string }>;
+  bulkAddUsers: (studentsData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>[]) => Promise<{ successCount: number; failCount: number; errors: string[] }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -33,24 +37,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     try {
-      // Load users from "DB" (localStorage) and merge with MOCK_USERS
       const storedUsersRaw = localStorage.getItem('users');
       const storedUsers = storedUsersRaw ? JSON.parse(storedUsersRaw) : [];
 
       const userMap = new Map<number, User>();
-      // Add MOCK_USERS first. This ensures new users from the config are included.
       MOCK_USERS.forEach(u => userMap.set(u.id, u));
-      // Overwrite with any stored users to preserve changes (like PIN updates).
       (storedUsers as User[]).forEach(u => userMap.set(u.id, u));
       
       const allUsers = Array.from(userMap.values());
-      persistUsers(allUsers); // This also calls setUsers
+      persistUsers(allUsers);
       
-      // Check for active session
       const sessionUser = sessionStorage.getItem('user');
       if (sessionUser) {
         const parsedUser = JSON.parse(sessionUser);
-        // Make sure user data is up-to-date from our "DB"
         const currentUserData = allUsers.find((u: User) => u.id === parsedUser.id);
         setUser(currentUserData || null);
       }
@@ -120,14 +119,91 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const deleteUser = useCallback(async (username: string) => {
     const updatedUsers = users.filter(u => u.username !== username);
     persistUsers(updatedUsers);
-    // If the deleted user is the one logged in, log them out.
     if (user?.username === username) {
       logout();
     }
   }, [users, user, logout]);
 
+  const addUser = useCallback(async (studentData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>): Promise<{ success: boolean; message: string }> => {
+    const { grade, classNum, studentNum, name } = studentData;
+
+    const studentExists = users.some(u =>
+      u.role === 'student' &&
+      u.grade === grade &&
+      u.classNum === classNum &&
+      u.studentNum === studentNum
+    );
+
+    if (studentExists) {
+      return { success: false, message: `${grade}학년 ${classNum}반 ${studentNum}번 학생은 이미 존재합니다.` };
+    }
+
+    const newId = Math.max(...users.map(u => u.id), 0) + 1;
+    const newUsername = `s-${grade}-${classNum}-${studentNum}`;
+
+    const newUser: User = {
+      id: newId,
+      username: newUsername,
+      pin: '0000',
+      role: 'student',
+      grade,
+      classNum,
+      studentNum,
+      name,
+    };
+
+    persistUsers([...users, newUser]);
+    return { success: true, message: `${name} 학생이 추가되었습니다.` };
+  }, [users]);
+
+  const bulkAddUsers = useCallback(async (studentsData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>[]): Promise<{ successCount: number; failCount: number; errors: string[] }> => {
+    let successCount = 0;
+    let failCount = 0;
+    const errors: string[] = [];
+    const newUsers: User[] = [];
+    const currentUsers = [...users];
+
+    studentsData.forEach((student, index) => {
+      const { grade, classNum, studentNum, name } = student;
+      const studentExists = currentUsers.some(u =>
+        u.role === 'student' &&
+        u.grade === grade &&
+        u.classNum === classNum &&
+        u.studentNum === studentNum
+      );
+      
+      if (studentExists) {
+        failCount++;
+        errors.push(`${index + 1}번째 줄: ${grade}-${classNum}-${studentNum} ${name} 학생은 이미 존재합니다.`);
+      } else {
+        const newId = Math.max(...currentUsers.map(u => u.id).filter(id => !isNaN(id)), 0) + 1;
+        const newUsername = `s-${grade}-${classNum}-${studentNum}`;
+        const newUser: User = {
+          id: newId,
+          username: newUsername,
+          pin: '0000',
+          role: 'student',
+          grade,
+          classNum,
+          studentNum,
+          name,
+        };
+        newUsers.push(newUser);
+        currentUsers.push(newUser);
+        successCount++;
+      }
+    });
+
+    if (newUsers.length > 0) {
+      persistUsers(currentUsers);
+    }
+    
+    return { successCount, failCount, errors };
+  }, [users]);
+
+
   return (
-    <AuthContext.Provider value={{ user, users, loading, login, logout, updatePin, resetPin, deleteUser }}>
+    <AuthContext.Provider value={{ user, users, loading, login, logout, updatePin, resetPin, deleteUser, addUser, bulkAddUsers }}>
       {children}
     </AuthContext.Provider>
   );
