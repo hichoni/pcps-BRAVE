@@ -113,20 +113,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     router.push('/login');
   }, [router]);
 
-  useEffect(() => {
-      if (user && users.length > 0) {
-          const updatedUser = users.find(u => u.id === user.id);
-          if (updatedUser) {
-              if (JSON.stringify(user) !== JSON.stringify(updatedUser)) {
-                  setUser(updatedUser);
-                  sessionStorage.setItem('user', JSON.stringify(updatedUser));
-              }
-          } else {
-              logout();
-          }
-      }
-  }, [users, user, logout]);
-
   const login = useCallback(async (credentials: LoginCredentials): Promise<User | null> => {
     const { pin, username, grade, classNum, studentNum } = credentials;
     const currentUsers = await ensureUsersLoaded();
@@ -158,31 +144,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw new Error("Cannot update PIN: user is not logged in.");
     }
   
-    // Step 1: Update the database first. This is the most critical step.
+    // Step 1: Update the database first.
     if (db) {
       const userDocRef = doc(db, "users", String(user.id));
       try {
         await setDoc(userDocRef, { pin: newPin }, { merge: true });
       } catch (error) {
         console.error("Failed to update PIN in Firestore. User ID:", user.id, "Error:", error);
-        // If the database operation fails, throw an error immediately.
-        // The UI will catch this and show an error message.
-        throw error;
+        throw error; // Re-throw to be caught by the UI and show a toast.
       }
     }
   
-    // Step 2: Only if the database update was successful, update all local states.
+    // Step 2: If the database update was successful, update all local states explicitly.
     const updatedUser = { ...user, pin: newPin };
     
-    // Update the main user object for the current session
+    // 2a. Update the main user object for the current session.
     setUser(updatedUser);
     
-    // Update the session storage so the user stays logged in on refresh
+    // 2b. Update the session storage to persist the change across refreshes.
     sessionStorage.setItem('user', JSON.stringify(updatedUser));
     
-    // Update the global list of users so other components see the change
+    // 2c. Update the user within the global list of users.
     setUsers(prevUsers => prevUsers.map(u => (u.id === user.id ? updatedUser : u)));
-  }, [user, setUsers]);
+  }, [user]);
 
 
   const resetPin = useCallback(async (username: string) => {
@@ -200,10 +184,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     }
     
-    const updatedUsers = currentUsers.map(u => u.username === username ? { ...u, pin: '0000' } : u);
-    setUsers(updatedUsers);
+    setUsers(prevUsers => prevUsers.map(u => u.username === username ? { ...u, pin: '0000' } : u));
 
-  }, [ensureUsersLoaded]);
+    if (user && user.username === username) {
+        const updatedCurrentUser = { ...user, pin: '0000' };
+        setUser(updatedCurrentUser);
+        sessionStorage.setItem('user', JSON.stringify(updatedCurrentUser));
+    }
+
+  }, [ensureUsersLoaded, user]);
 
   const deleteUser = useCallback(async (username: string) => {
     const currentUsers = await ensureUsersLoaded();
@@ -226,9 +215,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     }
 
-    const updatedUsers = currentUsers.filter(u => u.username !== username);
-    setUsers(updatedUsers);
-  }, [ensureUsersLoaded]);
+    setUsers(prevUsers => prevUsers.filter(u => u.username !== username));
+    
+    if (user && user.username === username) {
+        logout();
+    }
+  }, [ensureUsersLoaded, user, logout]);
 
   const addUser = useCallback(async (studentData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>): Promise<{ success: boolean; message: string }> => {
     const currentUsers = await ensureUsersLoaded();
