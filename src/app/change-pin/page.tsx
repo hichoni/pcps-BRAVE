@@ -79,7 +79,7 @@ export default function ChangePinPage() {
     <div className="flex min-h-screen items-center justify-center bg-secondary p-4">
       <Card className="w-full max-w-sm shadow-lg border">
         <CardHeader>
-          <CardTitle className="font-headline text-2xl">최초 PIN 번호 변경</CardTitle>
+          <CardTitle className="font-headline text-xl sm:text-2xl">최초 PIN 번호 변경</CardTitle>
           <CardDescription>
             보안을 위해 초기 PIN 번호를 변경해주세요.
           </CardDescription>

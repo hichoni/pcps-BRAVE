@@ -168,7 +168,7 @@ export default function LoginPage() {
               height={80}
               className="mx-auto rounded-full shadow-md mb-4"
             />
-            <CardTitle className="font-headline text-2xl text-primary">학교장 인증제 로그인</CardTitle>
+            <CardTitle className="font-headline text-xl sm:text-2xl text-primary">학교장 인증제 로그인</CardTitle>
             <CardDescription>계정 정보를 입력해주세요.</CardDescription>
           </CardHeader>
           <Tabs defaultValue="student" className="w-full">

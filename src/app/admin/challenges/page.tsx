@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -91,7 +90,7 @@ function ChallengeConfigEditor({ initialConfig }: { initialConfig: ChallengeConf
   return (
     <>
       <header className="flex justify-between items-center mb-8 pb-4 border-b">
-        <h1 className="text-3xl font-bold font-headline text-primary flex items-center gap-2"><Settings/> 도전 영역 관리</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold font-headline text-primary flex items-center gap-2"><Settings/> 도전 영역 관리</h1>
         <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => router.push('/admin')}>
                 <ArrowLeft className="mr-2"/> 관리자 페이지로

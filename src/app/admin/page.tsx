@@ -118,7 +118,7 @@ export default function AdminPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <header className="flex justify-between items-center mb-8 pb-4 border-b">
-        <h1 className="text-3xl font-bold font-headline text-primary flex items-center gap-2"><Users/> 학생 성취 현황 관리</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold font-headline text-primary flex items-center gap-2"><Users/> 학생 성취 현황 관리</h1>
         <div className="flex items-center gap-4">
           <span className="font-semibold">{user.name} 선생님</span>
            <Link href="/admin/challenges" passHref>

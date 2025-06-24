@@ -20,11 +20,11 @@ export function Dashboard() {
     <div className="container mx-auto px-4 py-8">
       <Header />
       <main>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
           <CertificateStatus />
           <Card className="h-full flex flex-col justify-center p-6 text-center shadow-lg border bg-card">
             <CardHeader className="p-2">
-              <CardTitle className="font-headline text-2xl">✨ 참여 안내 ✨</CardTitle>
+              <CardTitle className="font-headline text-xl sm:text-2xl">✨ 참여 안내 ✨</CardTitle>
             </CardHeader>
             <CardContent className="p-2 flex-grow flex flex-col items-center justify-center">
               <p className="font-semibold">4~6학년 친구들만 인증할 수 있어요!</p>
@@ -49,7 +49,7 @@ export function Dashboard() {
         </div>
         
         <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold font-headline text-primary">도전 영역 둘러보기</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold font-headline text-primary">도전 영역 둘러보기</h2>
             <p className="text-muted-foreground">아래 영역들을 눌러 현재 진행 상황을 확인해보세요.</p>
         </div>
 

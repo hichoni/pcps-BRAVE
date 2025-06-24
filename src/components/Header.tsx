@@ -10,25 +10,25 @@ export function Header() {
   const { user, logout } = useAuth();
 
   return (
-    <header className="py-6 border-b border-border mb-12 flex justify-between items-center">
-        <div className="flex items-center gap-6">
+    <header className="py-6 border-b border-border mb-12 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex items-center gap-4 sm:gap-6">
             <Image
               src="/icon-main.png?v=2"
               alt="풍천풍서초등학교 로고"
               width={72}
               height={72}
-              className="rounded-full shadow-md"
+              className="rounded-full shadow-md w-14 h-14 sm:w-[72px] sm:h-[72px]"
             />
             <div>
-                <p className="text-lg font-semibold text-muted-foreground">2025학년도</p>
-                <h1 className="text-4xl font-bold font-headline text-primary">
+                <p className="text-base sm:text-lg font-semibold text-muted-foreground">2025학년도</p>
+                <h1 className="text-3xl sm:text-4xl font-bold font-headline text-primary">
                     도전! 꿈 성취 학교장 인증제
                 </h1>
             </div>
         </div>
         {user && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold">
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <span className="text-xs sm:text-sm font-semibold text-right">
               {user.role === 'student'
                 ? `${user.grade}학년 ${user.classNum}반 ${user.studentNum}번 ${user.name} 학생`
                 : `${user.name}님`}
