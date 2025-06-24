@@ -110,7 +110,7 @@ function ChallengeConfigEditor({ initialConfig }: { initialConfig: ChallengeConf
             if (!areaConfig || !localAreaConfig) return null;
 
             return (
-              <Card key={area}>
+              <Card key={area} className="shadow-md border hover:shadow-lg transition-shadow">
                   <CardHeader>
                       <CardTitle>{areaConfig.koreanName}</CardTitle>
                       <CardDescription>{areaConfig.name}</CardDescription>

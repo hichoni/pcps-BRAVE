@@ -39,7 +39,7 @@ export function CertificateStatus() {
   };
 
   return (
-    <Card className="w-full h-full flex flex-col shadow-lg border-primary/20">
+    <Card className="w-full h-full flex flex-col shadow-lg border">
       <CardHeader className="text-center pb-2">
         <CardTitle className="font-headline text-2xl">나의 도전 현황</CardTitle>
       </CardHeader>

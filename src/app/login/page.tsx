@@ -149,15 +149,15 @@ export default function LoginPage() {
 
   if (!isClient || authLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+      <div className="flex min-h-screen items-center justify-center bg-secondary p-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-      <Card className="w-full max-w-sm shadow-lg">
+    <div className="flex min-h-screen items-center justify-center bg-secondary p-4">
+      <Card className="w-full max-w-sm shadow-lg border">
         <CardHeader className="text-center">
           <Image
             src="/icon-main.png?v=2"

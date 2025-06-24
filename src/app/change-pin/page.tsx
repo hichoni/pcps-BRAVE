@@ -76,8 +76,8 @@ export default function ChangePinPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-      <Card className="w-full max-w-sm">
+    <div className="flex min-h-screen items-center justify-center bg-secondary p-4">
+      <Card className="w-full max-w-sm shadow-lg border">
         <CardHeader>
           <CardTitle className="font-headline text-2xl">최초 PIN 번호 변경</CardTitle>
           <CardDescription>

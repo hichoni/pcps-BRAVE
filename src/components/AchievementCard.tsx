@@ -47,7 +47,7 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
   const AreaIcon = areaConfig.icon;
 
   return (
-    <Card className="flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300">
+    <Card className="flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300 border">
       <CardHeader>
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3 mb-2">
@@ -62,7 +62,7 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
       </CardHeader>
       <CardContent className="flex-grow flex flex-col items-center justify-center">
         <p className="font-headline text-2xl font-semibold text-center mb-4">{areaConfig.challengeName}</p>
-        <Progress value={progressValue} className="w-full h-3 transition-all duration-500" />
+        <Progress value={progressValue} className="w-full h-2.5 transition-all duration-500" />
       </CardContent>
       <CardFooter>
         <AchievementStatusDialog areaName={areaName} />

@@ -10,7 +10,7 @@ export function Header() {
   const { user, logout } = useAuth();
 
   return (
-    <header className="py-8 border-b-2 border-primary/10 mb-8 flex justify-between items-center">
+    <header className="py-6 border-b border-border mb-12 flex justify-between items-center">
         <div className="flex items-center gap-6">
             <Image
               src="/icon-main.png?v=2"

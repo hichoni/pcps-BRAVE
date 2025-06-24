@@ -131,7 +131,7 @@ export default function AdminPage() {
       </header>
 
       <AlertDialog onOpenChange={(open) => !open && setStudentToDelete(null)}>
-        <Card>
+        <Card className="shadow-lg border">
             <CardHeader>
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                     <div>
