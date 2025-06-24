@@ -12,7 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Loader2, Users, Undo, LogOut, Settings, Plus, Minus, Check, Trash2, PlusCircle, Upload } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Loader2, Users, Undo, LogOut, Settings, Plus, Minus, Check, Trash2, PlusCircle, Upload, Search } from 'lucide-react';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
 import { BulkAddStudentsDialog } from '@/components/BulkAddStudentsDialog';
 
@@ -25,13 +27,20 @@ export default function AdminPage() {
   const [studentToDelete, setStudentToDelete] = useState<User | null>(null);
   const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
   const [isBulkAddDialogOpen, setIsBulkAddDialogOpen] = useState(false);
-
+  
+  const [gradeFilter, setGradeFilter] = useState<string>('all');
+  const [classFilter, setClassFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   useEffect(() => {
     if (!authLoading && user?.role !== 'teacher') {
       router.push('/login');
     }
   }, [user, authLoading, router]);
+
+  useEffect(() => {
+    setClassFilter('all');
+  }, [gradeFilter]);
 
   const handleProgressUpdate = async (username: string, area: AreaName, change: number) => {
     const studentAchievements = getAchievements(username);
@@ -78,8 +87,20 @@ export default function AdminPage() {
     return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
   }
 
-  const students = users
-    .filter(u => u.role === 'student')
+  const allStudentUsers = users.filter(u => u.role === 'student');
+
+  const availableGrades = [...new Set(allStudentUsers.map(u => u.grade))].sort((a,b) => (a ?? 0) - (b ?? 0));
+  
+  const studentsForClassList = allStudentUsers.filter(u => gradeFilter === 'all' || u.grade === parseInt(gradeFilter, 10));
+  const availableClasses = [...new Set(studentsForClassList.map(u => u.classNum))].sort((a,b) => (a ?? 0) - (b ?? 0));
+
+  const students = allStudentUsers
+    .filter(u => {
+        const gradeMatch = gradeFilter === 'all' || u.grade === parseInt(gradeFilter, 10);
+        const classMatch = classFilter === 'all' || u.classNum === parseInt(classFilter, 10);
+        const nameMatch = (u.name ?? '').toLowerCase().includes(searchQuery.toLowerCase());
+        return gradeMatch && classMatch && nameMatch;
+    })
     .sort((a, b) => {
         if (a.grade !== b.grade) return (a.grade ?? 0) - (b.grade ?? 0);
         if (a.classNum !== b.classNum) return (a.classNum ?? 0) - (b.classNum ?? 0);
@@ -104,10 +125,10 @@ export default function AdminPage() {
       <AlertDialog onOpenChange={(open) => !open && setStudentToDelete(null)}>
         <Card>
             <CardHeader>
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                     <div>
                         <CardTitle>학생 명렬표</CardTitle>
-                        <CardDescription>학생들의 도전과제 성취 현황을 관리하고 학생 정보를 추가, 수정, 삭제할 수 있습니다.</CardDescription>
+                        <CardDescription>학생들의 성취 현황을 관리하고 검색, 필터링할 수 있습니다.</CardDescription>
                     </div>
                     <div className="flex gap-2">
                         <Button onClick={() => setIsAddStudentDialogOpen(true)}>
@@ -116,6 +137,41 @@ export default function AdminPage() {
                         <Button variant="outline" onClick={() => setIsBulkAddDialogOpen(true)}>
                             <Upload className="mr-2"/> 일괄 등록
                         </Button>
+                    </div>
+                </div>
+                <div className="mt-4 flex flex-col md:flex-row items-stretch gap-2">
+                    <div className="flex items-center gap-2">
+                        <Select value={gradeFilter} onValueChange={setGradeFilter}>
+                            <SelectTrigger className="w-full md:w-[120px]">
+                                <SelectValue placeholder="학년" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">전체 학년</SelectItem>
+                                {availableGrades.map(grade => (
+                                    grade && <SelectItem key={grade} value={String(grade)}>{grade}학년</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Select value={classFilter} onValueChange={setClassFilter} disabled={availableClasses.length === 0}>
+                            <SelectTrigger className="w-full md:w-[120px]">
+                                <SelectValue placeholder="반" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">전체 반</SelectItem>
+                                {availableClasses.map(classNum => (
+                                    classNum && <SelectItem key={classNum} value={String(classNum)}>{classNum}반</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="relative w-full md:flex-grow">
+                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                         <Input
+                            placeholder="학생 이름으로 검색..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10"
+                         />
                     </div>
                 </div>
             </CardHeader>
