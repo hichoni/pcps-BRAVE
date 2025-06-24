@@ -28,6 +28,11 @@ export default function ChangePinPage() {
   const { user, updatePin, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const {
     register,
@@ -38,13 +43,13 @@ export default function ChangePinPage() {
   });
 
   useEffect(() => {
-    if (authLoading) return; // Wait for auth to load
+    if (!isClient || authLoading) return;
     if (!user) {
       router.push('/login');
     } else if (user.pin !== '0000') {
       router.push('/');
     }
-  }, [authLoading, user, router]);
+  }, [authLoading, user, router, isClient]);
 
   const onSubmit = async (data: ChangePinFormValues) => {
     setLoading(true);
@@ -66,9 +71,7 @@ export default function ChangePinPage() {
     }
   };
   
-  // While loading or if the user is not in the correct state, show a spinner.
-  // The useEffect above will handle the redirection.
-  if (authLoading || !user || user.pin !== '0000') {
+  if (!isClient || authLoading || !user || user.pin !== '0000') {
     return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 

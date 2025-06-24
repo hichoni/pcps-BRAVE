@@ -156,14 +156,19 @@ export default function ChallengeConfigPage() {
   const { user, loading: authLoading } = useAuth();
   const { challengeConfig, loading: configLoading } = useChallengeConfig();
   const router = useRouter();
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && user?.role !== 'teacher') {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (isClient && !authLoading && user?.role !== 'teacher') {
       router.push('/login');
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, isClient]);
 
-  if (authLoading || configLoading || !user || !challengeConfig) {
+  if (!isClient || authLoading || configLoading || !user || !challengeConfig) {
     return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
   

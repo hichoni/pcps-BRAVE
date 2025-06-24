@@ -32,16 +32,23 @@ export default function AdminPage() {
   const [gradeFilter, setGradeFilter] = useState<string>('all');
   const [classFilter, setClassFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && user?.role !== 'teacher') {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (isClient && !authLoading && user?.role !== 'teacher') {
       router.push('/login');
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, isClient]);
 
   useEffect(() => {
-    setClassFilter('all');
-  }, [gradeFilter]);
+    if (isClient) {
+      setClassFilter('all');
+    }
+  }, [gradeFilter, isClient]);
 
   const handleProgressUpdate = async (username: string, area: AreaName, change: number) => {
     const studentAchievements = getAchievements(username);
@@ -84,7 +91,7 @@ export default function AdminPage() {
     }
   };
 
-  if (authLoading || achievementsLoading || configLoading || !user || user.role !== 'teacher' || !challengeConfig) {
+  if (!isClient || authLoading || achievementsLoading || configLoading || !user || user.role !== 'teacher' || !challengeConfig) {
     return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
   }
 

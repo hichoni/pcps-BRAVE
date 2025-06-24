@@ -44,10 +44,15 @@ const maskName = (name: string) => {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, users } = useAuth();
+  const { login, users, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [foundStudent, setFoundStudent] = useState<User | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const studentForm = useForm<StudentLoginFormValues>({
     resolver: zodResolver(studentLoginSchema),
@@ -137,6 +142,14 @@ export default function LoginPage() {
       description: '입력한 정보가 올바르지 않습니다.',
     });
   };
+
+  if (!isClient || authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
