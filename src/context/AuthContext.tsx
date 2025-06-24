@@ -47,6 +47,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [usersLoading, setUsersLoading] = useState(false);
   const router = useRouter();
 
+  useEffect(() => {
+    const initializeAuth = async () => {
+      setLoading(true);
+      try {
+        const sessionUser = sessionStorage.getItem('user');
+        if (sessionUser) {
+          setUser(JSON.parse(sessionUser));
+        }
+        await fetchUsers();
+      } catch (error) {
+        console.warn("Auth context initialization error:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    initializeAuth();
+  }, []);
+  
   const fetchUsers = useCallback(async (): Promise<User[]> => {
     setUsersLoading(true);
     let usersList: User[] = [];
@@ -88,27 +106,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return fetchUsers();
   }, [users, fetchUsers]);
 
-  useEffect(() => {
-    const initializeAuth = () => {
-      setLoading(true);
-      try {
-        const sessionUser = sessionStorage.getItem('user');
-        if (sessionUser) {
-          setUser(JSON.parse(sessionUser));
-        }
-      } catch (error) {
-        console.warn("Auth context initialization error:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializeAuth();
-  }, []);
-  
   const logout = useCallback(() => {
     setUser(null);
-    setUsers([]);
     sessionStorage.removeItem('user');
     router.push('/login');
   }, [router]);
@@ -141,62 +140,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const updatePin = useCallback(async (newPin: string) => {
     if (!user) {
-      throw new Error("Cannot update PIN: user is not logged in.");
+      throw new Error("사용자 정보가 없습니다. 다시 로그인해주세요.");
     }
-  
-    // Step 1: Update the database first.
+    
     if (db) {
       const userDocRef = doc(db, "users", String(user.id));
       try {
         await setDoc(userDocRef, { pin: newPin }, { merge: true });
       } catch (error) {
-        console.error("Failed to update PIN in Firestore. User ID:", user.id, "Error:", error);
-        throw error; // Re-throw to be caught by the UI and show a toast.
+        console.error("PIN 업데이트 실패 (Firestore):", error);
+        throw new Error("데이터베이스 저장에 실패했습니다. 인터넷 연결을 확인하거나 관리자에게 문의하세요.");
       }
     }
-  
-    // Step 2: If the database update was successful, update all local states explicitly.
+
     const updatedUser = { ...user, pin: newPin };
-    
-    // 2a. Update the main user object for the current session.
     setUser(updatedUser);
-    
-    // 2b. Update the session storage to persist the change across refreshes.
     sessionStorage.setItem('user', JSON.stringify(updatedUser));
-    
-    // 2c. Update the user within the global list of users.
     setUsers(prevUsers => prevUsers.map(u => (u.id === user.id ? updatedUser : u)));
   }, [user]);
 
-
   const resetPin = useCallback(async (username: string) => {
-    const currentUsers = await ensureUsersLoaded();
-    const targetUser = currentUsers.find(u => u.username === username);
-    if (!targetUser) return;
+    const targetUser = users.find(u => u.username === username);
+    if (!targetUser) {
+        throw new Error(`사용자 '${username}'를 찾을 수 없습니다.`);
+    }
 
     if (db) {
+        const userDocRef = doc(db, "users", String(targetUser.id));
         try {
-            const userDocRef = doc(db, "users", String(targetUser.id));
             await setDoc(userDocRef, { pin: '0000' }, { merge: true });
-        } catch (e) {
-            console.warn("Failed to reset PIN in Firestore", e);
-            throw e; // re-throw to notify the caller
+        } catch (error) {
+            console.error(`PIN 초기화 실패 (Firestore) - 사용자: ${username}:`, error);
+            throw new Error("데이터베이스 저장에 실패하여 PIN을 초기화할 수 없습니다.");
         }
     }
     
-    setUsers(prevUsers => prevUsers.map(u => u.username === username ? { ...u, pin: '0000' } : u));
+    const updatedUser = { ...targetUser, pin: '0000' };
+    setUsers(prevUsers => prevUsers.map(u => u.id === updatedUser.id ? updatedUser : u));
 
-    if (user && user.username === username) {
-        const updatedCurrentUser = { ...user, pin: '0000' };
-        setUser(updatedCurrentUser);
-        sessionStorage.setItem('user', JSON.stringify(updatedCurrentUser));
+    if (user && user.id === updatedUser.id) {
+        setUser(updatedUser);
+        sessionStorage.setItem('user', JSON.stringify(updatedUser));
     }
-
-  }, [ensureUsersLoaded, user]);
+  }, [user, users]);
 
   const deleteUser = useCallback(async (username: string) => {
-    const currentUsers = await ensureUsersLoaded();
-    const targetUser = currentUsers.find(u => u.username === username);
+    const targetUser = users.find(u => u.username === username);
     if (!targetUser) return;
     
     if (db) {
@@ -220,13 +209,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (user && user.username === username) {
         logout();
     }
-  }, [ensureUsersLoaded, user, logout]);
+  }, [users, user, logout]);
 
   const addUser = useCallback(async (studentData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>): Promise<{ success: boolean; message: string }> => {
-    const currentUsers = await ensureUsersLoaded();
     const { grade, classNum, studentNum, name } = studentData;
 
-    const studentExists = currentUsers.some(u =>
+    const studentExists = users.some(u =>
       u.role === 'student' &&
       u.grade === grade &&
       u.classNum === classNum &&
@@ -237,7 +225,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { success: false, message: `${grade}학년 ${classNum}반 ${studentNum}번 학생은 이미 존재합니다.` };
     }
 
-    const newId = (currentUsers.length > 0 ? Math.max(...currentUsers.map(u => u.id)) : 0) + 1;
+    const newId = (users.length > 0 ? Math.max(...users.map(u => u.id)) : 0) + 1;
     const newUsername = `s-${grade}-${classNum}-${studentNum}`;
 
     const newUser: User = {
@@ -270,18 +258,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     setUsers(prev => [...prev, newUser]);
     return { success: true, message: `${name} 학생이 추가되었습니다.` };
-  }, [ensureUsersLoaded]);
+  }, [users]);
 
   const bulkAddUsers = useCallback(async (studentsData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>[]): Promise<{ successCount: number; failCount: number; errors: string[] }> => {
-    const currentUsers = await ensureUsersLoaded();
     let successCount = 0;
     let failCount = 0;
     const errors: string[] = [];
     const newUsers: User[] = [];
     
-    let lastId = (currentUsers.length > 0 ? Math.max(...currentUsers.map(u => u.id)) : 0);
+    let lastId = (users.length > 0 ? Math.max(...users.map(u => u.id)) : 0);
     const batch = db ? writeBatch(db) : null;
-    const usersInThisOperation = [...currentUsers];
+    const usersInThisOperation = [...users];
 
     studentsData.forEach((student, index) => {
       const { grade, classNum, studentNum, name } = student;
@@ -334,7 +321,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     
     return { successCount, failCount, errors };
-  }, [ensureUsersLoaded]);
+  }, [users]);
 
 
   return (
