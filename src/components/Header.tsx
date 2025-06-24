@@ -1,9 +1,16 @@
+"use client";
+
 import React from 'react';
 import Image from 'next/image';
+import { useAuth } from '@/context/AuthContext';
+import { Button } from './ui/button';
+import { LogOut } from 'lucide-react';
 
 export function Header() {
+  const { user, logout } = useAuth();
+
   return (
-    <header className="py-8 text-center border-b-2 border-primary/10 mb-8">
+    <header className="py-8 text-center border-b-2 border-primary/10 mb-8 relative">
         <div className="inline-flex items-center gap-6">
             <Image
               src="https://placehold.co/72x72.png"
@@ -26,6 +33,14 @@ export function Header() {
                 <span>5</span>
              </div>
         </div>
+        {user && (
+          <div className="absolute top-1/2 right-0 -translate-y-1/2 flex items-center gap-2">
+            <span className="text-sm font-semibold">{user.name}님</span>
+            <Button variant="ghost" size="icon" onClick={logout} aria-label="로그아웃">
+              <LogOut className="h-5 w-5"/>
+            </Button>
+          </div>
+        )}
     </header>
   );
 }

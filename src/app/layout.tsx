@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import { AchievementsProvider } from '@/context/AchievementsContext';
+import { AuthProvider } from '@/context/AuthContext';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
@@ -25,9 +26,11 @@ export default function RootLayout({
         />
       </head>
       <body className={cn('font-body antialiased min-h-screen bg-background')}>
-        <AchievementsProvider>
-          {children}
-        </AchievementsProvider>
+        <AuthProvider>
+          <AchievementsProvider>
+            {children}
+          </AchievementsProvider>
+        </AuthProvider>
         <Toaster />
       </body>
     </html>

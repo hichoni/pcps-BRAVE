@@ -1,19 +1,22 @@
 "use client";
 
 import { useAchievements } from '@/context/AchievementsContext';
+import { useAuth } from '@/context/AuthContext';
 import { STATUS_CONFIG } from '@/lib/config';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Skeleton } from './ui/skeleton';
 
 export function CertificateStatus() {
-  const { certificateStatus, loading } = useAchievements();
+  const { user, loading: authLoading } = useAuth();
+  const { certificateStatus, loading: achievementsLoading } = useAchievements();
 
-  if (loading) {
+  if (authLoading || achievementsLoading || !user) {
     return <Skeleton className="h-40 w-full max-w-md mx-auto" />;
   }
   
-  const statusInfo = STATUS_CONFIG[certificateStatus];
+  const currentStatus = certificateStatus(user.username);
+  const statusInfo = STATUS_CONFIG[currentStatus];
 
   return (
     <Card className="max-w-md mx-auto shadow-lg border-primary/20">
@@ -26,7 +29,7 @@ export function CertificateStatus() {
           <p className={cn("text-3xl font-bold font-headline transition-colors duration-500", statusInfo.color)}>
             {statusInfo.label}
           </p>
-          <p className="text-muted-foreground">{certificateStatus}</p>
+          <p className="text-muted-foreground">{currentStatus}</p>
         </div>
       </CardContent>
     </Card>

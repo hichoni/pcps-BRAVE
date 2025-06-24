@@ -1,78 +1,104 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { AreaName, Achievement, AchievementsState, AREAS, CERTIFICATE_THRESHOLDS, CertificateStatus } from '@/lib/config';
+import { AreaName, AchievementsState, CertificateStatus, AREAS, CERTIFICATE_THRESHOLDS, AREAS_CONFIG, MOCK_USERS } from '@/lib/config';
+
+type AllAchievementsState = Record<string, AchievementsState>; // Keyed by username
 
 interface AchievementsContextType {
-  achievements: AchievementsState | null;
-  addAchievement: (area: AreaName, achievement: Achievement) => void;
-  certificateStatus: CertificateStatus;
+  getAchievements: (username: string) => AchievementsState | null;
+  updateProgress: (username: string, area: AreaName, progress: number) => Promise<void>;
+  certificateStatus: (username: string) => CertificateStatus;
   loading: boolean;
 }
 
 const AchievementsContext = createContext<AchievementsContextType | undefined>(undefined);
 
-const initialAchievementsState: AchievementsState = AREAS.reduce((acc, area) => {
-  acc[area] = { achievements: [], isCertified: false };
-  return acc;
-}, {} as AchievementsState);
+const generateInitialState = (): AllAchievementsState => {
+  const allAchievements: AllAchievementsState = {};
+  MOCK_USERS.forEach(user => {
+    if (user.role === 'student') {
+      const studentAchievements = {} as AchievementsState;
+      AREAS.forEach(area => {
+        studentAchievements[area] = {
+          progress: 0,
+          isCertified: false
+        };
+      });
+      allAchievements[user.username] = studentAchievements;
+    }
+  });
+  return allAchievements;
+};
 
 export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
-  const [achievements, setAchievements] = useState<AchievementsState | null>(null);
+  const [allAchievements, setAllAchievements] = useState<AllAchievementsState | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     try {
-      const storedAchievements = localStorage.getItem('achievements');
-      if (storedAchievements) {
-        setAchievements(JSON.parse(storedAchievements));
+      const storedData = localStorage.getItem('allAchievements');
+      if (storedData) {
+        setAllAchievements(JSON.parse(storedData));
       } else {
-        setAchievements(initialAchievementsState);
+        setAllAchievements(generateInitialState());
       }
     } catch (error) {
       console.error("Failed to parse achievements from localStorage", error);
-      setAchievements(initialAchievementsState);
+      setAllAchievements(generateInitialState());
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (achievements) {
+    if (allAchievements && !loading) {
       try {
-        localStorage.setItem('achievements', JSON.stringify(achievements));
+        localStorage.setItem('allAchievements', JSON.stringify(allAchievements));
       } catch (error) {
         console.error("Failed to save achievements to localStorage", error);
       }
     }
-  }, [achievements]);
+  }, [allAchievements, loading]);
 
-  const addAchievement = useCallback((area: AreaName, newAchievement: Achievement) => {
-    setAchievements(prev => {
-      if (!prev) return null;
-      const newState = {
-        ...prev,
+  const getAchievements = useCallback((username: string): AchievementsState | null => {
+    if (!allAchievements) return null;
+    return allAchievements[username] || null;
+  }, [allAchievements]);
+
+  const updateProgress = useCallback(async (username: string, area: AreaName, progress: number) => {
+    setAllAchievements(prev => {
+      if (!prev || !prev[username]) return prev;
+
+      const areaConfig = AREAS_CONFIG[area];
+      const isCertified = progress >= areaConfig.goal;
+      
+      const newState = { ...prev };
+      newState[username] = {
+        ...prev[username],
         [area]: {
-          ...prev[area],
-          achievements: [...prev[area].achievements, newAchievement],
-          isCertified: true,
+          progress,
+          isCertified,
         },
       };
       return newState;
     });
   }, []);
   
-  const certificateStatus = React.useMemo<CertificateStatus>(() => {
-    if (!achievements) return 'Unranked';
-    const certifiedCount = Object.values(achievements).filter(a => a.isCertified).length;
+  const certificateStatus = useCallback((username: string): CertificateStatus => {
+    if (!allAchievements || !allAchievements[username]) return 'Unranked';
+    
+    const userAchievements = allAchievements[username];
+    const certifiedCount = Object.values(userAchievements).filter(a => a.isCertified).length;
+    
     if (certifiedCount >= CERTIFICATE_THRESHOLDS.GOLD) return 'Gold';
     if (certifiedCount >= CERTIFICATE_THRESHOLDS.SILVER) return 'Silver';
     if (certifiedCount >= CERTIFICATE_THRESHOLDS.BRONZE) return 'Bronze';
     return 'Unranked';
-  }, [achievements]);
+  }, [allAchievements]);
 
   return (
-    <AchievementsContext.Provider value={{ achievements, addAchievement, certificateStatus, loading }}>
+    <AchievementsContext.Provider value={{ getAchievements, updateProgress, certificateStatus, loading }}>
       {children}
     </AchievementsContext.Provider>
   );

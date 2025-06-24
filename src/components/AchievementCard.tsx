@@ -1,10 +1,11 @@
 "use client";
 
 import { useAchievements } from '@/context/AchievementsContext';
+import { useAuth } from '@/context/AuthContext';
 import { AreaName, AREAS_CONFIG } from '@/lib/config';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { AddAchievementDialog } from './AddAchievementDialog';
+import { AchievementStatusDialog } from './AchievementStatusDialog';
 import { Badge } from './ui/badge';
 import { CheckCircle2, XCircle } from 'lucide-react';
 
@@ -13,11 +14,21 @@ interface AchievementCardProps {
 }
 
 export function AchievementCard({ areaName }: AchievementCardProps) {
-  const { achievements } = useAchievements();
+  const { user } = useAuth();
+  const { getAchievements } = useAchievements();
+  
+  if (!user) return null;
+
+  const achievements = getAchievements(user.username);
   const areaConfig = AREAS_CONFIG[areaName];
   const areaState = achievements?.[areaName];
-  const isCertified = areaState?.isCertified ?? false;
-  const progressValue = isCertified ? 100 : 0;
+  
+  if (!areaState) return null;
+
+  const { isCertified, progress } = areaState;
+  const { goal } = areaConfig;
+
+  const progressValue = goal > 0 ? (progress / goal) * 100 : 0;
 
   return (
     <Card className="flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300">
@@ -38,7 +49,7 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
         <Progress value={progressValue} className="w-full h-3 transition-all duration-500" />
       </CardContent>
       <CardFooter>
-        <AddAchievementDialog areaName={areaName} />
+        <AchievementStatusDialog areaName={areaName} />
       </CardFooter>
     </Card>
   );

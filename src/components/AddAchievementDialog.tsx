@@ -1,192 +1,102 @@
-"use client";
+import { BookOpen, HeartHandshake, Bike, Palette, Laptop, Award, Medal, Gem, ShieldOff } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
-import { useState, useRef } from 'react';
-import { useForm, Controller } from 'react-hook-form';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogClose,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { useAchievements } from '@/context/AchievementsContext';
-import { AreaName, AREAS_CONFIG } from '@/lib/config';
-import { useToast } from '@/hooks/use-toast';
-import { certificationCheck, CertificationCheckOutput } from '@/ai/flows/certification-checker';
-import { Loader2, FileUp, CheckCircle, AlertTriangle } from 'lucide-react';
+export const AREAS = ['Humanities', 'Volunteering', 'Physical Education', 'Arts', 'Information'] as const;
+export type AreaName = (typeof AREAS)[number];
 
-const formSchema = z.object({
-  description: z.string().min(10, { message: '설명은 최소 10자 이상이어야 합니다.' }),
-  evidence: z.any().refine(file => file instanceof FileList && file.length > 0, '증빙 자료 파일은 필수입니다.'),
-});
+export type Role = 'student' | 'teacher';
 
-type FormValues = z.infer<typeof formSchema>;
-
-type AiState = 'idle' | 'loading' | 'success' | 'error';
-
-export function AddAchievementDialog({ areaName }: { areaName: AreaName }) {
-  const [open, setOpen] = useState(false);
-  const [aiState, setAiState] = useState<AiState>('idle');
-  const [aiResponse, setAiResponse] = useState<CertificationCheckOutput | null>(null);
-  const { addAchievement } = useAchievements();
-  const { toast } = useToast();
-  const areaConfig = AREAS_CONFIG[areaName];
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const {
-    control,
-    handleSubmit,
-    reset,
-    formState: { errors },
-    watch,
-  } = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: { description: '', evidence: undefined },
-  });
-
-  const evidenceFile = watch('evidence');
-
-  const fileToDataUri = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = error => reject(error);
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const onSubmit = async (data: FormValues) => {
-    setAiState('loading');
-    setAiResponse(null);
-    try {
-      const file = data.evidence[0];
-      const evidenceDataUri = await fileToDataUri(file);
-
-      const result = await certificationCheck({
-        area: areaName,
-        achievementDescription: data.description,
-        certificationRequirements: areaConfig.requirements,
-        evidenceDataUri,
-      });
-
-      setAiResponse(result);
-
-      if (result.meetsRequirements) {
-        setAiState('success');
-        addAchievement(areaName, {
-          id: new Date().toISOString(),
-          description: data.description,
-          date: new Date().toLocaleDateString(),
-          evidenceDataUri: '', // Not storing large data URI in local storage
-        });
-        toast({
-          title: '✅ 성취 인증 완료!',
-          description: `${areaConfig.koreanName} 영역의 성취가 승인되었습니다.`,
-        });
-        setTimeout(() => {
-          setOpen(false);
-        }, 1500);
-      } else {
-        setAiState('error');
-        toast({
-          variant: 'destructive',
-          title: '인증 거부됨',
-          description: result.reasoning,
-        });
-      }
-    } catch (error) {
-      console.error('Certification check failed:', error);
-      setAiState('error');
-      setAiResponse({ meetsRequirements: false, reasoning: "예기치 않은 오류가 발생했습니다. 다시 시도해주세요." });
-      toast({
-        variant: 'destructive',
-        title: '오류',
-        description: '인증 확인에 실패했습니다. 나중에 다시 시도해주세요.',
-      });
-    }
-  };
-  
-  const handleOpenChange = (isOpen: boolean) => {
-    if (!isOpen) {
-      reset();
-      setAiState('idle');
-      setAiResponse(null);
-    }
-    setOpen(isOpen);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        <Button className="w-full font-bold">
-          <FileUp className="mr-2 h-4 w-4" /> 인증 제출
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[480px]">
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <DialogHeader>
-            <DialogTitle className="font-headline text-2xl">{areaConfig.koreanName} 영역 인증 제출</DialogTitle>
-            <DialogDescription>{areaConfig.requirements}</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-6 py-6">
-            <div className="grid gap-2">
-              <Label htmlFor="description">성취 설명</Label>
-              <Controller
-                name="description"
-                control={control}
-                render={({ field }) => <Textarea id="description" placeholder="성취에 대해 자세히 설명해주세요..." {...field} />}
-              />
-              {errors.description && <p className="text-sm text-destructive">{errors.description.message}</p>}
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="evidence">증빙 자료</Label>
-              <Controller
-                name="evidence"
-                control={control}
-                render={({ field: { onChange, ...field } }) => (
-                  <Input 
-                    id="evidence" 
-                    type="file" 
-                    accept="image/*,application/pdf"
-                    onChange={(e) => onChange(e.target.files)}
-                    ref={fileInputRef}
-                    {...field}
-                  />
-                )}
-              />
-              {evidenceFile?.[0] && <p className="text-sm text-muted-foreground">선택된 파일: {evidenceFile[0].name}</p>}
-              {errors.evidence && <p className="text-sm text-destructive">{errors.evidence.message as string}</p>}
-            </div>
-            {aiState !== 'idle' && aiResponse && (
-               <div className={`p-4 rounded-md flex items-start gap-4 ${aiState === 'success' ? 'bg-green-500/10 text-green-400' : 'bg-destructive/10 text-destructive'}`}>
-                {aiState === 'success' ? <CheckCircle className="w-5 h-5 mt-1" /> : <AlertTriangle className="w-5 h-5 mt-1" />}
-                <div>
-                  <h4 className="font-bold">{aiState === 'success' ? '인증 승인됨' : '인증 거부됨'}</h4>
-                  <p className="text-sm">{aiResponse.reasoning}</p>
-                </div>
-               </div>
-            )}
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="secondary">취소</Button>
-            </DialogClose>
-            <Button type="submit" disabled={aiState === 'loading'}>
-              {aiState === 'loading' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              인증 확인
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
+export interface User {
+  id: number;
+  username: string;
+  pin: string;
+  name: string;
+  role: Role;
 }
+
+export const MOCK_USERS: User[] = [
+    { id: 1, username: 'teacher', pin: '1234', name: '김선생', role: 'teacher' },
+    { id: 2, username: 'student1', pin: '0000', name: '김철수', role: 'student' },
+    { id: 3, username: 'student2', pin: '1111', name: '이영희', role: 'student' },
+    { id: 4, username: 'student3', pin: '0000', name: '박바둑', role: 'student' },
+];
+
+export type AreaState = {
+  progress: number;
+  isCertified: boolean;
+};
+
+export type AchievementsState = Record<AreaName, AreaState>;
+
+export const CERTIFICATE_THRESHOLDS = {
+  GOLD: 4,
+  SILVER: 3,
+  BRONZE: 2,
+};
+
+export type CertificateStatus = 'Gold' | 'Silver' | 'Bronze' | 'Unranked';
+
+export const STATUS_CONFIG: Record<CertificateStatus, { label: string; icon: LucideIcon; color: string }> = {
+  Gold: { label: '금장', icon: Award, color: 'text-yellow-400' },
+  Silver: { label: '은장', icon: Medal, color: 'text-gray-400' },
+  Bronze: { label: '동장', icon: Gem, color: 'text-orange-400' },
+  Unranked: { label: '미해당', icon: ShieldOff, color: 'text-muted-foreground' },
+};
+
+type AreaConfig = {
+  name: string;
+  icon: LucideIcon;
+  requirements: string;
+  koreanName: string;
+  challengeName: string;
+  goal: number;
+  unit: string;
+};
+
+export const AREAS_CONFIG: Record<AreaName, AreaConfig> = {
+  Humanities: {
+    name: 'Humanities',
+    koreanName: '인문',
+    challengeName: '독서 마라톤 ✨',
+    icon: BookOpen,
+    requirements: '지정된 필독서 중 1권 이상을 읽고 독후감을 제출하여 증명해야 합니다.',
+    goal: 5,
+    unit: '권',
+  },
+  Volunteering: {
+    name: 'Volunteering',
+    koreanName: '봉사',
+    challengeName: '탄소 줄임 실천 ♥',
+    icon: HeartHandshake,
+    requirements: '최소 10시간 이상의 봉사활동을 완료했다는 증빙 자료를 제출해야 합니다. (예: 탄소중립포인트 실천 활동)',
+    goal: 10,
+    unit: '시간',
+  },
+  'Physical Education': {
+    name: 'Physical Education',
+    koreanName: '체육',
+    challengeName: '건강 체력 인증',
+    icon: Bike,
+    requirements: '건강체력평가(PAPS) 결과에서 상위 등급을 받았거나, 한 시즌 동안 교내 스포츠팀 활동에 참여했음을 증명해야 합니다.',
+    goal: 2,
+    unit: '등급',
+  },
+  Arts: {
+    name: 'Arts',
+    koreanName: '예술',
+    challengeName: '풍풍 쇼케이스 💥',
+    icon: Palette,
+    requirements: '풍풍 쇼케이스 또는 교내외 예술 관련 대회/공연에 참여하여 자신의 재능을 선보여야 합니다.',
+    goal: 1,
+    unit: '회 참여',
+  },
+  Information: {
+    name: 'Information',
+    koreanName: '정보',
+    challengeName: '타자의 달인 •',
+    icon: Laptop,
+    requirements: '교내 타자 대회에서 일정 수준 이상의 성적을 거두거나, 정보 관련 자격증을 취득하여 능력을 증명해야 합니다.',
+    goal: 300,
+    unit: '타',
+  },
+};

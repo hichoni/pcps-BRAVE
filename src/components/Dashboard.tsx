@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useAchievements } from '@/context/AchievementsContext';
+import { useAuth } from '@/context/AuthContext';
 import { Header } from '@/components/Header';
 import { AchievementCard } from '@/components/AchievementCard';
 import { CertificateStatus } from '@/components/CertificateStatus';
@@ -9,7 +10,10 @@ import { AREAS } from '@/lib/config';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function Dashboard() {
-  const { achievements, loading } = useAchievements();
+  const { user, loading: authLoading } = useAuth();
+  const { loading: achievementsLoading } = useAchievements();
+
+  const loading = authLoading || achievementsLoading;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -39,7 +43,7 @@ export function Dashboard() {
         </div>
 
         <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {loading || !achievements
+          {loading || !user
             ? Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="flex flex-col space-y-3">
                   <Skeleton className="h-[125px] w-full rounded-xl" />
