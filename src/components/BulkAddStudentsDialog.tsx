@@ -86,37 +86,37 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
         }
 
         const lines = text.trim().split(/\r\n|\n/);
+        const validLines = lines.filter(line => line.trim() !== '');
 
-        if (lines.length === 0 || (lines.length === 1 && lines[0].trim() === '')) {
-            toast({ variant: 'destructive', title: '파일 오류', description: '파일이 비어있습니다.' });
+        if (validLines.length === 0) {
+            toast({ variant: 'destructive', title: '파일 오류', description: '파일이 비어있거나 내용이 없습니다.' });
             setLoading(false);
             return;
         }
         
-        let hasHeader = false;
-        if (lines[0].includes('학년')) {
-            hasHeader = true;
-            lines.shift();
+        let headerIndex = -1;
+        if (validLines[0].includes('학년')) {
+            headerIndex = 0;
         }
+        const dataLines = headerIndex === 0 ? validLines.slice(1) : validLines;
         
-        const delimiter = lines[0].includes(';') ? ';' : ',';
+        if (dataLines.length === 0) {
+            toast({ variant: 'destructive', title: '데이터 오류', description: '헤더만 있고 학생 데이터가 없습니다.' });
+            setLoading(false);
+            return;
+        }
+
+        const delimiter = dataLines[0].includes(';') ? ';' : ',';
 
         const studentsToAdd: StudentData[] = [];
         const parseErrors: string[] = [];
 
-        lines.forEach((line, index) => {
-            const trimmedLine = line.trim();
-            if (trimmedLine === '') return;
+        dataLines.forEach((line, index) => {
+            const parts = line.trim().split(delimiter).map(p => p.trim().replace(/^"|"$/g, ''));
             
-            const parts = trimmedLine.split(delimiter).map(p => p.trim().replace(/^"|"$/g, ''));
-            
-            if (parts.length > 0 && parts.every(p => p === '')) {
-                return;
-            }
-
             if (parts.length !== 4) {
-                const lineNumber = hasHeader ? index + 2 : index + 1;
-                parseErrors.push(`${lineNumber}번째 줄: 형식이 올바르지 않습니다. 쉼표로 구분된 4개의 값(학년,반,번호,이름)이 필요합니다.`);
+                const lineNumber = headerIndex === 0 ? index + 2 : index + 1;
+                parseErrors.push(`${lineNumber}번째 줄: 형식이 올바르지 않습니다. 4개의 열(학년,반,번호,이름)이 필요합니다.`);
                 return;
             }
 
@@ -126,7 +126,7 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
             const studentNum = parseInt(studentNumStr, 10);
 
             if (isNaN(grade) || isNaN(classNum) || isNaN(studentNum) || !name) {
-                const lineNumber = hasHeader ? index + 2 : index + 1;
+                const lineNumber = headerIndex === 0 ? index + 2 : index + 1;
                 parseErrors.push(`${lineNumber}번째 줄: 데이터가 유효하지 않습니다. 숫자와 이름이 올바른지 확인해주세요.`);
                 return;
             }
@@ -223,7 +223,7 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
                 <Info className="h-4 w-4" />
                 <AlertTitle>파일 형식 안내</AlertTitle>
                 <AlertDescription>
-                    <p>예시 파일을 다운로드하여 형식을 확인해주세요. 파일은 쉼표(,) 또는 세미콜론(;)으로 구분된 CSV 형식이어야 합니다.</p>
+                    <p>엑셀, 구글 시트 등에서 예시 파일과 같이 4개 열(학년, 반, 번호, 이름)을 작성한 후, CSV 형식으로 저장하여 업로드해주세요.</p>
                 </AlertDescription>
             </Alert>
             
