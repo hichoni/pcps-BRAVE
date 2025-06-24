@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -8,7 +8,7 @@ import { useAchievements } from '@/context/AchievementsContext';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
 import { User, AREAS, AreaName } from '@/lib/config';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Users, Undo, LogOut, Settings, Plus, Minus, CheckCircle2 } from 'lucide-react';
@@ -66,8 +66,8 @@ export default function AdminPage() {
         <div className="flex items-center gap-4">
           <span className="font-semibold">{user.name} 선생님</span>
            <Link href="/admin/challenges" passHref>
-              <Button variant="outline" size="icon" aria-label="도전 영역 관리">
-                <Settings/>
+              <Button variant="outline" aria-label="도전 영역 관리">
+                <Settings className="mr-2"/> 도전 영역 관리
               </Button>
            </Link>
           <Button variant="outline" onClick={logout}><LogOut className="mr-2"/> 로그아웃</Button>
@@ -77,16 +77,17 @@ export default function AdminPage() {
       <Card>
           <CardHeader>
               <CardTitle>학생 명렬표</CardTitle>
+              <CardDescription>학생들의 도전과제 성취 현황을 관리하고 PIN을 초기화할 수 있습니다.</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead className="w-[150px]">학생 정보</TableHead>
+                        <TableHead className="w-[220px]">학생 정보</TableHead>
                         {AREAS.map(area => (
-                            <TableHead key={area}>{challengeConfig[area].koreanName}</TableHead>
+                            <TableHead key={area} className="text-center">{challengeConfig[area].koreanName}</TableHead>
                         ))}
-                        <TableHead className="text-center">관리</TableHead>
+                        <TableHead className="text-center w-[150px]">관리</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -94,30 +95,30 @@ export default function AdminPage() {
                         const studentAchievements = getAchievements(student.username);
                         return (
                             <TableRow key={student.id}>
-                                <TableCell className="font-medium">
-                                    {student.grade}-{student.classNum} {student.studentNum} {student.name}
+                                <TableCell className="font-medium whitespace-nowrap">
+                                    {`${student.grade}학년 ${student.classNum}반 ${student.studentNum}번 ${student.name}`}
                                 </TableCell>
                                 {AREAS.map(area => {
                                     const progress = studentAchievements?.[area]?.progress ?? 0;
                                     const isCertified = studentAchievements?.[area]?.isCertified ?? false;
                                     return (
                                         <TableCell key={area}>
-                                            <div className="flex items-center gap-2">
-                                                <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => handleProgressUpdate(student.username, area, -1)}>
+                                            <div className="flex items-center justify-center gap-1">
+                                                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleProgressUpdate(student.username, area, -1)}>
                                                     <Minus className="h-4 w-4"/>
                                                 </Button>
-                                                <span className="font-mono w-8 text-center">{progress}</span>
-                                                <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => handleProgressUpdate(student.username, area, 1)}>
+                                                <span className="font-mono w-10 text-center text-lg">{progress}</span>
+                                                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleProgressUpdate(student.username, area, 1)}>
                                                     <Plus className="h-4 w-4"/>
                                                 </Button>
-                                                {isCertified && <CheckCircle2 className="h-5 w-5 text-green-500" />}
+                                                {isCertified && <CheckCircle2 className="h-5 w-5 text-green-500 ml-2" />}
                                             </div>
                                         </TableCell>
                                     )
                                 })}
                                 <TableCell className="text-center">
-                                    <Button variant="destructive" size="sm" onClick={() => handleResetPin(student.username)}>
-                                        <Undo className="mr-2 h-4 w-4" /> PIN 초기화
+                                    <Button variant="destructive" size="sm" className="h-8 px-2" onClick={() => handleResetPin(student.username)}>
+                                        <Undo className="mr-1 h-3.5 w-3.5" /> PIN 초기화
                                     </Button>
                                 </TableCell>
                             </TableRow>
