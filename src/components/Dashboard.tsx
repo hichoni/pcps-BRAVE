@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from 'react';
 import { useAchievements } from '@/context/AchievementsContext';
 import { useAuth } from '@/context/AuthContext';
 import { Header } from '@/components/Header';
@@ -9,11 +10,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Separator } from './ui/separator';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { KeyRound, ShieldAlert } from 'lucide-react';
+import { ChangePinDialog } from './ChangePinDialog';
 
 export function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const { loading: achievementsLoading } = useAchievements();
   const { challengeConfig, loading: configLoading } = useChallengeConfig();
+  const [isChangePinDialogOpen, setChangePinDialogOpen] = useState(false);
 
   const loading = authLoading || achievementsLoading || configLoading;
 
@@ -21,6 +27,20 @@ export function Dashboard() {
     <div className="container mx-auto px-4 py-8">
       <Header />
       <main>
+        {user?.pin === '0000' && (
+          <Alert variant="destructive" className="mb-8">
+            <ShieldAlert className="h-4 w-4" />
+            <AlertTitle className="font-bold">보안 경고!</AlertTitle>
+            <AlertDescription className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+              <span>초기 PIN 번호를 사용하고 있습니다. 보안을 위해 즉시 변경해주세요.</span>
+              <Button variant="outline" size="sm" className="bg-white hover:bg-gray-100 text-destructive border-destructive" onClick={() => setChangePinDialogOpen(true)}>
+                <KeyRound className="mr-2 h-4 w-4" />
+                PIN 변경하기
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
           <CertificateStatus />
           <Card className="h-full flex flex-col justify-center p-6 text-center shadow-lg border bg-card">
@@ -70,6 +90,7 @@ export function Dashboard() {
               ))}
         </div>
       </main>
+      <ChangePinDialog open={isChangePinDialogOpen} onOpenChange={setChangePinDialogOpen} />
     </div>
   );
 }

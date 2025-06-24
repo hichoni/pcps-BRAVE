@@ -19,15 +19,13 @@ export default function Home() {
     if (!loading && isClient) {
       if (!user) {
         router.push('/login');
-      } else if (user.role === 'student' && user.pin === '0000') {
-        router.push('/change-pin');
       } else if (user.role === 'teacher') {
         router.push('/admin');
       }
     }
   }, [user, loading, router, isClient]);
 
-  if (!isClient || loading || !user || (user.role === 'student' && user.pin === '0000') || user.role === 'teacher') {
+  if (!isClient || loading || !user || user.role === 'teacher') {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

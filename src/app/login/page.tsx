@@ -128,8 +128,6 @@ export default function LoginPage() {
       });
       if (loggedInUser.role === 'teacher') {
         router.push('/admin');
-      } else if (loggedInUser.pin === '0000') {
-        router.push('/change-pin');
       } else {
         router.push('/');
       }
