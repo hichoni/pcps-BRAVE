@@ -8,20 +8,24 @@ export type Role = 'student' | 'teacher';
 
 export interface User {
   id: number;
-  username: string;
+  username: string; // Unique identifier. e.g., 'teacher1' or 's-4-1-1'
   pin: string;
   name: string;
   role: Role;
+  grade?: number;
+  classNum?: number;
+  studentNum?: number;
 }
 
 export const MOCK_USERS: User[] = [
     { id: 1, username: 'teacher1', pin: '1234', name: '김선생', role: 'teacher' },
     { id: 2, username: 'teacher2', pin: '1234', name: '이선생', role: 'teacher' },
-    { id: 11, username: 'student1', pin: '0000', name: '김철수', role: 'student' },
-    { id: 12, username: 'student2', pin: '1111', name: '이영희', role: 'student' },
-    { id: 13, username: 'student3', pin: '0000', name: '박바둑', role: 'student' },
-    { id: 14, username: 'student4', pin: '1111', name: '최미미', role: 'student' },
-    { id: 15, username: 'student5', pin: '1111', name: '강현우', role: 'student' },
+    { id: 11, username: 's-4-1-1', pin: '0000', name: '김철수', role: 'student', grade: 4, classNum: 1, studentNum: 1 },
+    { id: 12, username: 's-4-1-2', pin: '1111', name: '이영희', role: 'student', grade: 4, classNum: 1, studentNum: 2 },
+    { id: 13, username: 's-5-2-3', pin: '0000', name: '박바둑', role: 'student', grade: 5, classNum: 2, studentNum: 3 },
+    { id: 14, username: 's-5-2-4', pin: '1111', name: '최미미', role: 'student', grade: 5, classNum: 2, studentNum: 4 },
+    { id: 15, username: 's-6-1-5', pin: '1111', name: '강현우', role: 'student', grade: 6, classNum: 1, studentNum: 5 },
+    { id: 16, username: 's-4-1-111', pin: '0000', name: '홍길동', role: 'student', grade: 4, classNum: 1, studentNum: 111 },
 ];
 
 export type AreaState = {

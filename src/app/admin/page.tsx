@@ -69,7 +69,8 @@ export default function AdminPage() {
   const handleResetPin = async (studentUsername: string) => {
     try {
         await resetPin(studentUsername);
-        toast({ title: '성공', description: `${studentUsername} 학생의 PIN이 '0000'으로 초기화되었습니다.`});
+        const student = users.find(u => u.username === studentUsername);
+        toast({ title: '성공', description: `${student?.name} 학생의 PIN이 '0000'으로 초기화되었습니다.`});
     } catch (error) {
         toast({ variant: 'destructive', title: '오류', description: 'PIN 초기화에 실패했습니다.' });
     }
@@ -103,7 +104,9 @@ export default function AdminPage() {
               </SelectTrigger>
               <SelectContent>
                 {students.map(s => (
-                  <SelectItem key={s.id} value={s.username}>{s.name} ({s.username})</SelectItem>
+                  <SelectItem key={s.id} value={s.username}>
+                    {s.name} ({s.grade}학년 {s.classNum}반 {s.studentNum}번)
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>

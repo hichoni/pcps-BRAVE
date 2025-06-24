@@ -4,11 +4,19 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { useRouter } from 'next/navigation';
 import { User, MOCK_USERS } from '@/lib/config';
 
+interface LoginCredentials {
+  pin: string;
+  username?: string; // For teacher
+  grade?: number;    // For student
+  classNum?: number; // For student
+  studentNum?: number; // For student
+}
+
 interface AuthContextType {
   user: User | null;
   users: User[];
   loading: boolean;
-  login: (username: string, pin: string) => Promise<User | null>;
+  login: (credentials: LoginCredentials) => Promise<User | null>;
   logout: () => void;
   updatePin: (newPin: string) => Promise<void>;
   resetPin: (username: string) => Promise<void>;
@@ -58,8 +66,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('users', JSON.stringify(updatedUsers));
   }
 
-  const login = useCallback(async (username: string, pin: string): Promise<User | null> => {
-    const targetUser = users.find(u => u.username === username && u.pin === pin);
+  const login = useCallback(async (credentials: LoginCredentials): Promise<User | null> => {
+    const { pin, username, grade, classNum, studentNum } = credentials;
+    let targetUser: User | undefined;
+
+    if (username) { // Teacher login
+      targetUser = users.find(u => u.role === 'teacher' && u.username === username && u.pin === pin);
+    } else if (grade && classNum && studentNum) { // Student login
+      targetUser = users.find(u =>
+        u.role === 'student' &&
+        u.grade === grade &&
+        u.classNum === classNum &&
+        u.studentNum === studentNum &&
+        u.pin === pin
+      );
+    }
+    
     if (targetUser) {
       setUser(targetUser);
       sessionStorage.setItem('user', JSON.stringify(targetUser));
