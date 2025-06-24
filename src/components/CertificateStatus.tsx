@@ -2,21 +2,41 @@
 
 import { useAchievements } from '@/context/AchievementsContext';
 import { useAuth } from '@/context/AuthContext';
-import { STATUS_CONFIG } from '@/lib/config';
+import { STATUS_CONFIG, CERTIFICATE_THRESHOLDS } from '@/lib/config';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Skeleton } from './ui/skeleton';
 
 export function CertificateStatus() {
   const { user, loading: authLoading } = useAuth();
-  const { certificateStatus, loading: achievementsLoading } = useAchievements();
+  const { getAchievements, certificateStatus, loading: achievementsLoading } = useAchievements();
 
   if (authLoading || achievementsLoading || !user) {
     return <Skeleton className="h-40 w-full max-w-md mx-auto" />;
   }
   
+  const userAchievements = getAchievements(user.username);
+  const certifiedCount = Object.values(userAchievements).filter(a => a.isCertified).length;
   const currentStatus = certificateStatus(user.username);
   const statusInfo = STATUS_CONFIG[currentStatus];
+
+  const getNextGoalMessage = () => {
+    switch (currentStatus) {
+      case 'Unranked':
+        const neededForBronze = CERTIFICATE_THRESHOLDS.BRONZE - certifiedCount;
+        return `${neededForBronze}개 영역만 더 인증하면 동장이에요!`;
+      case 'Bronze':
+        const neededForSilver = CERTIFICATE_THRESHOLDS.SILVER - certifiedCount;
+        return `${neededForSilver}개 영역만 더 인증하면 은장이에요!`;
+      case 'Silver':
+        const neededForGold = CERTIFICATE_THRESHOLDS.GOLD - certifiedCount;
+        return `${neededForGold}개 영역만 더 인증하면 금장이에요!`;
+      case 'Gold':
+        return '최고 등급을 달성했어요! 축하합니다!';
+      default:
+        return '';
+    }
+  };
 
   return (
     <Card className="max-w-md mx-auto shadow-lg border-primary/20">
@@ -29,7 +49,7 @@ export function CertificateStatus() {
           <p className={cn("text-3xl font-bold font-headline transition-colors duration-500", statusInfo.color)}>
             {statusInfo.label}
           </p>
-          <p className="text-muted-foreground">{currentStatus}</p>
+          <p className="text-muted-foreground font-semibold">{getNextGoalMessage()}</p>
         </div>
       </CardContent>
     </Card>
