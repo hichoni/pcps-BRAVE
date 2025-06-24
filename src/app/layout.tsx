@@ -5,8 +5,8 @@ import { AchievementsProvider } from '@/context/AchievementsContext';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
-  title: 'Scholar Achievements Tracker',
-  description: 'Track your progress towards school-wide certification.',
+  title: '장학생 성취 트래커',
+  description: '학교장 인증을 향한 진행 상황을 추적하세요.',
 };
 
 export default function RootLayout({
@@ -15,7 +15,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="ko">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

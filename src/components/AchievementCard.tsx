@@ -30,9 +30,9 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
             </div>
             <CardDescription className="text-sm">{areaConfig.name}</CardDescription>
           </div>
-          <Badge variant={isCertified ? 'default' : 'secondary'} className="capitalize shrink-0">
+          <Badge variant={isCertified ? 'default' : 'secondary'} className="shrink-0">
             {isCertified ? <CheckCircle2 className="mr-1 h-4 w-4" /> : <XCircle className="mr-1 h-4 w-4" />}
-            {isCertified ? 'Certified' : 'Not Certified'}
+            {isCertified ? '인증됨' : '미인증'}
           </Badge>
         </div>
       </CardHeader>

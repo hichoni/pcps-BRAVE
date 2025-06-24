@@ -25,8 +25,8 @@ import { certificationCheck, CertificationCheckOutput } from '@/ai/flows/certifi
 import { Loader2, FileUp, CheckCircle, AlertTriangle } from 'lucide-react';
 
 const formSchema = z.object({
-  description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
-  evidence: z.any().refine(file => file instanceof FileList && file.length > 0, 'Evidence file is required.'),
+  description: z.string().min(10, { message: '설명은 최소 10자 이상이어야 합니다.' }),
+  evidence: z.any().refine(file => file instanceof FileList && file.length > 0, '증빙 자료 파일은 필수입니다.'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -89,8 +89,8 @@ export function AddAchievementDialog({ areaName }: { areaName: AreaName }) {
           evidenceDataUri: '', // Not storing large data URI in local storage
         });
         toast({
-          title: '✅ Achievement Certified!',
-          description: `Your achievement in ${areaConfig.koreanName} has been approved.`,
+          title: '✅ 성취 인증 완료!',
+          description: `${areaConfig.koreanName} 영역의 성취가 승인되었습니다.`,
         });
         setTimeout(() => {
           setOpen(false);
@@ -99,18 +99,18 @@ export function AddAchievementDialog({ areaName }: { areaName: AreaName }) {
         setAiState('error');
         toast({
           variant: 'destructive',
-          title: 'Certification Denied',
+          title: '인증 거부됨',
           description: result.reasoning,
         });
       }
     } catch (error) {
       console.error('Certification check failed:', error);
       setAiState('error');
-      setAiResponse({ meetsRequirements: false, reasoning: "An unexpected error occurred. Please try again." });
+      setAiResponse({ meetsRequirements: false, reasoning: "예기치 않은 오류가 발생했습니다. 다시 시도해주세요." });
       toast({
         variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to check certification. Please try again later.',
+        title: '오류',
+        description: '인증 확인에 실패했습니다. 나중에 다시 시도해주세요.',
       });
     }
   };
@@ -139,16 +139,16 @@ export function AddAchievementDialog({ areaName }: { areaName: AreaName }) {
           </DialogHeader>
           <div className="grid gap-6 py-6">
             <div className="grid gap-2">
-              <Label htmlFor="description">Achievement Description</Label>
+              <Label htmlFor="description">성취 설명</Label>
               <Controller
                 name="description"
                 control={control}
-                render={({ field }) => <Textarea id="description" placeholder="Describe your achievement in detail..." {...field} />}
+                render={({ field }) => <Textarea id="description" placeholder="성취에 대해 자세히 설명해주세요..." {...field} />}
               />
               {errors.description && <p className="text-sm text-destructive">{errors.description.message}</p>}
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="evidence">Evidence</Label>
+              <Label htmlFor="evidence">증빙 자료</Label>
               <Controller
                 name="evidence"
                 control={control}
@@ -163,14 +163,14 @@ export function AddAchievementDialog({ areaName }: { areaName: AreaName }) {
                   />
                 )}
               />
-              {evidenceFile?.[0] && <p className="text-sm text-muted-foreground">Selected: {evidenceFile[0].name}</p>}
+              {evidenceFile?.[0] && <p className="text-sm text-muted-foreground">선택된 파일: {evidenceFile[0].name}</p>}
               {errors.evidence && <p className="text-sm text-destructive">{errors.evidence.message as string}</p>}
             </div>
             {aiState !== 'idle' && aiResponse && (
                <div className={`p-4 rounded-md flex items-start gap-4 ${aiState === 'success' ? 'bg-green-500/10 text-green-400' : 'bg-destructive/10 text-destructive'}`}>
                 {aiState === 'success' ? <CheckCircle className="w-5 h-5 mt-1" /> : <AlertTriangle className="w-5 h-5 mt-1" />}
                 <div>
-                  <h4 className="font-bold">{aiState === 'success' ? 'Certification Approved' : 'Certification Denied'}</h4>
+                  <h4 className="font-bold">{aiState === 'success' ? '인증 승인됨' : '인증 거부됨'}</h4>
                   <p className="text-sm">{aiResponse.reasoning}</p>
                 </div>
                </div>
@@ -178,11 +178,11 @@ export function AddAchievementDialog({ areaName }: { areaName: AreaName }) {
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button type="button" variant="secondary">Cancel</Button>
+              <Button type="button" variant="secondary">취소</Button>
             </DialogClose>
             <Button type="submit" disabled={aiState === 'loading'}>
               {aiState === 'loading' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Check Certification
+              인증 확인
             </Button>
           </DialogFooter>
         </form>

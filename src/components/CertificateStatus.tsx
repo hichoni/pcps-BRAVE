@@ -18,7 +18,7 @@ export function CertificateStatus() {
   return (
     <Card className="max-w-md mx-auto shadow-lg border-primary/20">
       <CardHeader className="text-center pb-2">
-        <CardTitle className="font-headline text-2xl">Overall Status</CardTitle>
+        <CardTitle className="font-headline text-2xl">전체 현황</CardTitle>
       </CardHeader>
       <CardContent className="text-center">
         <div className="flex flex-col items-center gap-2">
