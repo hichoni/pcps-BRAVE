@@ -223,13 +223,13 @@ export default function AdminPage() {
                                                   ) : (
                                                       <Select
                                                         value={progress as string || ''}
-                                                        onValueChange={(value) => handleProgressUpdate(student.username, area, value)}
+                                                        onValueChange={(value) => handleProgressUpdate(student.username, area, value === '__NONE__' ? '' : value)}
                                                       >
                                                         <SelectTrigger className="w-[120px] h-8">
                                                             <SelectValue placeholder="선택" />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            <SelectItem value="">미선택</SelectItem>
+                                                            <SelectItem value="__NONE__">미선택</SelectItem>
                                                             {areaConfig.options?.map(option => (
                                                                 <SelectItem key={option} value={option}>{option}</SelectItem>
                                                             ))}
