@@ -24,13 +24,15 @@ const ChallengeConfigContext = createContext<ChallengeConfigContextType | undefi
 
 const resolveConfigWithIcons = (storedConfig: StoredChallengeConfig): ChallengeConfig => {
     const resolvedConfig = {} as ChallengeConfig;
-    (Object.keys(storedConfig) as AreaName[]).forEach(area => {
+    AREAS.forEach(area => {
         const config = storedConfig[area];
-        resolvedConfig[area] = {
-            ...config,
-            name: area,
-            icon: ICONS[config.iconName] || ShieldOff, // Fallback icon
-        };
+        if (config) {
+            resolvedConfig[area] = {
+                ...config,
+                name: area,
+                icon: ICONS[config.iconName] || ShieldOff, // Fallback icon
+            };
+        }
     });
     return resolvedConfig;
 };
@@ -43,52 +45,54 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
 
   useEffect(() => {
     const fetchConfig = async () => {
+      setLoading(true);
+      let configData: StoredChallengeConfig;
+
       if (!db) {
-        const defaultConfig = {...DEFAULT_AREAS_CONFIG};
-        setChallengeConfig(resolveConfigWithIcons(defaultConfig));
-        setLoading(false);
-        return;
-      }
+        configData = { ...DEFAULT_AREAS_CONFIG };
+      } else {
+        try {
+          const configDocRef = doc(db, CONFIG_DOC_PATH);
+          const configDocSnap = await getDoc(configDocRef);
 
-      try {
-        const configDocRef = doc(db, CONFIG_DOC_PATH);
-        const configDocSnap = await getDoc(configDocRef);
-
-        let configData: StoredChallengeConfig;
-
-        if (configDocSnap.exists()) {
-          configData = configDocSnap.data() as StoredChallengeConfig;
-        } else {
-          // If no config in Firestore, use default and save it.
+          if (configDocSnap.exists() && typeof configDocSnap.data() === 'object' && configDocSnap.data() !== null) {
+            configData = configDocSnap.data() as StoredChallengeConfig;
+          } else {
+            // If no config in Firestore or data is malformed, use default and save it.
+            configData = { ...DEFAULT_AREAS_CONFIG };
+            await setDoc(configDocRef, configData);
+          }
+        } catch (error) {
+          console.warn("Failed to fetch/read challenge config from Firestore", error);
           configData = { ...DEFAULT_AREAS_CONFIG };
-          await setDoc(configDocRef, configData);
         }
-        
-        // Ensure all areas from AREAS constant exist in the config
-        let needsUpdate = false;
+      }
+      
+      try {
+        // Ensure all areas from AREAS constant exist in the config, and data is valid
+        let needsUpdateInDb = false;
         AREAS.forEach(area => {
-            if (!configData[area]) {
+            if (!configData[area] || typeof configData[area] !== 'object') {
                 configData[area] = DEFAULT_AREAS_CONFIG[area];
-                needsUpdate = true;
+                needsUpdateInDb = true;
             }
-            // Ensure goal is in the new format
-            if (typeof configData[area].goal === 'number') {
-                const oldGoal = configData[area].goal as number;
+            // Ensure goal is in the new format (object with grade keys)
+            if (typeof configData[area].goal !== 'object' || configData[area].goal === null) {
+                const oldGoal = Number(configData[area].goal) || DEFAULT_AREAS_CONFIG[area].goal['4'];
                 configData[area].goal = { '4': oldGoal, '5': oldGoal, '6': oldGoal };
-                needsUpdate = true;
+                needsUpdateInDb = true;
             }
         });
         
-        if (needsUpdate) {
-            await setDoc(configDocRef, configData);
+        if (needsUpdateInDb && db) {
+            await setDoc(doc(db, CONFIG_DOC_PATH), configData);
         }
 
         setChallengeConfig(resolveConfigWithIcons(configData));
 
       } catch (error) {
-        console.warn("Failed to fetch challenge config from Firestore", error);
-        const defaultConfig = {...DEFAULT_AREAS_CONFIG};
-        setChallengeConfig(resolveConfigWithIcons(defaultConfig));
+        console.error("Error processing the challenge config, falling back to default.", error);
+        setChallengeConfig(resolveConfigWithIcons({ ...DEFAULT_AREAS_CONFIG }));
       } finally {
         setLoading(false);
       }
@@ -99,9 +103,11 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
 
   const updateChallengeConfig = useCallback(async (newConfig: StoredChallengeConfig) => {
     setLoading(true);
+    // Optimistically update the UI
     setChallengeConfig(resolveConfigWithIcons(newConfig));
 
     if (!db) {
+        console.warn("DB not available, config only updated in local state.");
         setLoading(false);
         return;
     }
@@ -110,7 +116,8 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
       const configDocRef = doc(db, CONFIG_DOC_PATH);
       await setDoc(configDocRef, newConfig);
     } catch (error) {
-      console.warn("Failed to save challenge config to Firestore", error);
+      console.error("Failed to save challenge config to Firestore", error);
+      // Optional: Add logic to revert optimistic update
     } finally {
       setLoading(false);
     }
