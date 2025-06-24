@@ -20,6 +20,7 @@ interface AuthContextType {
   logout: () => void;
   updatePin: (newPin: string) => Promise<void>;
   resetPin: (username: string) => Promise<void>;
+  deleteUser: (username: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -116,8 +117,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     persistUsers(updatedUsers);
   }, [users]);
 
+  const deleteUser = useCallback(async (username: string) => {
+    const updatedUsers = users.filter(u => u.username !== username);
+    persistUsers(updatedUsers);
+    // If the deleted user is the one logged in, log them out.
+    if (user?.username === username) {
+      logout();
+    }
+  }, [users, user, logout]);
+
   return (
-    <AuthContext.Provider value={{ user, users, loading, login, logout, updatePin, resetPin }}>
+    <AuthContext.Provider value={{ user, users, loading, login, logout, updatePin, resetPin, deleteUser }}>
       {children}
     </AuthContext.Provider>
   );

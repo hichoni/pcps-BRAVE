@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -11,14 +11,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Users, Undo, LogOut, Settings, Plus, Minus, CheckCircle2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Loader2, Users, Undo, LogOut, Settings, Plus, Minus, Check, Trash2 } from 'lucide-react';
 
 export default function AdminPage() {
-  const { user, users, loading: authLoading, logout, resetPin } = useAuth();
-  const { getAchievements, updateProgress, loading: achievementsLoading } = useAchievements();
+  const { user, users, loading: authLoading, logout, resetPin, deleteUser } = useAuth();
+  const { getAchievements, updateProgress, toggleCertification, loading: achievementsLoading } = useAchievements();
   const { challengeConfig, loading: configLoading } = useChallengeConfig();
   const router = useRouter();
   const { toast } = useToast();
+  const [studentToDelete, setStudentToDelete] = useState<User | null>(null);
+
 
   useEffect(() => {
     if (!authLoading && user?.role !== 'teacher') {
@@ -37,6 +40,14 @@ export default function AdminPage() {
     }
   };
 
+  const handleToggleCertification = async (username: string, area: AreaName) => {
+    try {
+        await toggleCertification(username, area);
+    } catch (error) {
+        toast({ variant: 'destructive', title: '오류', description: '인증 상태 변경에 실패했습니다.' });
+    }
+  };
+  
   const handleResetPin = async (studentUsername: string) => {
     try {
         await resetPin(studentUsername);
@@ -44,6 +55,18 @@ export default function AdminPage() {
         toast({ title: '성공', description: `${student?.name} 학생의 PIN이 '0000'으로 초기화되었습니다.`});
     } catch (error) {
         toast({ variant: 'destructive', title: '오류', description: 'PIN 초기화에 실패했습니다.' });
+    }
+  };
+
+  const handleDeleteStudent = async () => {
+    if (!studentToDelete) return;
+    try {
+        await deleteUser(studentToDelete.username);
+        toast({ title: '성공', description: `${studentToDelete.name} 학생 정보가 삭제되었습니다.`});
+    } catch (error) {
+        toast({ variant: 'destructive', title: '오류', description: '학생 정보 삭제에 실패했습니다.' });
+    } finally {
+        setStudentToDelete(null);
     }
   };
 
@@ -74,60 +97,91 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <Card>
-          <CardHeader>
-              <CardTitle>학생 명렬표</CardTitle>
-              <CardDescription>학생들의 도전과제 성취 현황을 관리하고 PIN을 초기화할 수 있습니다.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead className="w-[220px]">학생 정보</TableHead>
-                        {AREAS.map(area => (
-                            <TableHead key={area} className="text-center">{challengeConfig[area].koreanName}</TableHead>
-                        ))}
-                        <TableHead className="text-center w-[150px]">관리</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {students.map(student => {
-                        const studentAchievements = getAchievements(student.username);
-                        return (
-                            <TableRow key={student.id}>
-                                <TableCell className="font-medium whitespace-nowrap">
-                                    {`${student.grade}학년 ${student.classNum}반 ${student.studentNum}번 ${student.name}`}
-                                </TableCell>
-                                {AREAS.map(area => {
-                                    const progress = studentAchievements?.[area]?.progress ?? 0;
-                                    const isCertified = studentAchievements?.[area]?.isCertified ?? false;
-                                    return (
-                                        <TableCell key={area}>
-                                            <div className="flex items-center justify-center gap-1">
-                                                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleProgressUpdate(student.username, area, -1)}>
-                                                    <Minus className="h-4 w-4"/>
-                                                </Button>
-                                                <span className="font-mono w-10 text-center text-lg">{progress}</span>
-                                                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleProgressUpdate(student.username, area, 1)}>
-                                                    <Plus className="h-4 w-4"/>
-                                                </Button>
-                                                {isCertified && <CheckCircle2 className="h-5 w-5 text-green-500 ml-2" />}
-                                            </div>
-                                        </TableCell>
-                                    )
-                                })}
-                                <TableCell className="text-center">
-                                    <Button variant="destructive" size="sm" className="h-8 px-2" onClick={() => handleResetPin(student.username)}>
-                                        <Undo className="mr-1 h-3.5 w-3.5" /> PIN 초기화
-                                    </Button>
-                                </TableCell>
-                            </TableRow>
-                        )
-                    })}
-                </TableBody>
-            </Table>
-          </CardContent>
-      </Card>
+      <AlertDialog onOpenChange={(open) => !open && setStudentToDelete(null)}>
+        <Card>
+            <CardHeader>
+                <CardTitle>학생 명렬표</CardTitle>
+                <CardDescription>학생들의 도전과제 성취 현황을 관리하고 PIN을 초기화하거나 학생 정보를 삭제할 수 있습니다.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                  <TableHeader>
+                      <TableRow>
+                          <TableHead className="w-[220px]">학생 정보</TableHead>
+                          {AREAS.map(area => (
+                              <TableHead key={area} className="text-center">{challengeConfig[area].koreanName}</TableHead>
+                          ))}
+                          <TableHead className="text-center w-[220px]">관리</TableHead>
+                      </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                      {students.map(student => {
+                          const studentAchievements = getAchievements(student.username);
+                          return (
+                              <TableRow key={student.id}>
+                                  <TableCell className="font-medium whitespace-nowrap">
+                                      {`${student.grade}학년 ${student.classNum}반 ${student.studentNum}번 ${student.name}`}
+                                  </TableCell>
+                                  {AREAS.map(area => {
+                                      const progress = studentAchievements?.[area]?.progress ?? 0;
+                                      const isCertified = studentAchievements?.[area]?.isCertified ?? false;
+                                      return (
+                                          <TableCell key={area}>
+                                              <div className="flex items-center justify-center gap-1">
+                                                  <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => handleProgressUpdate(student.username, area, -1)}>
+                                                      <Minus className="h-3 w-3"/>
+                                                  </Button>
+                                                  <span className="font-mono w-8 text-center text-base">{progress}</span>
+                                                  <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => handleProgressUpdate(student.username, area, 1)}>
+                                                      <Plus className="h-3 w-3"/>
+                                                  </Button>
+                                                  <Button
+                                                    variant={isCertified ? 'default' : 'outline'}
+                                                    size="icon"
+                                                    className="h-6 w-6 ml-2"
+                                                    onClick={() => handleToggleCertification(student.username, area)}
+                                                  >
+                                                      <Check className="h-4 w-4" />
+                                                  </Button>
+                                              </div>
+                                          </TableCell>
+                                      )
+                                  })}
+                                  <TableCell className="text-center">
+                                      <div className="flex items-center justify-center gap-2">
+                                          <Button variant="outline" size="sm" className="h-8 px-2" onClick={() => handleResetPin(student.username)}>
+                                              <Undo className="mr-1 h-3.5 w-3.5" /> PIN 초기화
+                                          </Button>
+                                          <AlertDialogTrigger asChild>
+                                              <Button variant="destructive" size="sm" className="h-8 px-2" onClick={() => setStudentToDelete(student)}>
+                                                  <Trash2 className="mr-1 h-3.5 w-3.5" /> 삭제
+                                              </Button>
+                                          </AlertDialogTrigger>
+                                      </div>
+                                  </TableCell>
+                              </TableRow>
+                          )
+                      })}
+                  </TableBody>
+              </Table>
+            </CardContent>
+        </Card>
+
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>정말로 삭제하시겠습니까?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    {studentToDelete && `${studentToDelete.grade}학년 ${studentToDelete.classNum}반 ${studentToDelete.studentNum}번 ${studentToDelete.name}`} 학생의 모든 데이터가 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>취소</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteStudent} className="bg-destructive hover:bg-destructive/90">
+                    삭제
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

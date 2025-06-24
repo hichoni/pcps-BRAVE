@@ -10,6 +10,7 @@ type AllAchievementsState = Record<string, AchievementsState>; // Keyed by usern
 interface AchievementsContextType {
   getAchievements: (username: string) => AchievementsState | null;
   updateProgress: (username: string, area: AreaName, progress: number) => Promise<void>;
+  toggleCertification: (username: string, area: AreaName) => Promise<void>;
   certificateStatus: (username: string) => CertificateStatus;
   loading: boolean;
 }
@@ -94,30 +95,41 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
 
   const updateProgress = useCallback(async (username: string, area: AreaName, progress: number) => {
     setAllAchievements(prev => {
-      if (!prev || !prev[username] || !challengeConfig || !users) return prev;
-      
-      const student = users.find((u: User) => u.username === username);
-      if (!student || !student.grade) return prev; // Not a student or no grade
-
-      const areaConfig = challengeConfig[area];
-      if (!areaConfig) return prev;
-      
-      const goalForGrade = areaConfig.goal[student.grade];
-      if (typeof goalForGrade === 'undefined') return prev; // No goal for this grade
-
-      const isCertified = progress >= goalForGrade;
+      if (!prev || !prev[username]) return prev;
       
       const newState = { ...prev };
+      
+      const existingAreaState = prev[username][area] || { progress: 0, isCertified: false };
+
       newState[username] = {
         ...prev[username],
         [area]: {
+          ...existingAreaState,
           progress,
-          isCertified,
         },
       };
       return newState;
     });
-  }, [challengeConfig, users]);
+  }, []);
+
+  const toggleCertification = useCallback(async (username: string, area: AreaName) => {
+    setAllAchievements(prev => {
+        if (!prev || !prev[username]) return prev;
+        
+        const existingAreaState = prev[username][area] || { progress: 0, isCertified: false };
+        const currentIsCertified = existingAreaState.isCertified;
+        
+        const newState = { ...prev };
+        newState[username] = {
+            ...prev[username],
+            [area]: {
+                ...existingAreaState,
+                isCertified: !currentIsCertified,
+            },
+        };
+        return newState;
+    });
+  }, []);
   
   const certificateStatus = useCallback((username: string): CertificateStatus => {
     if (!allAchievements || !allAchievements[username]) return 'Unranked';
@@ -132,7 +144,7 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
   }, [allAchievements]);
 
   return (
-    <AchievementsContext.Provider value={{ getAchievements, updateProgress, certificateStatus, loading: loading || configLoading }}>
+    <AchievementsContext.Provider value={{ getAchievements, updateProgress, toggleCertification, certificateStatus, loading: loading || configLoading }}>
       {children}
     </AchievementsContext.Provider>
   );
