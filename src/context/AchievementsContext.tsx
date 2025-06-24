@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
@@ -10,7 +11,7 @@ import { collection, doc, getDocs, setDoc, updateDoc } from 'firebase/firestore'
 type AllAchievementsState = Record<string, AchievementsState>; // Keyed by username
 
 interface AchievementsContextType {
-  getAchievements: (username: string) => AchievementsState | null;
+  getAchievements: (username: string) => AchievementsState;
   updateProgress: (username: string, area: AreaName, progress: number) => Promise<void>;
   toggleCertification: (username: string, area: AreaName) => Promise<void>;
   certificateStatus: (username: string) => CertificateStatus;
@@ -48,30 +49,19 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
         const achievementsCollectionRef = collection(db, 'achievements');
         const querySnapshot = await getDocs(achievementsCollectionRef);
         const fetchedAchievements: AllAchievementsState = {};
+        
         querySnapshot.forEach(doc => {
-            fetchedAchievements[doc.id] = doc.data() as AchievementsState;
+            const data = doc.data();
+            const achievements = generateInitialStateForUser(); // Start with a full default object
+            // Merge fetched data over the default to ensure all fields are present
+            Object.keys(achievements).forEach(key => {
+                const area = key as AreaName;
+                if (data[area]) {
+                    achievements[area] = { ...achievements[area], ...data[area] };
+                }
+            });
+            fetchedAchievements[doc.id] = achievements;
         });
-
-        const students = users.filter(u => u.role === 'student');
-        
-        const batch: { ref: any; data: AchievementsState }[] = [];
-
-        students.forEach(student => {
-            if (!fetchedAchievements[student.username]) {
-                const newAchievement = generateInitialStateForUser();
-                fetchedAchievements[student.username] = newAchievement;
-                
-                const achievementDocRef = doc(db, 'achievements', student.username);
-                batch.push({ ref: achievementDocRef, data: newAchievement });
-            }
-        });
-        
-        if (batch.length > 0) {
-            console.log(`Creating achievement entries for ${batch.length} new students...`);
-            for (const item of batch) {
-                await setDoc(item.ref, item.data);
-            }
-        }
         
         setAllAchievements(fetchedAchievements);
 
@@ -92,7 +82,7 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
   }, [users, authLoading]);
 
 
-  const getAchievements = useCallback((username: string): AchievementsState | null => {
+  const getAchievements = useCallback((username: string): AchievementsState => {
     if (!allAchievements) return generateInitialStateForUser(); // Return default if not loaded
     return allAchievements[username] || generateInitialStateForUser();
   }, [allAchievements]);

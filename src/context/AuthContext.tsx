@@ -1,8 +1,9 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, MOCK_USERS } from '@/lib/config';
+import { User, MOCK_USERS, AREAS, AreaName, AchievementsState } from '@/lib/config';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, setDoc, query, where, writeBatch, deleteDoc, updateDoc, addDoc } from 'firebase/firestore';
 
@@ -31,6 +32,18 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Helper function to avoid circular dependency
+const generateInitialStateForUser = (): AchievementsState => {
+    const studentAchievements = {} as AchievementsState;
+    AREAS.forEach(area => {
+        studentAchievements[area] = {
+            progress: 0,
+            isCertified: false
+        };
+    });
+    return studentAchievements;
+}
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -91,8 +104,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [fetchUsers]);
   
   // This useEffect re-validates the session user when the users list is updated.
+  const logout = useCallback(() => {
+    setUser(null);
+    sessionStorage.removeItem('user');
+    router.push('/login');
+  }, [router]);
+
   useEffect(() => {
-      if (user) {
+      if (user && users.length > 0) {
           const updatedUser = users.find(u => u.id === user.id);
           if (updatedUser) {
               if (JSON.stringify(user) !== JSON.stringify(updatedUser)) {
@@ -104,8 +123,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               logout();
           }
       }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [users]);
+  }, [users, user, logout]);
 
   const login = useCallback(async (credentials: LoginCredentials): Promise<User | null> => {
     const { pin, username, grade, classNum, studentNum } = credentials;
@@ -130,12 +148,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     return null;
   }, [users]);
-
-  const logout = useCallback(() => {
-    setUser(null);
-    sessionStorage.removeItem('user');
-    router.push('/login');
-  }, [router]);
 
   const updatePin = useCallback(async (newPin: string) => {
     if (!user) return;
@@ -181,13 +193,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!db) return;
 
     try {
+        const batch = writeBatch(db);
         const userDocRef = doc(db, "users", String(targetUser.id));
-        await deleteDoc(userDocRef);
-        // Also delete achievements
+        batch.delete(userDocRef);
+        
         const achievementDocRef = doc(db, 'achievements', username);
-        await deleteDoc(achievementDocRef);
+        batch.delete(achievementDocRef);
+
+        await batch.commit();
     } catch (e) {
-        console.warn("Failed to delete user from Firestore", e);
+        console.warn("Failed to delete user and achievements from Firestore", e);
     }
   }, [users]);
 
@@ -226,10 +241,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
+        const batch = writeBatch(db);
         const userDocRef = doc(db, "users", String(newUser.id));
-        await setDoc(userDocRef, newUser);
+        batch.set(userDocRef, newUser);
+        
+        const achievementDocRef = doc(db, 'achievements', newUser.username);
+        batch.set(achievementDocRef, generateInitialStateForUser());
+        
+        await batch.commit();
+
     } catch (e) {
-        console.warn("Failed to add user to Firestore", e);
+        console.warn("Failed to add user and achievements to Firestore", e);
     }
 
     return { success: true, message: `${name} 학생이 추가되었습니다.` };
@@ -272,8 +294,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         newUsers.push(newUser);
         currentUsers.push(newUser); // Add to temp list to check for duplicates within the same file
         if (batch) {
-            const docRef = doc(db, "users", String(newUser.id));
-            batch.set(docRef, newUser);
+            const userDocRef = doc(db, "users", String(newUser.id));
+            batch.set(userDocRef, newUser);
+            
+            const achievementDocRef = doc(db, "achievements", newUser.username);
+            batch.set(achievementDocRef, generateInitialStateForUser());
         }
         successCount++;
       }
@@ -285,7 +310,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           try {
             await batch.commit();
           } catch(e) {
-            console.warn("Failed to bulk add users to Firestore", e);
+            console.warn("Failed to bulk add users and achievements to Firestore", e);
           }
       }
     }

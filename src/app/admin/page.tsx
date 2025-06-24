@@ -45,7 +45,7 @@ export default function AdminPage() {
 
   const handleProgressUpdate = async (username: string, area: AreaName, change: number) => {
     const studentAchievements = getAchievements(username);
-    const currentProgress = studentAchievements?.[area]?.progress || 0;
+    const currentProgress = studentAchievements[area].progress || 0;
     const newProgress = Math.max(0, currentProgress + change);
     try {
         await updateProgress(username, area, newProgress);
@@ -199,8 +199,8 @@ export default function AdminPage() {
                                   </TableCell>
                                   {AREAS.map(area => {
                                       if (!challengeConfig[area]) return null;
-                                      const progress = studentAchievements?.[area]?.progress ?? 0;
-                                      const isCertified = studentAchievements?.[area]?.isCertified ?? false;
+                                      const progress = studentAchievements[area].progress;
+                                      const isCertified = studentAchievements[area].isCertified;
                                       return (
                                           <TableCell key={area}>
                                               <div className="flex items-center justify-center gap-1">
