@@ -1,7 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { AreaName, AchievementsState, CertificateStatus, AREAS, CERTIFICATE_THRESHOLDS, AREAS_CONFIG, MOCK_USERS } from '@/lib/config';
+import { useAuth } from './AuthContext';
+import { AreaName, AchievementsState, CertificateStatus, AREAS, CERTIFICATE_THRESHOLDS, AREAS_CONFIG } from '@/lib/config';
 
 type AllAchievementsState = Record<string, AchievementsState>; // Keyed by username
 
@@ -14,42 +15,65 @@ interface AchievementsContextType {
 
 const AchievementsContext = createContext<AchievementsContextType | undefined>(undefined);
 
-const generateInitialState = (): AllAchievementsState => {
-  const allAchievements: AllAchievementsState = {};
-  MOCK_USERS.forEach(user => {
-    if (user.role === 'student') {
-      const studentAchievements = {} as AchievementsState;
-      AREAS.forEach(area => {
+const generateInitialStateForUser = (): AchievementsState => {
+    const studentAchievements = {} as AchievementsState;
+    AREAS.forEach(area => {
         studentAchievements[area] = {
-          progress: 0,
-          isCertified: false
+            progress: 0,
+            isCertified: false
         };
-      });
-      allAchievements[user.username] = studentAchievements;
-    }
-  });
-  return allAchievements;
-};
+    });
+    return studentAchievements;
+}
 
 export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
   const [allAchievements, setAllAchievements] = useState<AllAchievementsState | null>(null);
   const [loading, setLoading] = useState(true);
+  const { users, loading: authLoading } = useAuth();
 
   useEffect(() => {
+    if (authLoading) return; // Wait for users to be available
+
     try {
-      const storedData = localStorage.getItem('allAchievements');
-      if (storedData) {
-        setAllAchievements(JSON.parse(storedData));
-      } else {
-        setAllAchievements(generateInitialState());
+      const storedDataRaw = localStorage.getItem('allAchievements');
+      const storedData: AllAchievementsState = storedDataRaw ? JSON.parse(storedDataRaw) : {};
+      
+      const students = users.filter(u => u.role === 'student');
+      let needsUpdate = false;
+
+      // Ensure all current students have an entry
+      students.forEach(student => {
+          if (!storedData[student.username]) {
+              storedData[student.username] = generateInitialStateForUser();
+              needsUpdate = true;
+          }
+      });
+
+      // Prune achievements for users that no longer exist
+      const studentUsernames = new Set(students.map(s => s.username));
+      for (const username in storedData) {
+          if (!studentUsernames.has(username)) {
+              delete storedData[username];
+              needsUpdate = true;
+          }
       }
+
+      setAllAchievements(storedData);
+      if (needsUpdate) {
+        localStorage.setItem('allAchievements', JSON.stringify(storedData));
+      }
+
     } catch (error) {
-      console.error("Failed to parse achievements from localStorage", error);
-      setAllAchievements(generateInitialState());
+      console.error("Failed to process achievements from localStorage", error);
+      const initialState: AllAchievementsState = {};
+      users.filter(u => u.role === 'student').forEach(student => {
+          initialState[student.username] = generateInitialStateForUser();
+      });
+      setAllAchievements(initialState);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [users, authLoading]);
 
   useEffect(() => {
     if (allAchievements && !loading) {

@@ -15,10 +15,13 @@ export interface User {
 }
 
 export const MOCK_USERS: User[] = [
-    { id: 1, username: 'teacher', pin: '1234', name: '김선생', role: 'teacher' },
-    { id: 2, username: 'student1', pin: '0000', name: '김철수', role: 'student' },
-    { id: 3, username: 'student2', pin: '1111', name: '이영희', role: 'student' },
-    { id: 4, username: 'student3', pin: '0000', name: '박바둑', role: 'student' },
+    { id: 1, username: 'teacher1', pin: '1234', name: '김선생', role: 'teacher' },
+    { id: 2, username: 'teacher2', pin: '1234', name: '이선생', role: 'teacher' },
+    { id: 11, username: 'student1', pin: '0000', name: '김철수', role: 'student' },
+    { id: 12, username: 'student2', pin: '1111', name: '이영희', role: 'student' },
+    { id: 13, username: 'student3', pin: '0000', name: '박바둑', role: 'student' },
+    { id: 14, username: 'student4', pin: '1111', name: '최미미', role: 'student' },
+    { id: 15, username: 'student5', pin: '1111', name: '강현우', role: 'student' },
 ];
 
 export type AreaState = {

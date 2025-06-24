@@ -24,10 +24,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     try {
-      // Load users from "DB" (localStorage)
-      const storedUsers = localStorage.getItem('users');
-      const allUsers = storedUsers ? JSON.parse(storedUsers) : MOCK_USERS;
-      setUsers(allUsers);
+      // Load users from "DB" (localStorage) and merge with MOCK_USERS
+      const storedUsersRaw = localStorage.getItem('users');
+      const storedUsers = storedUsersRaw ? JSON.parse(storedUsersRaw) : [];
+
+      const userMap = new Map<number, User>();
+      // Add MOCK_USERS first. This ensures new users from the config are included.
+      MOCK_USERS.forEach(u => userMap.set(u.id, u));
+      // Overwrite with any stored users to preserve changes (like PIN updates).
+      (storedUsers as User[]).forEach(u => userMap.set(u.id, u));
+      
+      const allUsers = Array.from(userMap.values());
+      persistUsers(allUsers); // This also calls setUsers
       
       // Check for active session
       const sessionUser = sessionStorage.getItem('user');
