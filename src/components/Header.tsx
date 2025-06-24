@@ -28,7 +28,11 @@ export function Header() {
         </div>
         {user && (
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold">{user.name}님</span>
+            <span className="text-sm font-semibold">
+              {user.role === 'student'
+                ? `${user.grade}학년 ${user.classNum}반 ${user.studentNum}번 ${user.name} 학생`
+                : `${user.name}님`}
+            </span>
             <Button variant="ghost" size="icon" onClick={logout} aria-label="로그아웃">
               <LogOut className="h-5 w-5"/>
             </Button>
