@@ -10,8 +10,8 @@ export function Header() {
   const { user, logout } = useAuth();
 
   return (
-    <header className="py-8 text-center border-b-2 border-primary/10 mb-8 relative">
-        <div className="inline-flex items-center gap-6">
+    <header className="py-8 border-b-2 border-primary/10 mb-8 flex justify-between items-center">
+        <div className="flex items-center gap-6">
             <Image
               src="/icon-main.png"
               alt="풍천풍서초등학교 로고"
@@ -27,7 +27,7 @@ export function Header() {
             </div>
         </div>
         {user && (
-          <div className="absolute top-1/2 right-0 -translate-y-1/2 flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <span className="text-sm font-semibold">{user.name}님</span>
             <Button variant="ghost" size="icon" onClick={logout} aria-label="로그아웃">
               <LogOut className="h-5 w-5"/>
