@@ -41,14 +41,16 @@ export function CertificateStatus() {
   return (
     <Card className="max-w-md mx-auto shadow-lg border-primary/20">
       <CardHeader className="text-center pb-2">
-        <CardTitle className="font-headline text-2xl">전체 현황</CardTitle>
+        <CardTitle className="font-headline text-2xl">도전 현황</CardTitle>
       </CardHeader>
       <CardContent className="text-center">
         <div className="flex flex-col items-center gap-2">
           <statusInfo.icon className={cn("w-20 h-20 transition-all duration-500", statusInfo.color)} />
-          <p className={cn("text-3xl font-bold font-headline transition-colors duration-500", statusInfo.color)}>
-            {statusInfo.label}
-          </p>
+          {currentStatus !== 'Unranked' && (
+            <p className={cn("text-3xl font-bold font-headline transition-colors duration-500", statusInfo.color)}>
+              {statusInfo.label}
+            </p>
+          )}
           <p className="text-muted-foreground font-semibold">{getNextGoalMessage()}</p>
         </div>
       </CardContent>
