@@ -70,11 +70,10 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm shadow-lg">
         <CardHeader className="text-center">
             <Image
-              src="https://placehold.co/80x80.png"
+              src="/icon-main.png"
               alt="풍천풍서초등학교 로고"
               width={80}
               height={80}
-              data-ai-hint="school logo"
               className="mx-auto rounded-full shadow-md mb-4"
             />
           <CardTitle className="font-headline text-2xl">학교장 인증제 로그인</CardTitle>

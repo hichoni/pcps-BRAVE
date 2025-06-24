@@ -13,11 +13,10 @@ export function Header() {
     <header className="py-8 text-center border-b-2 border-primary/10 mb-8 relative">
         <div className="inline-flex items-center gap-6">
             <Image
-              src="https://placehold.co/72x72.png"
+              src="/icon-main.png"
               alt="풍천풍서초등학교 로고"
               width={72}
               height={72}
-              data-ai-hint="school logo"
               className="rounded-full shadow-md"
             />
             <div>
