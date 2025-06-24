@@ -34,17 +34,17 @@ type TeacherLoginFormValues = z.infer<typeof teacherLoginSchema>;
 
 const maskName = (name: string) => {
   if (name.length > 2) {
-    return `${name.charAt(0)}${'@'.repeat(name.length - 2)}${name.charAt(name.length - 1)}`;
+    return `${name.charAt(0)}${'*'.repeat(name.length - 2)}${name.charAt(name.length - 1)}`;
   }
   if (name.length === 2) {
-    return `${name.charAt(0)}@`;
+    return `${name.charAt(0)}*`;
   }
   return name;
 }
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, users, loading: authLoading } = useAuth();
+  const { login, users, loading: authLoading, usersLoading } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [foundStudent, setFoundStudent] = useState<User | null>(null);
@@ -73,20 +73,22 @@ export default function LoginPage() {
       const classNum = parseInt(watchedClassNum, 10);
       const studentNum = parseInt(watchedStudentNum, 10);
       if (!isNaN(grade) && !isNaN(classNum) && !isNaN(studentNum)) {
-        const student = users.find(u =>
-          u.role === 'student' &&
-          u.grade === grade &&
-          u.classNum === classNum &&
-          u.studentNum === studentNum
-        );
-        setFoundStudent(student || null);
+        if (!usersLoading) {
+            const student = users.find(u =>
+              u.role === 'student' &&
+              u.grade === grade &&
+              u.classNum === classNum &&
+              u.studentNum === studentNum
+            );
+            setFoundStudent(student || null);
+        }
       } else {
         setFoundStudent(null);
       }
     } else {
       setFoundStudent(null);
     }
-  }, [watchedGrade, watchedClassNum, watchedStudentNum, users]);
+  }, [watchedGrade, watchedClassNum, watchedStudentNum, users, usersLoading]);
 
   const onStudentSubmit = async (data: StudentLoginFormValues) => {
     setLoading(true);
@@ -142,6 +144,8 @@ export default function LoginPage() {
       description: '입력한 정보가 올바르지 않습니다.',
     });
   };
+
+  const combinedLoading = loading || usersLoading;
 
   if (!isClient || authLoading) {
     return (
@@ -219,8 +223,8 @@ export default function LoginPage() {
                 </div>
               </CardContent>
               <CardFooter>
-                <Button type="submit" className="w-full font-bold" disabled={loading}>
-                  {loading ? <Loader2 className="animate-spin" /> : <LogIn />}
+                <Button type="submit" className="w-full font-bold" disabled={combinedLoading}>
+                  {combinedLoading ? <Loader2 className="animate-spin" /> : <LogIn />}
                   로그인
                 </Button>
               </CardFooter>
@@ -241,8 +245,8 @@ export default function LoginPage() {
                 </div>
               </CardContent>
               <CardFooter>
-                <Button type="submit" className="w-full font-bold" disabled={loading}>
-                  {loading ? <Loader2 className="animate-spin" /> : <LogIn />}
+                <Button type="submit" className="w-full font-bold" disabled={combinedLoading}>
+                  {combinedLoading ? <Loader2 className="animate-spin" /> : <LogIn />}
                   로그인
                 </Button>
               </CardFooter>

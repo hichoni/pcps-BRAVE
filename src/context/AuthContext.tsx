@@ -22,6 +22,7 @@ interface AuthContextType {
   user: User | null;
   users: User[];
   loading: boolean;
+  usersLoading: boolean;
   login: (credentials: LoginCredentials) => Promise<User | null>;
   logout: () => void;
   updatePin: (newPin: string) => Promise<void>;
@@ -49,12 +50,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [usersLoading, setUsersLoading] = useState(true);
   const router = useRouter();
 
-  const fetchUsers = useCallback(async (): Promise<User[]> => {
+  const fetchUsers = useCallback(async (): Promise<void> => {
+    setUsersLoading(true);
     if (!db) {
+      console.warn("Firebase is disabled. Using local mock data.");
       setUsers(MOCK_USERS);
-      return MOCK_USERS;
+      setUsersLoading(false);
+      return;
     }
     
     try {
@@ -69,47 +74,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
         await batch.commit();
         setUsers(MOCK_USERS);
-        return MOCK_USERS;
       } else {
         const usersList = usersSnapshot.docs.map(doc => ({ ...doc.data() } as User));
         setUsers(usersList);
-        return usersList;
       }
     } catch(error) {
         console.warn("Error fetching users from Firestore:", error);
         setUsers(MOCK_USERS);
-        return MOCK_USERS;
+    } finally {
+        setUsersLoading(false);
     }
   }, []);
 
   useEffect(() => {
     const initializeAuth = async () => {
       setLoading(true);
-      const fetchedUsers = await fetchUsers();
+      fetchUsers(); // Fire-and-forget, this will populate `users` in the background.
       try {
         const sessionUser = sessionStorage.getItem('user');
         if (sessionUser) {
-          const parsedUser = JSON.parse(sessionUser);
-          const currentUserData = fetchedUsers.find((u: User) => u.id === parsedUser.id);
-          setUser(currentUserData || null);
+          // The user data will be reconciled in the second useEffect
+          setUser(JSON.parse(sessionUser));
         }
       } catch (error) {
         console.warn("Auth context initialization error:", error);
       } finally {
-        setLoading(false);
+        setLoading(false); // This is now fast.
       }
     };
 
     initializeAuth();
   }, [fetchUsers]);
   
-  // This useEffect re-validates the session user when the users list is updated.
   const logout = useCallback(() => {
     setUser(null);
     sessionStorage.removeItem('user');
     router.push('/login');
   }, [router]);
 
+  // This useEffect re-validates the session user when the users list is updated.
   useEffect(() => {
       if (user && users.length > 0) {
           const updatedUser = users.find(u => u.id === user.id);
@@ -320,7 +323,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   return (
-    <AuthContext.Provider value={{ user, users, loading, login, logout, updatePin, resetPin, deleteUser, addUser, bulkAddUsers }}>
+    <AuthContext.Provider value={{ user, users, loading, usersLoading, login, logout, updatePin, resetPin, deleteUser, addUser, bulkAddUsers }}>
       {children}
     </AuthContext.Provider>
   );
