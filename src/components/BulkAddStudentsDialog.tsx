@@ -73,11 +73,16 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
 
     const reader = new FileReader();
     reader.onload = async (e) => {
-        const text = e.target?.result as string;
+        let text = e.target?.result as string;
         if (!text) {
             toast({ variant: 'destructive', title: '파일 오류', description: '파일 내용을 읽을 수 없습니다.' });
             setLoading(false);
             return;
+        }
+
+        // Remove BOM (Byte Order Mark) if present
+        if (text.charCodeAt(0) === 0xFEFF) {
+            text = text.substring(1);
         }
 
         const lines = text.trim().split(/\r\n|\n/);
@@ -88,23 +93,30 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
             return;
         }
         
-        const header = lines[0];
-        const delimiter = header.includes(';') ? ';' : ',';
-
-        if (header.includes('학년')) {
+        let hasHeader = false;
+        if (lines[0].includes('학년')) {
+            hasHeader = true;
             lines.shift();
         }
+        
+        const delimiter = lines[0].includes(';') ? ';' : ',';
 
         const studentsToAdd: StudentData[] = [];
         const parseErrors: string[] = [];
 
         lines.forEach((line, index) => {
-            if (line.trim() === '') return;
+            const trimmedLine = line.trim();
+            if (trimmedLine === '') return;
             
-            const parts = line.split(delimiter).map(p => p.trim().replace(/^"|"$/g, ''));
+            const parts = trimmedLine.split(delimiter).map(p => p.trim().replace(/^"|"$/g, ''));
             
+            if (parts.length > 0 && parts.every(p => p === '')) {
+                return;
+            }
+
             if (parts.length !== 4) {
-                parseErrors.push(`${index + 1}번째 줄: 형식이 올바르지 않습니다. (예: 4${delimiter}1${delimiter}1${delimiter}김철수)`);
+                const lineNumber = hasHeader ? index + 2 : index + 1;
+                parseErrors.push(`${lineNumber}번째 줄: 형식이 올바르지 않습니다. 쉼표로 구분된 4개의 값(학년,반,번호,이름)이 필요합니다.`);
                 return;
             }
 
@@ -114,7 +126,8 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
             const studentNum = parseInt(studentNumStr, 10);
 
             if (isNaN(grade) || isNaN(classNum) || isNaN(studentNum) || !name) {
-                parseErrors.push(`${index + 1}번째 줄: 데이터가 유효하지 않습니다. 숫자와 이름이 올바른지 확인해주세요.`);
+                const lineNumber = hasHeader ? index + 2 : index + 1;
+                parseErrors.push(`${lineNumber}번째 줄: 데이터가 유효하지 않습니다. 숫자와 이름이 올바른지 확인해주세요.`);
                 return;
             }
             
