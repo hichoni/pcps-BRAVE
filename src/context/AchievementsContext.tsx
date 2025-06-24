@@ -4,7 +4,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { AreaName, AchievementsState, CertificateStatus, AREAS, CERTIFICATE_THRESHOLDS, User } from '@/lib/config';
-import { useChallengeConfig } from './ChallengeConfigContext';
 import { db } from '@/lib/firebase';
 import { collection, doc, getDocs, setDoc, updateDoc, getDoc } from 'firebase/firestore';
 
@@ -35,26 +34,22 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
   const [allAchievements, setAllAchievements] = useState<AllAchievementsState | null>(null);
   const [loading, setLoading] = useState(true);
   const { user, loading: authLoading } = useAuth();
-  const { loading: configLoading } = useChallengeConfig();
 
   useEffect(() => {
     const loadData = async () => {
-      // If auth is still loading, we are also loading. Wait for the next run.
+      // Wait for authentication to be resolved before doing anything.
       if (authLoading) {
-        setLoading(true);
         return;
       }
 
-      // If there is no user, we are done loading (with empty data).
-      if (!user) {
-        setAllAchievements({});
-        setLoading(false);
-        return;
-      }
-      
-      // If we have a user and auth is done, start loading their achievements.
       setLoading(true);
       try {
+        // If there is no user, we are done. Set empty state.
+        if (!user) {
+          setAllAchievements({});
+          return;
+        }
+        
         const fetchedAchievements: AllAchievementsState = {};
         if (!db) {
           console.warn("Firebase is not configured. No achievements will be loaded.");
@@ -182,7 +177,7 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
   }, [allAchievements]);
 
   return (
-    <AchievementsContext.Provider value={{ getAchievements, updateProgress, toggleCertification, certificateStatus, loading: loading || configLoading || authLoading }}>
+    <AchievementsContext.Provider value={{ getAchievements, updateProgress, toggleCertification, certificateStatus, loading }}>
       {children}
     </AchievementsContext.Provider>
   );
