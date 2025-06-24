@@ -79,7 +79,7 @@ export default function ChangePinPage() {
     <div className="flex min-h-screen items-center justify-center bg-secondary p-4">
       <Card className="w-full max-w-sm shadow-lg border">
         <CardHeader>
-          <CardTitle className="font-headline text-xl sm:text-2xl">최초 PIN 번호 변경</CardTitle>
+          <CardTitle className="font-headline text-2xl">최초 PIN 번호 변경</CardTitle>
           <CardDescription>
             보안을 위해 초기 PIN 번호를 변경해주세요.
           </CardDescription>
@@ -94,6 +94,7 @@ export default function ChangePinPage() {
                 maxLength={4}
                 {...register('newPin')}
                 placeholder="4자리 숫자"
+                className="text-lg"
               />
               {errors.newPin && <p className="text-sm text-destructive">{errors.newPin.message}</p>}
             </div>
@@ -105,6 +106,7 @@ export default function ChangePinPage() {
                 maxLength={4}
                 {...register('confirmPin')}
                 placeholder="4자리 숫자"
+                className="text-lg"
               />
               {errors.confirmPin && <p className="text-sm text-destructive">{errors.confirmPin.message}</p>}
             </div>

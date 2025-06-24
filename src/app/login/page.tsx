@@ -168,7 +168,7 @@ export default function LoginPage() {
               height={80}
               className="mx-auto rounded-full shadow-md mb-4"
             />
-            <CardTitle className="font-headline text-xl sm:text-2xl text-primary">학교장 인증제 로그인</CardTitle>
+            <CardTitle className="font-headline text-2xl text-primary">학교장 인증제 로그인</CardTitle>
             <CardDescription>계정 정보를 입력해주세요.</CardDescription>
           </CardHeader>
           <Tabs defaultValue="student" className="w-full">
@@ -220,6 +220,7 @@ export default function LoginPage() {
                       maxLength={4}
                       placeholder="4자리 숫자"
                       {...studentForm.register('pin')}
+                      className="text-lg"
                     />
                     {studentForm.formState.errors.pin && <p className="text-sm text-destructive">{studentForm.formState.errors.pin.message}</p>}
                   </div>
@@ -242,7 +243,7 @@ export default function LoginPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="pin-teacher">PIN 번호</Label>
-                    <Input id="pin-teacher" type="password" maxLength={4} placeholder="4자리 숫자" {...teacherForm.register('pin')} />
+                    <Input id="pin-teacher" type="password" maxLength={4} placeholder="4자리 숫자" {...teacherForm.register('pin')} className="text-lg"/>
                     {teacherForm.formState.errors.pin && <p className="text-sm text-destructive">{teacherForm.formState.errors.pin.message}</p>}
                   </div>
                 </CardContent>

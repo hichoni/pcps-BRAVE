@@ -11,7 +11,7 @@ export function Header() {
 
   return (
     <header className="py-6 border-b border-border mb-12 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center gap-4 sm:gap-6">
+        <div className="flex items-center gap-4">
             <Image
               src="/icon-main.png?v=2"
               alt="풍천풍서초등학교 로고"

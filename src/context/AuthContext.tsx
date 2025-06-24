@@ -161,9 +161,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const updatePin = useCallback(async (newPin: string) => {
     if (!user) return;
+
+    const updatedUser = { ...user, pin: newPin };
     
+    // 1. Update the main user state and session storage immediately.
+    setUser(updatedUser);
+    sessionStorage.setItem('user', JSON.stringify(updatedUser));
+    
+    // 2. Update the full list of users to maintain consistency.
     const currentUsers = await ensureUsersLoaded();
-    const updatedUsers = currentUsers.map(u => (u.id === user.id ? { ...u, pin: newPin } : u));
+    const updatedUsers = currentUsers.map(u => (u.id === user.id ? updatedUser : u));
     setUsers(updatedUsers);
     
     if (!db) return;
@@ -173,8 +180,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await updateDoc(userDocRef, { pin: newPin });
     } catch (e) {
         console.warn("Failed to update PIN in Firestore", e);
+        // Optional: Revert UI changes on failure
     }
-
   }, [user, ensureUsersLoaded]);
 
   const resetPin = useCallback(async (username: string) => {
