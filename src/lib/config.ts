@@ -20,6 +20,7 @@ export interface User {
 export const MOCK_USERS: User[] = [
     { id: 1, username: 'teacher1', pin: '1234', name: '김선생', role: 'teacher' },
     { id: 2, username: 'teacher2', pin: '1234', name: '이선생', role: 'teacher' },
+    { id: 99, username: 'master', pin: '1234', name: '마스터선생', role: 'teacher' },
     { id: 11, username: 's-4-1-1', pin: '0000', name: '김철수', role: 'student', grade: 4, classNum: 1, studentNum: 1 },
     { id: 12, username: 's-4-1-2', pin: '1111', name: '이영희', role: 'student', grade: 4, classNum: 1, studentNum: 2 },
     { id: 13, username: 's-5-2-3', pin: '0000', name: '박바둑', role: 'student', grade: 5, classNum: 2, studentNum: 3 },
