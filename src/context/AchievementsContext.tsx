@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { AreaName, AchievementsState, CertificateStatus, AREAS, CERTIFICATE_THRESHOLDS } from '@/lib/config';
+import { AreaName, AchievementsState, CertificateStatus, AREAS, CERTIFICATE_THRESHOLDS, User } from '@/lib/config';
 import { useChallengeConfig } from './ChallengeConfigContext';
 
 type AllAchievementsState = Record<string, AchievementsState>; // Keyed by username
@@ -94,12 +94,18 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
 
   const updateProgress = useCallback(async (username: string, area: AreaName, progress: number) => {
     setAllAchievements(prev => {
-      if (!prev || !prev[username] || !challengeConfig) return prev;
+      if (!prev || !prev[username] || !challengeConfig || !users) return prev;
+      
+      const student = users.find((u: User) => u.username === username);
+      if (!student || !student.grade) return prev; // Not a student or no grade
 
       const areaConfig = challengeConfig[area];
       if (!areaConfig) return prev;
       
-      const isCertified = progress >= areaConfig.goal;
+      const goalForGrade = areaConfig.goal[student.grade];
+      if (typeof goalForGrade === 'undefined') return prev; // No goal for this grade
+
+      const isCertified = progress >= goalForGrade;
       
       const newState = { ...prev };
       newState[username] = {
@@ -111,7 +117,7 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
       };
       return newState;
     });
-  }, [challengeConfig]);
+  }, [challengeConfig, users]);
   
   const certificateStatus = useCallback((username: string): CertificateStatus => {
     if (!allAchievements || !allAchievements[username]) return 'Unranked';

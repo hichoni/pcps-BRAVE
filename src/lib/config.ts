@@ -57,7 +57,7 @@ export type AreaConfig = {
   requirements: string;
   koreanName: string;
   challengeName: string;
-  goal: number;
+  goal: Record<string, number>; // Grade-specific goals
   unit: string;
 };
 
@@ -78,7 +78,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     challengeName: '독서 마라톤 ✨',
     iconName: 'BookOpen',
     requirements: '지정된 필독서 중 1권 이상을 읽고 독후감을 제출하여 증명해야 합니다.',
-    goal: 5,
+    goal: { '4': 5, '5': 5, '6': 5 },
     unit: '권',
   },
   Volunteering: {
@@ -87,7 +87,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     challengeName: '탄소 줄임 실천 ♥',
     iconName: 'HeartHandshake',
     requirements: '최소 10시간 이상의 봉사활동을 완료했다는 증빙 자료를 제출해야 합니다. (예: 탄소중립포인트 실천 활동)',
-    goal: 10,
+    goal: { '4': 10, '5': 10, '6': 10 },
     unit: '시간',
   },
   'Physical Education': {
@@ -96,7 +96,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     challengeName: '건강 체력 인증',
     iconName: 'Bike',
     requirements: '건강체력평가(PAPS) 결과에서 상위 등급을 받았거나, 한 시즌 동안 교내 스포츠팀 활동에 참여했음을 증명해야 합니다.',
-    goal: 2,
+    goal: { '4': 2, '5': 2, '6': 2 },
     unit: '등급',
   },
   Arts: {
@@ -105,7 +105,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     challengeName: '풍풍 쇼케이스 💥',
     iconName: 'Palette',
     requirements: '풍풍 쇼케이스 또는 교내외 예술 관련 대회/공연에 참여하여 자신의 재능을 선보여야 합니다.',
-    goal: 1,
+    goal: { '4': 1, '5': 1, '6': 1 },
     unit: '회 참여',
   },
   Information: {
@@ -114,7 +114,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     challengeName: '타자의 달인 •',
     iconName: 'Laptop',
     requirements: '교내 타자 대회에서 일정 수준 이상의 성적을 거두거나, 정보 관련 자격증을 취득하여 능력을 증명해야 합니다.',
-    goal: 300,
+    goal: { '4': 300, '5': 300, '6': 300 },
     unit: '타',
   },
 };

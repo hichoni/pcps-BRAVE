@@ -41,15 +41,8 @@ export default function ChallengeConfigPage() {
     }
   }, [challengeConfig]);
 
-  const handleInputChange = (area: AreaName, field: keyof StoredAreaConfig, value: string | number) => {
+  const handleInputChange = (area: AreaName, field: keyof Omit<StoredAreaConfig, 'goal'>, value: string) => {
     if (!localConfig) return;
-
-    // For goal, ensure it's a number
-    if (field === 'goal') {
-        const numValue = Number(value);
-        if (isNaN(numValue)) return;
-        value = numValue;
-    }
 
     setLocalConfig(prev => {
         if (!prev) return null;
@@ -58,6 +51,24 @@ export default function ChallengeConfigPage() {
             [area]: {
                 ...prev[area],
                 [field]: value
+            }
+        };
+    });
+  };
+
+  const handleGoalChange = (area: AreaName, grade: string, value: string) => {
+    if (!localConfig) return;
+    const numValue = Number(value);
+    if (isNaN(numValue)) return;
+
+    setLocalConfig(prev => {
+        if (!prev) return null;
+        const newGoals = { ...prev[area].goal, [grade]: numValue };
+        return {
+            ...prev,
+            [area]: {
+                ...prev[area],
+                goal: newGoals
             }
         };
     });
@@ -79,6 +90,8 @@ export default function ChallengeConfigPage() {
   if (authLoading || configLoading || !user || !localConfig || !challengeConfig) {
     return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
   }
+
+  const GRADES = ['4', '5', '6'];
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -111,15 +124,20 @@ export default function ChallengeConfigPage() {
                         <Label htmlFor={`challengeName-${area}`}>도전 과제 이름</Label>
                         <Input id={`challengeName-${area}`} value={localConfig[area].challengeName} onChange={(e) => handleInputChange(area, 'challengeName', e.target.value)} />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor={`goal-${area}`}>목표량</Label>
-                            <Input id={`goal-${area}`} type="number" value={localConfig[area].goal} onChange={(e) => handleInputChange(area, 'goal', e.target.value)} />
+                    <div className="space-y-2">
+                        <Label>목표량 (학년별)</Label>
+                        <div className="grid grid-cols-3 gap-4">
+                          {GRADES.map(grade => (
+                            <div key={grade} className="space-y-1">
+                              <Label htmlFor={`goal-${area}-${grade}`} className="text-sm font-normal">{grade}학년</Label>
+                              <Input id={`goal-${area}-${grade}`} type="number" value={localConfig[area].goal[grade] ?? ''} onChange={(e) => handleGoalChange(area, grade, e.target.value)} />
+                            </div>
+                          ))}
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor={`unit-${area}`}>단위</Label>
-                            <Input id={`unit-${area}`} value={localConfig[area].unit} onChange={(e) => handleInputChange(area, 'unit', e.target.value)} />
-                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor={`unit-${area}`}>단위</Label>
+                        <Input id={`unit-${area}`} value={localConfig[area].unit} onChange={(e) => handleInputChange(area, 'unit', e.target.value)} />
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor={`requirements-${area}`}>인증 기준 설명</Label>

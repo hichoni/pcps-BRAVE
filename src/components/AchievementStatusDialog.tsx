@@ -21,7 +21,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const { getAchievements } = useAchievements();
   const { challengeConfig } = useChallengeConfig();
   
-  if (!user || !challengeConfig) return null;
+  if (!user || !challengeConfig || !user.grade) return null;
   
   const achievements = getAchievements(user.username);
   const areaConfig = challengeConfig[areaName];
@@ -29,8 +29,11 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
 
   if (!areaState || !areaConfig) return null;
   
+  const goalForGrade = areaConfig.goal[user.grade];
+  if (typeof goalForGrade === 'undefined') return null;
+
   const { progress } = areaState;
-  const { goal, unit, koreanName, challengeName } = areaConfig;
+  const { unit, koreanName, challengeName } = areaConfig;
 
   return (
     <Dialog>
@@ -51,7 +54,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
             <div className="text-4xl font-bold text-primary my-2">
                 {progress} <span className="text-2xl text-muted-foreground">{unit}</span>
             </div>
-            <div className="text-sm text-muted-foreground">목표: {goal} {unit}</div>
+            <div className="text-sm text-muted-foreground">목표: {goalForGrade} {unit}</div>
         </div>
          <DialogClose asChild>
             <Button type="button" className="w-full">확인</Button>

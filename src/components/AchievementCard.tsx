@@ -36,10 +36,12 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
   const areaConfig = challengeConfig[areaName];
   const areaState = achievements?.[areaName];
   
-  if (!areaState || !areaConfig) return null;
+  if (!areaState || !areaConfig || !user.grade) return null;
 
   const { isCertified, progress } = areaState;
-  const { goal } = areaConfig;
+  const goal = areaConfig.goal[user.grade];
+  if (typeof goal === 'undefined') return null;
+
 
   const progressValue = goal > 0 ? (progress / goal) * 100 : 0;
   const AreaIcon = areaConfig.icon;

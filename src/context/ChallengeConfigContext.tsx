@@ -50,6 +50,12 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
           storedConfig[area] = DEFAULT_AREAS_CONFIG[area];
           needsUpdate = true;
         }
+        // Ensure goal is in the new format
+        if (typeof storedConfig[area].goal === 'number') {
+            const oldGoal = storedConfig[area].goal as number;
+            storedConfig[area].goal = { '4': oldGoal, '5': oldGoal, '6': oldGoal };
+            needsUpdate = true;
+        }
       });
       
       setChallengeConfig(resolveConfigWithIcons(storedConfig));
