@@ -49,11 +49,12 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
         return <Progress value={progressValue} className="w-full h-2.5 transition-all duration-500" />;
     }
     if (areaConfig.goalType === 'objective') {
+        const hasProgress = !!progress;
         return (
             <div className="text-center">
                 <p className="text-sm text-muted-foreground">현재 상태</p>
                 <p className="font-bold text-lg text-primary flex items-center justify-center gap-2">
-                    <Trophy className="w-5 h-5"/>
+                    {hasProgress && <Trophy className="w-5 h-5"/>}
                     {progress || '미달성'}
                 </p>
             </div>
