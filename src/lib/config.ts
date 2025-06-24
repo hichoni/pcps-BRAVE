@@ -73,7 +73,6 @@ export const ICONS: Record<string, LucideIcon> = {
 
 export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
   Humanities: {
-    name: 'Humanities',
     koreanName: '인문',
     challengeName: '독서 마라톤 ✨',
     iconName: 'BookOpen',
@@ -82,7 +81,6 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     unit: '권',
   },
   Volunteering: {
-    name: 'Volunteering',
     koreanName: '봉사',
     challengeName: '탄소 줄임 실천 ♥',
     iconName: 'HeartHandshake',
@@ -91,7 +89,6 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     unit: '시간',
   },
   'Physical Education': {
-    name: 'Physical Education',
     koreanName: '체육',
     challengeName: '건강 체력 인증',
     iconName: 'Bike',
@@ -100,7 +97,6 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     unit: '등급',
   },
   Arts: {
-    name: 'Arts',
     koreanName: '예술',
     challengeName: '풍풍 쇼케이스 💥',
     iconName: 'Palette',
@@ -109,7 +105,6 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     unit: '회 참여',
   },
   Information: {
-    name: 'Information',
     koreanName: '정보',
     challengeName: '타자의 달인 •',
     iconName: 'Laptop',
