@@ -162,7 +162,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (db) {
       const userDocRef = doc(db, "users", String(user.id));
       try {
-        await updateDoc(userDocRef, { pin: newPin });
+        await setDoc(userDocRef, { pin: newPin }, { merge: true });
       } catch (error) {
         console.error("Failed to update PIN in Firestore. User ID:", user.id, "Error:", error);
         // If the database operation fails, throw an error immediately.
@@ -193,7 +193,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (db) {
         try {
             const userDocRef = doc(db, "users", String(targetUser.id));
-            await updateDoc(userDocRef, { pin: '0000' });
+            await setDoc(userDocRef, { pin: '0000' }, { merge: true });
         } catch (e) {
             console.warn("Failed to reset PIN in Firestore", e);
             throw e; // re-throw to notify the caller
