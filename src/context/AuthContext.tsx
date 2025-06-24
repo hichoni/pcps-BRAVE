@@ -142,45 +142,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!user) {
       throw new Error("사용자 정보가 없습니다. 다시 로그인해주세요.");
     }
-    
-    if (db) {
-      const userDocRef = doc(db, "users", String(user.id));
-      try {
-        await setDoc(userDocRef, { pin: newPin }, { merge: true });
-      } catch (error) {
-        console.error("PIN 업데이트 실패 (Firestore):", error);
-        throw new Error("데이터베이스 저장에 실패했습니다. 인터넷 연결을 확인하거나 관리자에게 문의하세요.");
-      }
+    if (!db) {
+      throw new Error("데이터베이스에 연결되지 않았습니다. 설정을 확인해주세요.");
     }
 
-    const updatedUser = { ...user, pin: newPin };
-    setUser(updatedUser);
-    sessionStorage.setItem('user', JSON.stringify(updatedUser));
-    setUsers(prevUsers => prevUsers.map(u => (u.id === user.id ? updatedUser : u)));
-  }, [user]);
+    const userDocRef = doc(db, "users", String(user.id));
+    try {
+      await setDoc(userDocRef, { pin: newPin }, { merge: true });
+      
+      const updatedUser = { ...user, pin: newPin };
+      setUser(updatedUser);
+      sessionStorage.setItem('user', JSON.stringify(updatedUser));
+      setUsers(prevUsers => prevUsers.map(u => (u.id === user.id ? updatedUser : u)));
+    } catch (error) {
+      console.error("PIN 업데이트 실패 (Firestore):", error);
+      throw new Error("데이터베이스 저장에 실패했습니다. 인터넷 연결을 확인하거나 관리자에게 문의하세요.");
+    }
+  }, [user, users]);
 
   const resetPin = useCallback(async (username: string) => {
     const targetUser = users.find(u => u.username === username);
     if (!targetUser) {
         throw new Error(`사용자 '${username}'를 찾을 수 없습니다.`);
     }
-
-    if (db) {
-        const userDocRef = doc(db, "users", String(targetUser.id));
-        try {
-            await setDoc(userDocRef, { pin: '0000' }, { merge: true });
-        } catch (error) {
-            console.error(`PIN 초기화 실패 (Firestore) - 사용자: ${username}:`, error);
-            throw new Error("데이터베이스 저장에 실패하여 PIN을 초기화할 수 없습니다.");
-        }
+    if (!db) {
+      throw new Error("데이터베이스에 연결되지 않았습니다. 설정을 확인해주세요.");
     }
-    
-    const updatedUser = { ...targetUser, pin: '0000' };
-    setUsers(prevUsers => prevUsers.map(u => u.id === updatedUser.id ? updatedUser : u));
 
-    if (user && user.id === updatedUser.id) {
-        setUser(updatedUser);
-        sessionStorage.setItem('user', JSON.stringify(updatedUser));
+    const userDocRef = doc(db, "users", String(targetUser.id));
+    try {
+        await setDoc(userDocRef, { pin: '0000' }, { merge: true });
+        
+        const updatedUser = { ...targetUser, pin: '0000' };
+        setUsers(prevUsers => prevUsers.map(u => u.id === updatedUser.id ? updatedUser : u));
+
+        if (user && user.id === updatedUser.id) {
+            setUser(updatedUser);
+            sessionStorage.setItem('user', JSON.stringify(updatedUser));
+        }
+    } catch (error) {
+        console.error(`PIN 초기화 실패 (Firestore) - 사용자: ${username}:`, error);
+        throw new Error("데이터베이스 저장에 실패하여 PIN을 초기화할 수 없습니다.");
     }
   }, [user, users]);
 
@@ -188,26 +190,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const targetUser = users.find(u => u.username === username);
     if (!targetUser) return;
     
-    if (db) {
-        try {
-            const batch = writeBatch(db);
-            const userDocRef = doc(db, "users", String(targetUser.id));
-            batch.delete(userDocRef);
-            
-            const achievementDocRef = doc(db, 'achievements', username);
-            batch.delete(achievementDocRef);
-
-            await batch.commit();
-        } catch (e) {
-            console.warn("Failed to delete user and achievements from Firestore", e);
-            throw e;
-        }
+    if (!db) {
+        throw new Error("데이터베이스에 연결되지 않았습니다. 설정을 확인해주세요.");
     }
+    try {
+        const batch = writeBatch(db);
+        const userDocRef = doc(db, "users", String(targetUser.id));
+        batch.delete(userDocRef);
+        
+        const achievementDocRef = doc(db, 'achievements', username);
+        batch.delete(achievementDocRef);
 
-    setUsers(prevUsers => prevUsers.filter(u => u.username !== username));
-    
-    if (user && user.username === username) {
-        logout();
+        await batch.commit();
+
+        setUsers(prevUsers => prevUsers.filter(u => u.username !== username));
+        
+        if (user && user.username === username) {
+            logout();
+        }
+    } catch (e) {
+        console.warn("Failed to delete user and achievements from Firestore", e);
+        throw e;
     }
   }, [users, user, logout]);
 
@@ -239,25 +242,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       name,
     };
     
-    if (db) {
-        try {
-            const batch = writeBatch(db);
-            const userDocRef = doc(db, "users", String(newUser.id));
-            batch.set(userDocRef, newUser);
-            
-            const achievementDocRef = doc(db, 'achievements', newUser.username);
-            batch.set(achievementDocRef, generateInitialStateForUser());
-            
-            await batch.commit();
-
-        } catch (e) {
-            console.warn("Failed to add user and achievements to Firestore", e);
-            return { success: false, message: '데이터베이스 저장에 실패했습니다.' };
-        }
+    if (!db) {
+      return { success: false, message: "데이터베이스에 연결되지 않았습니다. 설정을 확인해주세요." };
     }
-    
-    setUsers(prev => [...prev, newUser]);
-    return { success: true, message: `${name} 학생이 추가되었습니다.` };
+    try {
+        const batch = writeBatch(db);
+        const userDocRef = doc(db, "users", String(newUser.id));
+        batch.set(userDocRef, newUser);
+        
+        const achievementDocRef = doc(db, 'achievements', newUser.username);
+        batch.set(achievementDocRef, generateInitialStateForUser());
+        
+        await batch.commit();
+
+        setUsers(prev => [...prev, newUser]);
+        return { success: true, message: `${name} 학생이 추가되었습니다.` };
+    } catch (e) {
+        console.warn("Failed to add user and achievements to Firestore", e);
+        return { success: false, message: '데이터베이스 저장에 실패했습니다.' };
+    }
   }, [users]);
 
   const bulkAddUsers = useCallback(async (studentsData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>[]): Promise<{ successCount: number; failCount: number; errors: string[] }> => {
@@ -266,8 +269,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const errors: string[] = [];
     const newUsers: User[] = [];
     
+    if (!db) {
+      return { successCount: 0, failCount: studentsData.length, errors: ["데이터베이스에 연결되지 않았습니다. 설정을 확인해주세요."] };
+    }
+
     let lastId = (users.length > 0 ? Math.max(...users.map(u => u.id)) : 0);
-    const batch = db ? writeBatch(db) : null;
+    const batch = writeBatch(db);
     const usersInThisOperation = [...users];
 
     studentsData.forEach((student, index) => {
@@ -296,28 +303,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
         newUsers.push(newUser);
         usersInThisOperation.push(newUser);
-        if (batch) {
-            const userDocRef = doc(db, "users", String(newUser.id));
-            batch.set(userDocRef, newUser);
-            
-            const achievementDocRef = doc(db, "achievements", newUser.username);
-            batch.set(achievementDocRef, generateInitialStateForUser());
-        }
+        const userDocRef = doc(db, "users", String(newUser.id));
+        batch.set(userDocRef, newUser);
+        
+        const achievementDocRef = doc(db, "achievements", newUser.username);
+        batch.set(achievementDocRef, generateInitialStateForUser());
         successCount++;
       }
     });
 
     if (newUsers.length > 0) {
-      if (batch) {
-          try {
-            await batch.commit();
-          } catch(e) {
-            console.warn("Failed to bulk add users and achievements to Firestore", e);
-            // If DB write fails, don't update local state.
-            return { successCount: 0, failCount: studentsData.length, errors: ['데이터베이스에 일괄 등록하는 데 실패했습니다.'] };
-          }
+      try {
+        await batch.commit();
+        setUsers(prev => [...prev, ...newUsers].sort((a,b) => a.id - b.id));
+      } catch(e) {
+        console.warn("Failed to bulk add users and achievements to Firestore", e);
+        return { successCount: 0, failCount: studentsData.length, errors: ['데이터베이스에 일괄 등록하는 데 실패했습니다.'] };
       }
-      setUsers(prev => [...prev, ...newUsers].sort((a,b) => a.id - b.id));
     }
     
     return { successCount, failCount, errors };
