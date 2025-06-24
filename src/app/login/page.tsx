@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -156,104 +157,110 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-secondary p-4">
-      <Card className="w-full max-w-sm shadow-lg border">
-        <CardHeader className="text-center">
-          <Image
-            src="/icon-main.png?v=2"
-            alt="풍천풍서초등학교 로고"
-            width={80}
-            height={80}
-            className="mx-auto rounded-full shadow-md mb-4"
-          />
-          <CardTitle className="font-headline text-2xl">학교장 인증제 로그인</CardTitle>
-          <CardDescription>계정 정보를 입력해주세요.</CardDescription>
-        </CardHeader>
-        <Tabs defaultValue="student" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="student"><UserIcon className="mr-2"/> 학생</TabsTrigger>
-            <TabsTrigger value="teacher"><ShieldCheck className="mr-2"/> 교사</TabsTrigger>
-          </TabsList>
-          <TabsContent value="student">
-            <form onSubmit={studentForm.handleSubmit(onStudentSubmit)}>
-              <CardContent className="space-y-4 pt-4">
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="grade">학년</Label>
-                    <Select onValueChange={(value) => studentForm.setValue('grade', value)} defaultValue={studentForm.getValues('grade')}>
-                       <SelectTrigger id="grade">
-                         <SelectValue placeholder="학년"/>
-                       </SelectTrigger>
-                       <SelectContent>
-                         <SelectItem value="4">4학년</SelectItem>
-                         <SelectItem value="5">5학년</SelectItem>
-                         <SelectItem value="6">6학년</SelectItem>
-                       </SelectContent>
-                    </Select>
-                  </div>
-                   <div className="space-y-2">
-                     <Label htmlFor="classNum">반</Label>
-                     <Input id="classNum" type="number" placeholder="반" {...studentForm.register('classNum')} />
-                   </div>
-                   <div className="space-y-2">
-                     <Label htmlFor="studentNum">번호</Label>
-                     <Input id="studentNum" type="number" placeholder="번호" {...studentForm.register('studentNum')} />
-                   </div>
-                </div>
-                 {studentForm.formState.errors.grade && <p className="text-sm text-destructive">{studentForm.formState.errors.grade.message}</p>}
-                 {studentForm.formState.errors.classNum && <p className="text-sm text-destructive">{studentForm.formState.errors.classNum.message}</p>}
-                 {studentForm.formState.errors.studentNum && <p className="text-sm text-destructive">{studentForm.formState.errors.studentNum.message}</p>}
-                
-                {foundStudent && (
-                    <div className="p-3 bg-secondary rounded-md text-center text-secondary-foreground font-semibold">
-                        {maskName(foundStudent.name)}
+    <div className="flex flex-col min-h-screen bg-secondary">
+      <main className="flex-grow flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm shadow-lg border">
+          <CardHeader className="text-center">
+            <Image
+              src="/icon-main.png?v=2"
+              alt="풍천풍서초등학교 로고"
+              width={80}
+              height={80}
+              className="mx-auto rounded-full shadow-md mb-4"
+            />
+            <CardTitle className="font-headline text-2xl text-primary">학교장 인증제 로그인</CardTitle>
+            <CardDescription>계정 정보를 입력해주세요.</CardDescription>
+          </CardHeader>
+          <Tabs defaultValue="student" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="student"><UserIcon className="mr-2"/> 학생</TabsTrigger>
+              <TabsTrigger value="teacher"><ShieldCheck className="mr-2"/> 교사</TabsTrigger>
+            </TabsList>
+            <TabsContent value="student">
+              <form onSubmit={studentForm.handleSubmit(onStudentSubmit)}>
+                <CardContent className="space-y-4 pt-4">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="grade">학년</Label>
+                      <Select onValueChange={(value) => studentForm.setValue('grade', value)} defaultValue={studentForm.getValues('grade')}>
+                        <SelectTrigger id="grade">
+                          <SelectValue placeholder="학년"/>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="4">4학년</SelectItem>
+                          <SelectItem value="5">5학년</SelectItem>
+                          <SelectItem value="6">6학년</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                )}
-                
-                <div className="space-y-2">
-                  <Label htmlFor="pin-student">PIN 번호</Label>
-                  <Input
-                    id="pin-student"
-                    type="password"
-                    maxLength={4}
-                    placeholder="4자리 숫자"
-                    {...studentForm.register('pin')}
-                  />
-                  {studentForm.formState.errors.pin && <p className="text-sm text-destructive">{studentForm.formState.errors.pin.message}</p>}
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button type="submit" className="w-full font-bold" disabled={combinedLoading}>
-                  {combinedLoading ? <Loader2 className="animate-spin" /> : <LogIn />}
-                  로그인
-                </Button>
-              </CardFooter>
-            </form>
-          </TabsContent>
-          <TabsContent value="teacher">
-            <form onSubmit={teacherForm.handleSubmit(onTeacherSubmit)}>
-              <CardContent className="space-y-4 pt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="username">아이디</Label>
-                  <Input id="username" placeholder="아이디" {...teacherForm.register('username')} />
-                  {teacherForm.formState.errors.username && <p className="text-sm text-destructive">{teacherForm.formState.errors.username.message}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pin-teacher">PIN 번호</Label>
-                  <Input id="pin-teacher" type="password" maxLength={4} placeholder="4자리 숫자" {...teacherForm.register('pin')} />
-                  {teacherForm.formState.errors.pin && <p className="text-sm text-destructive">{teacherForm.formState.errors.pin.message}</p>}
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button type="submit" className="w-full font-bold" disabled={combinedLoading}>
-                  {combinedLoading ? <Loader2 className="animate-spin" /> : <LogIn />}
-                  로그인
-                </Button>
-              </CardFooter>
-            </form>
-          </TabsContent>
-        </Tabs>
-      </Card>
+                    <div className="space-y-2">
+                      <Label htmlFor="classNum">반</Label>
+                      <Input id="classNum" type="number" placeholder="반" {...studentForm.register('classNum')} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="studentNum">번호</Label>
+                      <Input id="studentNum" type="number" placeholder="번호" {...studentForm.register('studentNum')} />
+                    </div>
+                  </div>
+                  {studentForm.formState.errors.grade && <p className="text-sm text-destructive">{studentForm.formState.errors.grade.message}</p>}
+                  {studentForm.formState.errors.classNum && <p className="text-sm text-destructive">{studentForm.formState.errors.classNum.message}</p>}
+                  {studentForm.formState.errors.studentNum && <p className="text-sm text-destructive">{studentForm.formState.errors.studentNum.message}</p>}
+                  
+                  {foundStudent && (
+                      <div className="p-3 bg-secondary rounded-md text-center text-secondary-foreground font-semibold">
+                          {maskName(foundStudent.name)}
+                      </div>
+                  )}
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="pin-student">PIN 번호</Label>
+                    <Input
+                      id="pin-student"
+                      type="password"
+                      maxLength={4}
+                      placeholder="4자리 숫자"
+                      {...studentForm.register('pin')}
+                    />
+                    {studentForm.formState.errors.pin && <p className="text-sm text-destructive">{studentForm.formState.errors.pin.message}</p>}
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button type="submit" className="w-full font-bold" disabled={combinedLoading}>
+                    {combinedLoading ? <Loader2 className="animate-spin" /> : <LogIn />}
+                    로그인
+                  </Button>
+                </CardFooter>
+              </form>
+            </TabsContent>
+            <TabsContent value="teacher">
+              <form onSubmit={teacherForm.handleSubmit(onTeacherSubmit)}>
+                <CardContent className="space-y-4 pt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="username">아이디</Label>
+                    <Input id="username" placeholder="아이디" {...teacherForm.register('username')} />
+                    {teacherForm.formState.errors.username && <p className="text-sm text-destructive">{teacherForm.formState.errors.username.message}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pin-teacher">PIN 번호</Label>
+                    <Input id="pin-teacher" type="password" maxLength={4} placeholder="4자리 숫자" {...teacherForm.register('pin')} />
+                    {teacherForm.formState.errors.pin && <p className="text-sm text-destructive">{teacherForm.formState.errors.pin.message}</p>}
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button type="submit" className="w-full font-bold" disabled={combinedLoading}>
+                    {combinedLoading ? <Loader2 className="animate-spin" /> : <LogIn />}
+                    로그인
+                  </Button>
+                </CardFooter>
+              </form>
+            </TabsContent>
+          </Tabs>
+        </Card>
+      </main>
+      <footer className="p-4 text-center text-xs text-muted-foreground">
+        <p>본 서비스는 풍천풍서초등학교 학생들의 꿈과 도전을 응원하기 위해 제작되었습니다.</p>
+        <p className="mt-1">&copy; 2025 Pungcheon Pungseo Elementary School. All Rights Reserved.</p>
+      </footer>
     </div>
   );
 }
