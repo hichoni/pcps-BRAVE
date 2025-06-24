@@ -1,6 +1,5 @@
 "use client";
 
-import Image from 'next/image';
 import { useAchievements } from '@/context/AchievementsContext';
 import { useAuth } from '@/context/AuthContext';
 import { Header } from '@/components/Header';
@@ -25,15 +24,6 @@ export function Dashboard() {
             <h2 className="text-xl font-bold text-primary mb-2">✨ 참여 안내 ✨</h2>
             <p className="font-semibold">4~6학년 친구들만 인증할 수 있어요!</p>
             <p className="text-muted-foreground mb-4">인증 기간: 2025년 5월 1일 ~ 10월 31일</p>
-            
-            <Image
-                src="https://placehold.co/400x120.png"
-                alt="학생들이 응원하는 그림"
-                data-ai-hint="students cheering cartoon"
-                width={400}
-                height={120}
-                className="my-4 mx-auto rounded-lg"
-            />
 
             <div className="mt-6 flex justify-center items-center flex-wrap gap-x-6 gap-y-2 text-sm">
                 <span className="font-semibold">🥇 금장: 4개 영역 이상 인증</span>
