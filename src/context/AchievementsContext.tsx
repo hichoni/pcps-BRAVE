@@ -38,20 +38,29 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
   const { loading: configLoading } = useChallengeConfig();
 
   useEffect(() => {
-    const fetchAchievements = async () => {
-      if (authLoading || !db) {
-        if (!authLoading) setLoading(false);
+    const loadData = async () => {
+      // If auth is still loading, we can't do anything yet.
+      if (authLoading) {
         return;
       }
-
+      
+      // If there's no user logged in, we're done. No achievements to fetch.
       if (!user) {
-        setLoading(false);
         setAllAchievements({});
+        setLoading(false);
         return;
       }
 
+      // If we're here, we have a user. Let's fetch their data.
       setLoading(true);
       try {
+        if (!db) {
+            // Handle case where firebase is not configured
+            console.warn("Firebase is not configured. No achievements will be loaded.");
+            setAllAchievements({ [user.username]: generateInitialStateForUser() });
+            return;
+        }
+
         const achievementsCollectionRef = collection(db, 'achievements');
         const fetchedAchievements: AllAchievementsState = {};
 
@@ -87,19 +96,15 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
         }
         
         setAllAchievements(fetchedAchievements);
-
       } catch (error) {
         console.warn("Failed to fetch achievements from Firestore", error);
-        setAllAchievements({}); // Set to empty on error
+        setAllAchievements({});
       } finally {
         setLoading(false);
       }
     };
-    
-    if (!authLoading) {
-      fetchAchievements();
-    }
 
+    loadData();
   }, [user, authLoading]);
 
 
