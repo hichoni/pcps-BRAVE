@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -36,20 +36,15 @@ export default function ChangePinPage() {
   } = useForm<ChangePinFormValues>({
     resolver: zodResolver(changePinSchema),
   });
-  
-  if (authLoading) {
-    return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
-  }
-  
-  if (!user) {
-    router.push('/login');
-    return null;
-  }
-  
-  if (user.pin !== '0000') {
-    router.push('/');
-    return null;
-  }
+
+  useEffect(() => {
+    if (authLoading) return; // Wait for auth to load
+    if (!user) {
+      router.push('/login');
+    } else if (user.pin !== '0000') {
+      router.push('/');
+    }
+  }, [authLoading, user, router]);
 
   const onSubmit = async (data: ChangePinFormValues) => {
     setLoading(true);
@@ -70,6 +65,12 @@ export default function ChangePinPage() {
       setLoading(false);
     }
   };
+  
+  // While loading or if the user is not in the correct state, show a spinner.
+  // The useEffect above will handle the redirection.
+  if (authLoading || !user || user.pin !== '0000') {
+    return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
