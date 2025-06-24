@@ -4,6 +4,8 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { useAuth } from './AuthContext';
 import { AreaName, AchievementsState, CertificateStatus, AREAS, CERTIFICATE_THRESHOLDS, User } from '@/lib/config';
 import { useChallengeConfig } from './ChallengeConfigContext';
+import { db } from '@/lib/firebase';
+import { collection, doc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
 
 type AllAchievementsState = Record<string, AchievementsState>; // Keyed by username
 
@@ -32,104 +34,122 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
   const [allAchievements, setAllAchievements] = useState<AllAchievementsState | null>(null);
   const [loading, setLoading] = useState(true);
   const { users, loading: authLoading } = useAuth();
-  const { challengeConfig, loading: configLoading } = useChallengeConfig();
+  const { loading: configLoading } = useChallengeConfig();
 
   useEffect(() => {
-    if (authLoading) return; // Wait for users to be available
+    const fetchAchievements = async () => {
+      if (authLoading || !db) return;
 
-    try {
-      const storedDataRaw = localStorage.getItem('allAchievements');
-      const storedData: AllAchievementsState = storedDataRaw ? JSON.parse(storedDataRaw) : {};
-      
-      const students = users.filter(u => u.role === 'student');
-      let needsUpdate = false;
+      setLoading(true);
+      try {
+        const achievementsCollectionRef = collection(db, 'achievements');
+        const querySnapshot = await getDocs(achievementsCollectionRef);
+        const fetchedAchievements: AllAchievementsState = {};
+        querySnapshot.forEach(doc => {
+            fetchedAchievements[doc.id] = doc.data() as AchievementsState;
+        });
 
-      // Ensure all current students have an entry
-      students.forEach(student => {
-          if (!storedData[student.username]) {
-              storedData[student.username] = generateInitialStateForUser();
-              needsUpdate = true;
-          }
-      });
+        const students = users.filter(u => u.role === 'student');
+        
+        // Use a Firestore batch to create missing achievement documents
+        const batch: { ref: any; data: AchievementsState }[] = [];
 
-      // Prune achievements for users that no longer exist
-      const studentUsernames = new Set(students.map(s => s.username));
-      for (const username in storedData) {
-          if (!studentUsernames.has(username)) {
-              delete storedData[username];
-              needsUpdate = true;
-          }
+        students.forEach(student => {
+            if (!fetchedAchievements[student.username]) {
+                const newAchievement = generateInitialStateForUser();
+                fetchedAchievements[student.username] = newAchievement;
+                
+                const achievementDocRef = doc(db, 'achievements', student.username);
+                batch.push({ ref: achievementDocRef, data: newAchievement });
+            }
+        });
+        
+        if (batch.length > 0) {
+            console.log(`Creating achievement entries for ${batch.length} new students...`);
+            // Firestore write batch can't be used here easily as it's not imported, so simple loop is fine.
+            for (const item of batch) {
+                await setDoc(item.ref, item.data);
+            }
+        }
+        
+        setAllAchievements(fetchedAchievements);
+
+      } catch (error) {
+        console.error("Failed to fetch achievements from Firestore", error);
+        setAllAchievements({}); // Set to empty on error
+      } finally {
+        setLoading(false);
       }
+    };
 
-      setAllAchievements(storedData);
-      if (needsUpdate) {
-        localStorage.setItem('allAchievements', JSON.stringify(storedData));
-      }
-
-    } catch (error) {
-      console.error("Failed to process achievements from localStorage", error);
-      const initialState: AllAchievementsState = {};
-      users.filter(u => u.role === 'student').forEach(student => {
-          initialState[student.username] = generateInitialStateForUser();
-      });
-      setAllAchievements(initialState);
-    } finally {
+    if (!authLoading && users.length > 0) {
+      fetchAchievements();
+    } else if (!authLoading) {
       setLoading(false);
     }
   }, [users, authLoading]);
 
-  useEffect(() => {
-    if (allAchievements && !loading) {
-      try {
-        localStorage.setItem('allAchievements', JSON.stringify(allAchievements));
-      } catch (error) {
-        console.error("Failed to save achievements to localStorage", error);
-      }
-    }
-  }, [allAchievements, loading]);
 
   const getAchievements = useCallback((username: string): AchievementsState | null => {
-    if (!allAchievements) return null;
-    return allAchievements[username] || null;
+    if (!allAchievements) return generateInitialStateForUser(); // Return default if not loaded
+    return allAchievements[username] || generateInitialStateForUser();
   }, [allAchievements]);
 
   const updateProgress = useCallback(async (username: string, area: AreaName, progress: number) => {
+    if (!db) throw new Error("DB not initialized");
+    
+    // Optimistic UI update
     setAllAchievements(prev => {
-      if (!prev || !prev[username]) return prev;
-      
-      const newState = { ...prev };
-      
-      const existingAreaState = prev[username][area] || { progress: 0, isCertified: false };
-
-      newState[username] = {
-        ...prev[username],
-        [area]: {
-          ...existingAreaState,
-          progress,
+      if (!prev) return null;
+      const userAchievements = prev[username] || generateInitialStateForUser();
+      return {
+        ...prev,
+        [username]: {
+          ...userAchievements,
+          [area]: { ...userAchievements[area], progress },
         },
       };
-      return newState;
     });
+
+    try {
+        const achievementDocRef = doc(db, 'achievements', username);
+        const fieldPath = `${area}.progress`;
+        await updateDoc(achievementDocRef, { [fieldPath]: progress });
+    } catch(e) {
+        console.error("Failed to update progress in Firestore", e);
+        // Here you could add logic to revert the optimistic update
+    }
   }, []);
 
   const toggleCertification = useCallback(async (username: string, area: AreaName) => {
+    if (!db) throw new Error("DB not initialized");
+
+    const currentIsCertified = allAchievements?.[username]?.[area]?.isCertified ?? false;
+    const newIsCertified = !currentIsCertified;
+
+    // Optimistic UI update
     setAllAchievements(prev => {
-        if (!prev || !prev[username]) return prev;
-        
-        const existingAreaState = prev[username][area] || { progress: 0, isCertified: false };
-        const currentIsCertified = existingAreaState.isCertified;
-        
-        const newState = { ...prev };
-        newState[username] = {
-            ...prev[username],
-            [area]: {
-                ...existingAreaState,
-                isCertified: !currentIsCertified,
-            },
-        };
-        return newState;
+      if (!prev) return null;
+      const userAchievements = prev[username] || generateInitialStateForUser();
+      return {
+        ...prev,
+        [username]: {
+          ...userAchievements,
+          [area]: { ...userAchievements[area], isCertified: newIsCertified },
+        },
+      };
     });
-  }, []);
+
+    try {
+        const achievementDocRef = doc(db, 'achievements', username);
+        const fieldPath = `${area}.isCertified`;
+        await updateDoc(achievementDocRef, { [fieldPath]: newIsCertified });
+    } catch (e) {
+        console.error("Failed to toggle certification in Firestore", e);
+        // Here you could add logic to revert the optimistic update
+    }
+
+  }, [allAchievements]);
   
   const certificateStatus = useCallback((username: string): CertificateStatus => {
     if (!allAchievements || !allAchievements[username]) return 'Unranked';
@@ -144,7 +164,7 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
   }, [allAchievements]);
 
   return (
-    <AchievementsContext.Provider value={{ getAchievements, updateProgress, toggleCertification, certificateStatus, loading: loading || configLoading }}>
+    <AchievementsContext.Provider value={{ getAchievements, updateProgress, toggleCertification, certificateStatus, loading: loading || configLoading || authLoading }}>
       {children}
     </AchievementsContext.Provider>
   );

@@ -3,6 +3,9 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { User, MOCK_USERS } from '@/lib/config';
+import { db } from '@/lib/firebase';
+import { collection, getDocs, doc, setDoc, query, where, writeBatch, deleteDoc, updateDoc, addDoc } from 'firebase/firestore';
+
 
 interface LoginCredentials {
   pin: string;
@@ -35,36 +38,75 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    try {
-      const storedUsersRaw = localStorage.getItem('users');
-      const storedUsers = storedUsersRaw ? JSON.parse(storedUsersRaw) : [];
-
-      const userMap = new Map<number, User>();
-      MOCK_USERS.forEach(u => userMap.set(u.id, u));
-      (storedUsers as User[]).forEach(u => userMap.set(u.id, u));
-      
-      const allUsers = Array.from(userMap.values());
-      persistUsers(allUsers);
-      
-      const sessionUser = sessionStorage.getItem('user');
-      if (sessionUser) {
-        const parsedUser = JSON.parse(sessionUser);
-        const currentUserData = allUsers.find((u: User) => u.id === parsedUser.id);
-        setUser(currentUserData || null);
-      }
-    } catch (error) {
-      console.error("Auth context initialization error:", error);
+  const fetchUsers = useCallback(async () => {
+    if (!db) {
+      console.error("Firestore is not initialized. Using mock users.");
       setUsers(MOCK_USERS);
-    } finally {
-      setLoading(false);
+      return;
+    }
+    
+    try {
+      const usersCollectionRef = collection(db, "users");
+      const usersSnapshot = await getDocs(usersCollectionRef);
+      if (usersSnapshot.empty) {
+        // If DB is empty, seed with MOCK_USERS
+        console.log("No users found in Firestore. Seeding with mock data...");
+        const batch = writeBatch(db);
+        MOCK_USERS.forEach(userToSeed => {
+            const docRef = doc(db, "users", String(userToSeed.id)); // Use string ID for document ID
+            batch.set(docRef, userToSeed);
+        });
+        await batch.commit();
+        setUsers(MOCK_USERS);
+      } else {
+        const usersList = usersSnapshot.docs.map(doc => ({ ...doc.data() } as User));
+        setUsers(usersList);
+      }
+    } catch(error) {
+        console.error("Error fetching users from Firestore:", error);
+        setUsers(MOCK_USERS); // Fallback to mock users on error
     }
   }, []);
 
-  const persistUsers = (updatedUsers: User[]) => {
-    setUsers(updatedUsers);
-    localStorage.setItem('users', JSON.stringify(updatedUsers));
-  }
+  useEffect(() => {
+    const initializeAuth = async () => {
+      setLoading(true);
+      await fetchUsers();
+      try {
+        const sessionUser = sessionStorage.getItem('user');
+        if (sessionUser) {
+          const parsedUser = JSON.parse(sessionUser);
+          // Re-validate user data from the freshly fetched users list
+          const currentUserData = users.find((u: User) => u.id === parsedUser.id);
+          setUser(currentUserData || null);
+        }
+      } catch (error) {
+        console.error("Auth context initialization error:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchUsers]);
+  
+  // This useEffect re-validates the session user when the users list is updated.
+  useEffect(() => {
+      if (user) {
+          const updatedUser = users.find(u => u.id === user.id);
+          if (updatedUser) {
+              if (JSON.stringify(user) !== JSON.stringify(updatedUser)) {
+                  setUser(updatedUser);
+                  sessionStorage.setItem('user', JSON.stringify(updatedUser));
+              }
+          } else {
+              // User was deleted, log them out
+              logout();
+          }
+      }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [users]);
 
   const login = useCallback(async (credentials: LoginCredentials): Promise<User | null> => {
     const { pin, username, grade, classNum, studentNum } = credentials;
@@ -97,34 +139,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [router]);
 
   const updatePin = useCallback(async (newPin: string) => {
-    if (!user) throw new Error("No user logged in");
+    if (!user || !db) throw new Error("User not logged in or DB not initialized");
 
-    const updatedUsers = users.map(u => 
-      u.id === user.id ? { ...u, pin: newPin } : u
-    );
-    persistUsers(updatedUsers);
-    const updatedCurrentUser = { ...user, pin: newPin };
-    setUser(updatedCurrentUser);
-    sessionStorage.setItem('user', JSON.stringify(updatedCurrentUser));
+    const userDocRef = doc(db, "users", String(user.id));
+    await updateDoc(userDocRef, { pin: newPin });
+    
+    const updatedUsers = users.map(u => u.id === user.id ? { ...u, pin: newPin } : u);
+    setUsers(updatedUsers);
 
   }, [user, users]);
 
   const resetPin = useCallback(async (username: string) => {
-    const updatedUsers = users.map(u =>
-      u.username === username ? { ...u, pin: '0000' } : u
-    );
-    persistUsers(updatedUsers);
+    if (!db) throw new Error("DB not initialized");
+    const targetUser = users.find(u => u.username === username);
+    if (!targetUser) throw new Error("User not found");
+
+    const userDocRef = doc(db, "users", String(targetUser.id));
+    await updateDoc(userDocRef, { pin: '0000' });
+    
+    const updatedUsers = users.map(u => u.username === username ? { ...u, pin: '0000' } : u);
+    setUsers(updatedUsers);
   }, [users]);
 
   const deleteUser = useCallback(async (username: string) => {
+    if (!db) throw new Error("DB not initialized");
+    const targetUser = users.find(u => u.username === username);
+    if (!targetUser) throw new Error("User not found");
+
+    const userDocRef = doc(db, "users", String(targetUser.id));
+    await deleteDoc(userDocRef);
+
     const updatedUsers = users.filter(u => u.username !== username);
-    persistUsers(updatedUsers);
-    if (user?.username === username) {
-      logout();
-    }
-  }, [users, user, logout]);
+    setUsers(updatedUsers);
+
+  }, [users]);
 
   const addUser = useCallback(async (studentData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>): Promise<{ success: boolean; message: string }> => {
+    if (!db) return { success: false, message: "데이터베이스에 연결할 수 없습니다." };
+
     const { grade, classNum, studentNum, name } = studentData;
 
     const studentExists = users.some(u =>
@@ -138,7 +190,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { success: false, message: `${grade}학년 ${classNum}반 ${studentNum}번 학생은 이미 존재합니다.` };
     }
 
-    const newId = Math.max(0, ...users.map(u => u.id)) + 1;
+    const newId = (users.length > 0 ? Math.max(...users.map(u => u.id)) : 0) + 1;
     const newUsername = `s-${grade}-${classNum}-${studentNum}`;
 
     const newUser: User = {
@@ -152,22 +204,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       name,
     };
 
-    persistUsers([...users, newUser]);
+    const userDocRef = doc(db, "users", String(newUser.id));
+    await setDoc(userDocRef, newUser);
+
+    setUsers(prev => [...prev, newUser]);
     return { success: true, message: `${name} 학생이 추가되었습니다.` };
   }, [users]);
 
   const bulkAddUsers = useCallback(async (studentsData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>[]): Promise<{ successCount: number; failCount: number; errors: string[] }> => {
+    if (!db) return { successCount: 0, failCount: studentsData.length, errors: ["데이터베이스에 연결할 수 없습니다."] };
+
     let successCount = 0;
     let failCount = 0;
     const errors: string[] = [];
-    const usersToAdd: User[] = [];
+    const newUsers: User[] = [];
     
-    const allUsers = [...users];
-    let lastId = Math.max(0, ...allUsers.map(u => u.id));
+    let lastId = (users.length > 0 ? Math.max(...users.map(u => u.id)) : 0);
+    const batch = writeBatch(db);
+    const currentUsers = [...users];
 
     studentsData.forEach((student, index) => {
       const { grade, classNum, studentNum, name } = student;
-      const studentExists = allUsers.some(u =>
+      const studentExists = currentUsers.some(u =>
         u.role === 'student' &&
         u.grade === grade &&
         u.classNum === classNum &&
@@ -189,14 +247,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           studentNum,
           name,
         };
-        usersToAdd.push(newUser);
-        allUsers.push(newUser);
+        newUsers.push(newUser);
+        currentUsers.push(newUser); // Add to temp list to check for duplicates within the same file
+        const docRef = doc(db, "users", String(newUser.id));
+        batch.set(docRef, newUser);
         successCount++;
       }
     });
 
-    if (usersToAdd.length > 0) {
-      persistUsers([...users, ...usersToAdd]);
+    if (newUsers.length > 0) {
+      await batch.commit();
+      setUsers(prev => [...prev, ...newUsers].sort((a,b) => a.id - b.id));
     }
     
     return { successCount, failCount, errors };
