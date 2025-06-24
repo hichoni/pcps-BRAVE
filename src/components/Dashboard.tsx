@@ -18,9 +18,9 @@ export function Dashboard() {
     <div className="container mx-auto px-4 py-8">
       <Header />
       <main>
-        <CertificateStatus />
-
-        <div className="mt-8 text-center max-w-2xl mx-auto p-6 bg-card rounded-xl shadow-sm border">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+          <CertificateStatus />
+          <div className="text-center p-6 bg-card rounded-xl shadow-sm border h-full flex flex-col justify-center items-center">
             <h2 className="text-xl font-bold text-primary mb-2">✨ 참여 안내 ✨</h2>
             <p className="font-semibold">4~6학년 친구들만 인증할 수 있어요!</p>
             <p className="text-muted-foreground mb-4">인증 기간: 2025년 5월 1일 ~ 10월 31일</p>
@@ -30,9 +30,10 @@ export function Dashboard() {
                 <span className="font-semibold">🥈 은장: 3개 영역 인증</span>
                 <span className="font-semibold">🥉 동장: 2개 영역 인증</span>
             </div>
+          </div>
         </div>
 
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {loading || !user
             ? Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="flex flex-col space-y-3">

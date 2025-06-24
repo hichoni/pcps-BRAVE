@@ -12,7 +12,7 @@ export function CertificateStatus() {
   const { getAchievements, certificateStatus, loading: achievementsLoading } = useAchievements();
 
   if (authLoading || achievementsLoading || !user) {
-    return <Skeleton className="h-40 w-full max-w-md mx-auto" />;
+    return <Skeleton className="h-40 w-full" />;
   }
   
   const userAchievements = getAchievements(user.username);
@@ -39,11 +39,11 @@ export function CertificateStatus() {
   };
 
   return (
-    <Card className="max-w-md mx-auto shadow-lg border-primary/20">
+    <Card className="w-full h-full flex flex-col shadow-lg border-primary/20">
       <CardHeader className="text-center pb-2">
         <CardTitle className="font-headline text-2xl">나의 도전 현황</CardTitle>
       </CardHeader>
-      <CardContent className="text-center">
+      <CardContent className="text-center flex-grow flex flex-col items-center justify-center">
         <div className="flex flex-col items-center gap-2">
           <statusInfo.icon className={cn("w-20 h-20 transition-all duration-500", statusInfo.color)} />
           {currentStatus !== 'Unranked' && (
