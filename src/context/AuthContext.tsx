@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
@@ -154,27 +153,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [ensureUsersLoaded]);
 
   const updatePin = useCallback(async (newPin: string) => {
-    if (!user) return;
+    if (!user) {
+      throw new Error("Cannot update PIN: user is not logged in.");
+    }
 
+    const originalUser = { ...user };
     const updatedUser = { ...user, pin: newPin };
+
+    // Optimistic UI update
+    setUser(updatedUser);
+    sessionStorage.setItem('user', JSON.stringify(updatedUser));
+    setUsers(prevUsers => prevUsers.map(u => (u.id === user.id ? updatedUser : u)));
     
     if (!db) {
-        setUser(updatedUser);
-        sessionStorage.setItem('user', JSON.stringify(updatedUser));
-        setUsers(prevUsers => prevUsers.map(u => (u.id === user.id ? updatedUser : u)));
-        return;
+        return; // Success in mock mode
     }
 
     try {
         const userDocRef = doc(db, "users", String(user.id));
         await updateDoc(userDocRef, { pin: newPin });
-        
-        setUser(updatedUser);
-        sessionStorage.setItem('user', JSON.stringify(updatedUser));
-        setUsers(prevUsers => prevUsers.map(u => (u.id === user.id ? updatedUser : u)));
-
     } catch (e) {
-        console.warn("Failed to update PIN in Firestore", e);
+        console.warn("Failed to update PIN in Firestore, reverting.", e);
+        // Revert on failure
+        setUser(originalUser);
+        sessionStorage.setItem('user', JSON.stringify(originalUser));
+        setUsers(prevUsers => prevUsers.map(u => (u.id === user.id ? originalUser : u)));
+        // Propagate error to the UI
+        throw e;
     }
   }, [user]);
 
