@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -98,7 +99,7 @@ export default function AdminPage() {
     .filter(u => {
         const gradeMatch = gradeFilter === 'all' || u.grade === parseInt(gradeFilter, 10);
         const classMatch = classFilter === 'all' || u.classNum === parseInt(classFilter, 10);
-        const nameMatch = (u.name ?? '').toLowerCase().includes(searchQuery.toLowerCase());
+        const nameMatch = String(u.name ?? '').toLowerCase().includes(searchQuery.toLowerCase());
         return gradeMatch && classMatch && nameMatch;
     })
     .sort((a, b) => {
@@ -148,7 +149,7 @@ export default function AdminPage() {
                             <SelectContent>
                                 <SelectItem value="all">전체 학년</SelectItem>
                                 {availableGrades.map(grade => (
-                                    grade && <SelectItem key={grade} value={String(grade)}>{grade}학년</SelectItem>
+                                    grade != null && <SelectItem key={grade} value={String(grade)}>{grade}학년</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -159,7 +160,7 @@ export default function AdminPage() {
                             <SelectContent>
                                 <SelectItem value="all">전체 반</SelectItem>
                                 {availableClasses.map(classNum => (
-                                    classNum && <SelectItem key={classNum} value={String(classNum)}>{classNum}반</SelectItem>
+                                    classNum != null && <SelectItem key={classNum} value={String(classNum)}>{classNum}반</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
