@@ -9,6 +9,11 @@ import { ChallengeConfigProvider } from '@/context/ChallengeConfigContext';
 export const metadata: Metadata = {
   title: '풍천풍서초등학교 학교장 인증제',
   description: '도전! 꿈 성취 학교장 인증제를 통해 나의 성장을 기록하고 인증받아보세요.',
+  manifest: '/manifest.json',
+  themeColor: '#2f5c88',
+  icons: {
+    apple: '/icons/icon-192x192.png',
+  },
 };
 
 export default function RootLayout({
