@@ -143,7 +143,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm shadow-lg">
         <CardHeader className="text-center">
           <Image
-            src="/icon-main.png"
+            src="/icon-main.png?v=2"
             alt="풍천풍서초등학교 로고"
             width={80}
             height={80}

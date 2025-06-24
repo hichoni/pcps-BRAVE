@@ -13,7 +13,7 @@ export function Header() {
     <header className="py-8 border-b-2 border-primary/10 mb-8 flex justify-between items-center">
         <div className="flex items-center gap-6">
             <Image
-              src="/icon-main.png"
+              src="/icon-main.png?v=2"
               alt="풍천풍서초등학교 로고"
               width={72}
               height={72}
