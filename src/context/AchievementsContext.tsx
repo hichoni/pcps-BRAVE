@@ -6,7 +6,7 @@ import { useAuth } from './AuthContext';
 import { AreaName, AchievementsState, CertificateStatus, AREAS, CERTIFICATE_THRESHOLDS, User } from '@/lib/config';
 import { useChallengeConfig } from './ChallengeConfigContext';
 import { db } from '@/lib/firebase';
-import { collection, doc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc, updateDoc, getDoc } from 'firebase/firestore';
 
 type AllAchievementsState = Record<string, AchievementsState>; // Keyed by username
 
@@ -34,7 +34,7 @@ const generateInitialStateForUser = (): AchievementsState => {
 export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
   const [allAchievements, setAllAchievements] = useState<AllAchievementsState | null>(null);
   const [loading, setLoading] = useState(true);
-  const { users, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { loading: configLoading } = useChallengeConfig();
 
   useEffect(() => {
@@ -44,24 +44,47 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
+      if (!user) {
+        setLoading(false);
+        setAllAchievements({});
+        return;
+      }
+
       setLoading(true);
       try {
         const achievementsCollectionRef = collection(db, 'achievements');
-        const querySnapshot = await getDocs(achievementsCollectionRef);
         const fetchedAchievements: AllAchievementsState = {};
-        
-        querySnapshot.forEach(doc => {
-            const data = doc.data();
-            const achievements = generateInitialStateForUser(); // Start with a full default object
-            // Merge fetched data over the default to ensure all fields are present
-            Object.keys(achievements).forEach(key => {
-                const area = key as AreaName;
-                if (data[area]) {
-                    achievements[area] = { ...achievements[area], ...data[area] };
-                }
-            });
-            fetchedAchievements[doc.id] = achievements;
-        });
+
+        if (user.role === 'teacher') {
+          const querySnapshot = await getDocs(achievementsCollectionRef);
+          querySnapshot.forEach(doc => {
+              const data = doc.data();
+              const achievements = generateInitialStateForUser();
+              Object.keys(achievements).forEach(key => {
+                  const area = key as AreaName;
+                  if (data[area]) {
+                      achievements[area] = { ...achievements[area], ...data[area] };
+                  }
+              });
+              fetchedAchievements[doc.id] = achievements;
+          });
+        } else if (user.role === 'student') {
+            const studentDocRef = doc(db, 'achievements', user.username);
+            const docSnap = await getDoc(studentDocRef);
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                const achievements = generateInitialStateForUser();
+                Object.keys(achievements).forEach(key => {
+                    const area = key as AreaName;
+                    if (data[area]) {
+                        achievements[area] = { ...achievements[area], ...data[area] };
+                    }
+                });
+                fetchedAchievements[user.username] = achievements;
+            } else {
+                fetchedAchievements[user.username] = generateInitialStateForUser();
+            }
+        }
         
         setAllAchievements(fetchedAchievements);
 
@@ -72,14 +95,12 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
       }
     };
-
-    if (!authLoading && users.length > 0) {
+    
+    if (!authLoading) {
       fetchAchievements();
-    } else if (!authLoading) {
-      setLoading(false);
-      setAllAchievements({});
     }
-  }, [users, authLoading]);
+
+  }, [user, authLoading]);
 
 
   const getAchievements = useCallback((username: string): AchievementsState => {
