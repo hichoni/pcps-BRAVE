@@ -4,19 +4,21 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useAchievements } from '@/context/AchievementsContext';
-import { User, AREAS, AreaName, AREAS_CONFIG } from '@/lib/config';
+import { User, AREAS, AreaName } from '@/lib/config';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Users, Save, Undo, LogOut } from 'lucide-react';
+import { Loader2, Users, Save, Undo, LogOut, Settings } from 'lucide-react';
+import { useChallengeConfig } from '@/context/ChallengeConfigContext';
+import Link from 'next/link';
 
 export default function AdminPage() {
   const { user, users, loading, logout, resetPin } = useAuth();
   const { getAchievements, updateProgress, loading: achievementsLoading } = useAchievements();
+  const { challengeConfig, loading: configLoading } = useChallengeConfig();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -76,7 +78,7 @@ export default function AdminPage() {
     }
   };
 
-  if (loading || achievementsLoading || !user || user.role !== 'teacher') {
+  if (loading || achievementsLoading || configLoading || !user || user.role !== 'teacher' || !challengeConfig) {
     return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
   }
 
@@ -88,6 +90,11 @@ export default function AdminPage() {
         <h1 className="text-3xl font-bold font-headline text-primary flex items-center gap-2"><Users/> 관리자 페이지</h1>
         <div className="flex items-center gap-4">
           <span className="font-semibold">{user.name} 선생님</span>
+           <Link href="/admin/challenges" passHref>
+              <Button variant="outline" size="icon" aria-label="도전 영역 관리">
+                <Settings/>
+              </Button>
+           </Link>
           <Button variant="outline" onClick={logout}><LogOut className="mr-2"/> 로그아웃</Button>
         </div>
       </header>
@@ -105,7 +112,7 @@ export default function AdminPage() {
               <SelectContent>
                 {students.map(s => (
                   <SelectItem key={s.id} value={s.username}>
-                    {s.name} ({s.grade}학년 {s.classNum}반 {s.studentNum}번)
+                    {s.grade}학년 {s.classNum}반 {s.studentNum}번 {s.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -129,10 +136,12 @@ export default function AdminPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {AREAS.map(area => (
+                    {AREAS.map(area => {
+                      const areaConfig = challengeConfig[area];
+                      return (
                       <TableRow key={area}>
-                        <TableCell className="font-medium">{AREAS_CONFIG[area].koreanName}</TableCell>
-                        <TableCell>{AREAS_CONFIG[area].goal} {AREAS_CONFIG[area].unit}</TableCell>
+                        <TableCell className="font-medium">{areaConfig.koreanName}</TableCell>
+                        <TableCell>{areaConfig.goal} {areaConfig.unit}</TableCell>
                         <TableCell>
                           <Input
                             type="number"
@@ -142,7 +151,7 @@ export default function AdminPage() {
                           />
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )})}
                   </TableBody>
                 </Table>
                 <div className="flex justify-end gap-2">

@@ -12,23 +12,25 @@ import {
 } from '@/components/ui/dialog';
 import { useAchievements } from '@/context/AchievementsContext';
 import { useAuth } from '@/context/AuthContext';
-import { AreaName, AREAS_CONFIG } from '@/lib/config';
+import { AreaName } from '@/lib/config';
+import { useChallengeConfig } from '@/context/ChallengeConfigContext';
 import { ListChecks } from 'lucide-react';
 
 export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const { user } = useAuth();
   const { getAchievements } = useAchievements();
+  const { challengeConfig } = useChallengeConfig();
   
-  if (!user) return null;
+  if (!user || !challengeConfig) return null;
   
   const achievements = getAchievements(user.username);
-  const areaConfig = AREAS_CONFIG[areaName];
+  const areaConfig = challengeConfig[areaName];
   const areaState = achievements?.[areaName];
 
-  if (!areaState) return null;
+  if (!areaState || !areaConfig) return null;
   
   const { progress } = areaState;
-  const { goal, unit, koreanName } = areaConfig;
+  const { goal, unit, koreanName, challengeName } = areaConfig;
 
   return (
     <Dialog>
@@ -41,7 +43,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
         <DialogHeader>
           <DialogTitle className="font-headline text-2xl">{koreanName} 영역 현황</DialogTitle>
           <DialogDescription>
-            {areaConfig.challengeName}
+            {challengeName}
           </DialogDescription>
         </DialogHeader>
         <div className="py-4 text-center">

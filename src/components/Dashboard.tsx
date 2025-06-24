@@ -46,7 +46,7 @@ export function Dashboard() {
           {loading || !user
             ? Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="flex flex-col space-y-3">
-                  <Skeleton className="h-[125px] w-full rounded-xl" />
+                  <Skeleton className="h-[180px] w-full rounded-xl" />
                   <div className="space-y-2">
                     <Skeleton className="h-4 w-4/5" />
                     <Skeleton className="h-4 w-3/5" />

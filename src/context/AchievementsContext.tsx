@@ -2,7 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { AreaName, AchievementsState, CertificateStatus, AREAS, CERTIFICATE_THRESHOLDS, AREAS_CONFIG } from '@/lib/config';
+import { AreaName, AchievementsState, CertificateStatus, AREAS, CERTIFICATE_THRESHOLDS } from '@/lib/config';
+import { useChallengeConfig } from './ChallengeConfigContext';
 
 type AllAchievementsState = Record<string, AchievementsState>; // Keyed by username
 
@@ -30,6 +31,7 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
   const [allAchievements, setAllAchievements] = useState<AllAchievementsState | null>(null);
   const [loading, setLoading] = useState(true);
   const { users, loading: authLoading } = useAuth();
+  const { challengeConfig, loading: configLoading } = useChallengeConfig();
 
   useEffect(() => {
     if (authLoading) return; // Wait for users to be available
@@ -92,9 +94,11 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
 
   const updateProgress = useCallback(async (username: string, area: AreaName, progress: number) => {
     setAllAchievements(prev => {
-      if (!prev || !prev[username]) return prev;
+      if (!prev || !prev[username] || !challengeConfig) return prev;
 
-      const areaConfig = AREAS_CONFIG[area];
+      const areaConfig = challengeConfig[area];
+      if (!areaConfig) return prev;
+      
       const isCertified = progress >= areaConfig.goal;
       
       const newState = { ...prev };
@@ -107,7 +111,7 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
       };
       return newState;
     });
-  }, []);
+  }, [challengeConfig]);
   
   const certificateStatus = useCallback((username: string): CertificateStatus => {
     if (!allAchievements || !allAchievements[username]) return 'Unranked';
@@ -122,7 +126,7 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
   }, [allAchievements]);
 
   return (
-    <AchievementsContext.Provider value={{ getAchievements, updateProgress, certificateStatus, loading }}>
+    <AchievementsContext.Provider value={{ getAchievements, updateProgress, certificateStatus, loading: loading || configLoading }}>
       {children}
     </AchievementsContext.Provider>
   );

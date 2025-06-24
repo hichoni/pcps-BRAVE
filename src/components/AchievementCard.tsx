@@ -2,12 +2,14 @@
 
 import { useAchievements } from '@/context/AchievementsContext';
 import { useAuth } from '@/context/AuthContext';
-import { AreaName, AREAS_CONFIG } from '@/lib/config';
+import { AreaName } from '@/lib/config';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { AchievementStatusDialog } from './AchievementStatusDialog';
 import { Badge } from './ui/badge';
 import { CheckCircle2, XCircle } from 'lucide-react';
+import { useChallengeConfig } from '@/context/ChallengeConfigContext';
+import { Skeleton } from './ui/skeleton';
 
 interface AchievementCardProps {
   areaName: AreaName;
@@ -16,26 +18,38 @@ interface AchievementCardProps {
 export function AchievementCard({ areaName }: AchievementCardProps) {
   const { user } = useAuth();
   const { getAchievements } = useAchievements();
+  const { challengeConfig, loading: configLoading } = useChallengeConfig();
   
-  if (!user) return null;
+  if (!user || configLoading || !challengeConfig) {
+    return (
+        <div className="flex flex-col space-y-3">
+          <Skeleton className="h-[180px] w-full rounded-xl" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-4/5" />
+            <Skeleton className="h-4 w-3/5" />
+          </div>
+        </div>
+      )
+  }
 
   const achievements = getAchievements(user.username);
-  const areaConfig = AREAS_CONFIG[areaName];
+  const areaConfig = challengeConfig[areaName];
   const areaState = achievements?.[areaName];
   
-  if (!areaState) return null;
+  if (!areaState || !areaConfig) return null;
 
   const { isCertified, progress } = areaState;
   const { goal } = areaConfig;
 
   const progressValue = goal > 0 ? (progress / goal) * 100 : 0;
+  const AreaIcon = areaConfig.icon;
 
   return (
     <Card className="flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300">
       <CardHeader>
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3 mb-2">
-            <areaConfig.icon className="w-8 h-8 text-primary" />
+            <AreaIcon className="w-8 h-8 text-primary" />
             <CardTitle className="font-headline text-xl">{areaConfig.koreanName}</CardTitle>
           </div>
           <Badge variant={isCertified ? 'default' : 'secondary'} className="shrink-0">

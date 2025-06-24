@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { AchievementsProvider } from '@/context/AchievementsContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { Toaster } from '@/components/ui/toaster';
+import { ChallengeConfigProvider } from '@/context/ChallengeConfigContext';
 
 export const metadata: Metadata = {
   title: '풍천풍서초등학교 학교장 인증제',
@@ -27,9 +28,11 @@ export default function RootLayout({
       </head>
       <body className={cn('font-body antialiased min-h-screen bg-background')}>
         <AuthProvider>
-          <AchievementsProvider>
-            {children}
-          </AchievementsProvider>
+          <ChallengeConfigProvider>
+            <AchievementsProvider>
+              {children}
+            </AchievementsProvider>
+          </ChallengeConfigProvider>
         </AuthProvider>
         <Toaster />
       </body>
