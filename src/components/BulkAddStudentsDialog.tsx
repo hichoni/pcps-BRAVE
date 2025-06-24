@@ -51,7 +51,7 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0) {
       const file = event.target.files[0];
-      if (file.type !== 'text/csv') {
+      if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
         toast({ variant: 'destructive', title: '파일 형식 오류', description: 'CSV 파일만 업로드할 수 있습니다.' });
         event.target.value = ''; // Reset file input
         setSelectedFile(null);
@@ -81,8 +81,17 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
         }
 
         const lines = text.trim().split(/\r\n|\n/);
-        // Remove header row if it exists
-        if (lines[0] && lines[0].includes('학년')) {
+
+        if (lines.length === 0 || (lines.length === 1 && lines[0].trim() === '')) {
+            toast({ variant: 'destructive', title: '파일 오류', description: '파일이 비어있습니다.' });
+            setLoading(false);
+            return;
+        }
+        
+        const header = lines[0];
+        const delimiter = header.includes(';') ? ';' : ',';
+
+        if (header.includes('학년')) {
             lines.shift();
         }
 
@@ -91,9 +100,11 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
 
         lines.forEach((line, index) => {
             if (line.trim() === '') return;
-            const parts = line.split(',').map(p => p.trim());
+            
+            const parts = line.split(delimiter).map(p => p.trim().replace(/^"|"$/g, ''));
+            
             if (parts.length !== 4) {
-                parseErrors.push(`${index + 1}번째 줄: 형식이 올바르지 않습니다 (학년,반,번호,이름).`);
+                parseErrors.push(`${index + 1}번째 줄: 형식이 올바르지 않습니다. (예: 4${delimiter}1${delimiter}1${delimiter}김철수)`);
                 return;
             }
 
@@ -103,7 +114,7 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
             const studentNum = parseInt(studentNumStr, 10);
 
             if (isNaN(grade) || isNaN(classNum) || isNaN(studentNum) || !name) {
-                parseErrors.push(`${index + 1}번째 줄: 데이터가 유효하지 않습니다.`);
+                parseErrors.push(`${index + 1}번째 줄: 데이터가 유효하지 않습니다. 숫자와 이름이 올바른지 확인해주세요.`);
                 return;
             }
             
@@ -114,11 +125,11 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
             toast({
                 variant: 'destructive',
                 title: '입력 데이터 오류',
-                duration: 8000,
+                duration: 10000,
                 description: (
                     <div className="text-sm">
-                        <p>데이터 파싱 중 오류가 발생했습니다:</p>
-                        <ul className="list-disc pl-5 mt-2 max-h-20 overflow-y-auto">
+                        <p>CSV 파일 처리 중 오류가 발생했습니다:</p>
+                        <ul className="list-disc pl-5 mt-2 max-h-32 overflow-y-auto">
                             {parseErrors.map((e, i) => <li key={i}>{e}</li>)}
                         </ul>
                     </div>
@@ -132,7 +143,7 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
             toast({
                 variant: 'destructive',
                 title: '오류',
-                description: '추가할 학생 정보가 없습니다.'
+                description: '추가할 학생 정보가 없습니다. 파일 내용을 확인해주세요.'
             });
             setLoading(false);
             return;
@@ -150,11 +161,11 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
              toast({
                 variant: 'destructive',
                 title: '등록 실패 상세',
-                duration: 8000,
+                duration: 10000,
                 description: (
                      <div className="text-sm">
                         <p>일부 학생 등록에 실패했습니다:</p>
-                        <ul className="list-disc pl-5 mt-2 max-h-20 overflow-y-auto">
+                        <ul className="list-disc pl-5 mt-2 max-h-32 overflow-y-auto">
                             {result.errors.map((e, i) => <li key={i}>{e}</li>)}
                         </ul>
                     </div>
@@ -164,7 +175,9 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
         }
 
         setSelectedFile(null);
-        onOpenChange(false);
+        if (result.successCount > 0) {
+            onOpenChange(false);
+        }
         setLoading(false);
     };
 
@@ -197,7 +210,7 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
                 <Info className="h-4 w-4" />
                 <AlertTitle>파일 형식 안내</AlertTitle>
                 <AlertDescription>
-                    <p>예시 파일을 다운로드하여 형식을 확인해주세요. 파일은 쉼표(,)로 구분된 CSV 형식이어야 합니다.</p>
+                    <p>예시 파일을 다운로드하여 형식을 확인해주세요. 파일은 쉼표(,) 또는 세미콜론(;)으로 구분된 CSV 형식이어야 합니다.</p>
                 </AlertDescription>
             </Alert>
             
