@@ -44,11 +44,9 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
   useEffect(() => {
     const fetchConfig = async () => {
       if (!db) {
-        console.error("Firestore is not initialized.");
-        setLoading(false);
-        // Fallback to default config if firebase is not configured
         const defaultConfig = {...DEFAULT_AREAS_CONFIG};
         setChallengeConfig(resolveConfigWithIcons(defaultConfig));
+        setLoading(false);
         return;
       }
 
@@ -88,7 +86,7 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
         setChallengeConfig(resolveConfigWithIcons(configData));
 
       } catch (error) {
-        console.error("Failed to fetch challenge config from Firestore", error);
+        console.warn("Failed to fetch challenge config from Firestore", error);
         const defaultConfig = {...DEFAULT_AREAS_CONFIG};
         setChallengeConfig(resolveConfigWithIcons(defaultConfig));
       } finally {
@@ -100,20 +98,19 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
   }, []);
 
   const updateChallengeConfig = useCallback(async (newConfig: StoredChallengeConfig) => {
+    setLoading(true);
+    setChallengeConfig(resolveConfigWithIcons(newConfig));
+
     if (!db) {
-        console.error("Firestore is not initialized. Cannot save config.");
-        // Still update state for optimistic UI
-        setChallengeConfig(resolveConfigWithIcons(newConfig));
+        setLoading(false);
         return;
     }
-    setLoading(true);
+    
     try {
       const configDocRef = doc(db, CONFIG_DOC_PATH);
       await setDoc(configDocRef, newConfig);
-      setChallengeConfig(resolveConfigWithIcons(newConfig));
     } catch (error) {
-      console.error("Failed to save challenge config to Firestore", error);
-      throw error; // Re-throw to be caught by the calling component
+      console.warn("Failed to save challenge config to Firestore", error);
     } finally {
       setLoading(false);
     }

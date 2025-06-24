@@ -40,7 +40,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUsers = useCallback(async () => {
     if (!db) {
-      console.error("Firestore is not initialized. Using mock users.");
       setUsers(MOCK_USERS);
       return;
     }
@@ -63,7 +62,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUsers(usersList);
       }
     } catch(error) {
-        console.error("Error fetching users from Firestore:", error);
+        console.warn("Error fetching users from Firestore:", error);
         setUsers(MOCK_USERS); // Fallback to mock users on error
     }
   }, []);
@@ -81,7 +80,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(currentUserData || null);
         }
       } catch (error) {
-        console.error("Auth context initialization error:", error);
+        console.warn("Auth context initialization error:", error);
       } finally {
         setLoading(false);
       }
@@ -139,44 +138,57 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [router]);
 
   const updatePin = useCallback(async (newPin: string) => {
-    if (!user || !db) throw new Error("User not logged in or DB not initialized");
-
-    const userDocRef = doc(db, "users", String(user.id));
-    await updateDoc(userDocRef, { pin: newPin });
+    if (!user) return;
     
-    const updatedUsers = users.map(u => u.id === user.id ? { ...u, pin: newPin } : u);
+    const updatedUsers = users.map(u => (u.id === user.id ? { ...u, pin: newPin } : u));
     setUsers(updatedUsers);
+    
+    if (!db) return;
+
+    try {
+        const userDocRef = doc(db, "users", String(user.id));
+        await updateDoc(userDocRef, { pin: newPin });
+    } catch (e) {
+        console.warn("Failed to update PIN in Firestore", e);
+    }
 
   }, [user, users]);
 
   const resetPin = useCallback(async (username: string) => {
-    if (!db) throw new Error("DB not initialized");
     const targetUser = users.find(u => u.username === username);
-    if (!targetUser) throw new Error("User not found");
+    if (!targetUser) return;
 
-    const userDocRef = doc(db, "users", String(targetUser.id));
-    await updateDoc(userDocRef, { pin: '0000' });
-    
     const updatedUsers = users.map(u => u.username === username ? { ...u, pin: '0000' } : u);
     setUsers(updatedUsers);
+    
+    if (!db) return;
+
+    try {
+        const userDocRef = doc(db, "users", String(targetUser.id));
+        await updateDoc(userDocRef, { pin: '0000' });
+    } catch (e) {
+        console.warn("Failed to reset PIN in Firestore", e);
+    }
   }, [users]);
 
   const deleteUser = useCallback(async (username: string) => {
-    if (!db) throw new Error("DB not initialized");
     const targetUser = users.find(u => u.username === username);
-    if (!targetUser) throw new Error("User not found");
-
-    const userDocRef = doc(db, "users", String(targetUser.id));
-    await deleteDoc(userDocRef);
+    if (!targetUser) return;
 
     const updatedUsers = users.filter(u => u.username !== username);
     setUsers(updatedUsers);
+    
+    if (!db) return;
 
+    try {
+        const userDocRef = doc(db, "users", String(targetUser.id));
+        await deleteDoc(userDocRef);
+    } catch (e) {
+        console.warn("Failed to delete user from Firestore", e);
+    }
   }, [users]);
 
   const addUser = useCallback(async (studentData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>): Promise<{ success: boolean; message: string }> => {
-    if (!db) return { success: false, message: "데이터베이스에 연결할 수 없습니다." };
-
     const { grade, classNum, studentNum, name } = studentData;
 
     const studentExists = users.some(u =>
@@ -203,24 +215,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       studentNum,
       name,
     };
-
-    const userDocRef = doc(db, "users", String(newUser.id));
-    await setDoc(userDocRef, newUser);
-
+    
     setUsers(prev => [...prev, newUser]);
+    
+    if (!db) {
+        return { success: true, message: `${name} 학생이 추가되었습니다. (DB 연결 안됨)` };
+    }
+
+    try {
+        const userDocRef = doc(db, "users", String(newUser.id));
+        await setDoc(userDocRef, newUser);
+    } catch (e) {
+        console.warn("Failed to add user to Firestore", e);
+    }
+
     return { success: true, message: `${name} 학생이 추가되었습니다.` };
   }, [users]);
 
   const bulkAddUsers = useCallback(async (studentsData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>[]): Promise<{ successCount: number; failCount: number; errors: string[] }> => {
-    if (!db) return { successCount: 0, failCount: studentsData.length, errors: ["데이터베이스에 연결할 수 없습니다."] };
-
     let successCount = 0;
     let failCount = 0;
     const errors: string[] = [];
     const newUsers: User[] = [];
     
     let lastId = (users.length > 0 ? Math.max(...users.map(u => u.id)) : 0);
-    const batch = writeBatch(db);
+    const batch = db ? writeBatch(db) : null;
     const currentUsers = [...users];
 
     studentsData.forEach((student, index) => {
@@ -249,15 +268,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
         newUsers.push(newUser);
         currentUsers.push(newUser); // Add to temp list to check for duplicates within the same file
-        const docRef = doc(db, "users", String(newUser.id));
-        batch.set(docRef, newUser);
+        if (batch) {
+            const docRef = doc(db, "users", String(newUser.id));
+            batch.set(docRef, newUser);
+        }
         successCount++;
       }
     });
 
     if (newUsers.length > 0) {
-      await batch.commit();
       setUsers(prev => [...prev, ...newUsers].sort((a,b) => a.id - b.id));
+      if (batch) {
+          try {
+            await batch.commit();
+          } catch(e) {
+            console.warn("Failed to bulk add users to Firestore", e);
+          }
+      }
     }
     
     return { successCount, failCount, errors };

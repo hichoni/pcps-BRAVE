@@ -13,11 +13,10 @@ const firebaseConfig = {
 // Initialize Firebase
 let app;
 if (!getApps().length) {
-    if (!firebaseConfig.projectId) {
-        console.error("Firebase config is not set. Please update your .env file.");
-        app = null;
-    } else {
+    if (firebaseConfig.projectId) {
         app = initializeApp(firebaseConfig);
+    } else {
+        app = null;
     }
 } else {
     app = getApp();

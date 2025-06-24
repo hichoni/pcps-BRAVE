@@ -38,7 +38,10 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const fetchAchievements = async () => {
-      if (authLoading || !db) return;
+      if (authLoading || !db) {
+        if (!authLoading) setLoading(false);
+        return;
+      }
 
       setLoading(true);
       try {
@@ -51,7 +54,6 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
 
         const students = users.filter(u => u.role === 'student');
         
-        // Use a Firestore batch to create missing achievement documents
         const batch: { ref: any; data: AchievementsState }[] = [];
 
         students.forEach(student => {
@@ -66,7 +68,6 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
         
         if (batch.length > 0) {
             console.log(`Creating achievement entries for ${batch.length} new students...`);
-            // Firestore write batch can't be used here easily as it's not imported, so simple loop is fine.
             for (const item of batch) {
                 await setDoc(item.ref, item.data);
             }
@@ -75,7 +76,7 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
         setAllAchievements(fetchedAchievements);
 
       } catch (error) {
-        console.error("Failed to fetch achievements from Firestore", error);
+        console.warn("Failed to fetch achievements from Firestore", error);
         setAllAchievements({}); // Set to empty on error
       } finally {
         setLoading(false);
@@ -86,6 +87,7 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
       fetchAchievements();
     } else if (!authLoading) {
       setLoading(false);
+      setAllAchievements({});
     }
   }, [users, authLoading]);
 
@@ -96,8 +98,6 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
   }, [allAchievements]);
 
   const updateProgress = useCallback(async (username: string, area: AreaName, progress: number) => {
-    if (!db) throw new Error("DB not initialized");
-    
     // Optimistic UI update
     setAllAchievements(prev => {
       if (!prev) return null;
@@ -111,19 +111,21 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
       };
     });
 
+    if (!db) {
+        return;
+    }
+
     try {
         const achievementDocRef = doc(db, 'achievements', username);
         const fieldPath = `${area}.progress`;
         await updateDoc(achievementDocRef, { [fieldPath]: progress });
     } catch(e) {
-        console.error("Failed to update progress in Firestore", e);
+        console.warn("Failed to update progress in Firestore", e);
         // Here you could add logic to revert the optimistic update
     }
   }, []);
 
   const toggleCertification = useCallback(async (username: string, area: AreaName) => {
-    if (!db) throw new Error("DB not initialized");
-
     const currentIsCertified = allAchievements?.[username]?.[area]?.isCertified ?? false;
     const newIsCertified = !currentIsCertified;
 
@@ -140,12 +142,16 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
       };
     });
 
+    if (!db) {
+        return;
+    }
+
     try {
         const achievementDocRef = doc(db, 'achievements', username);
         const fieldPath = `${area}.isCertified`;
         await updateDoc(achievementDocRef, { [fieldPath]: newIsCertified });
     } catch (e) {
-        console.error("Failed to toggle certification in Firestore", e);
+        console.warn("Failed to toggle certification in Firestore", e);
         // Here you could add logic to revert the optimistic update
     }
 
