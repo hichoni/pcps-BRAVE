@@ -219,12 +219,12 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
         toast({ 
             variant: 'destructive', 
             title: '파일 읽기 오류', 
-            description: '파일을 읽는 중 오류가 발생했습니다. 파일이 손상되었거나 다른 프로그램에서 사용 중인지 확인해주세요. 또는 파일을 UTF-8 형식으로 저장한 후 다시 시도해보세요.'
+            description: '파일을 읽는 중 오류가 발생했습니다. 파일이 손상되었거나 다른 프로그램에서 사용 중인지 확인해주세요. 또는 파일을 "CSV(UTF-8)" 형식으로 저장한 후 다시 시도해보세요.'
         });
         setLoading(false);
     };
 
-    reader.readAsText(selectedFile, 'UTF-8');
+    reader.readAsText(selectedFile);
   };
 
   const handleOpenChange = (isOpen: boolean) => {
