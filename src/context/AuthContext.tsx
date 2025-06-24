@@ -38,45 +38,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(async (): Promise<User[]> => {
     if (!db) {
       setUsers(MOCK_USERS);
-      return;
+      return MOCK_USERS;
     }
     
     try {
       const usersCollectionRef = collection(db, "users");
       const usersSnapshot = await getDocs(usersCollectionRef);
       if (usersSnapshot.empty) {
-        // If DB is empty, seed with MOCK_USERS
         console.log("No users found in Firestore. Seeding with mock data...");
         const batch = writeBatch(db);
         MOCK_USERS.forEach(userToSeed => {
-            const docRef = doc(db, "users", String(userToSeed.id)); // Use string ID for document ID
+            const docRef = doc(db, "users", String(userToSeed.id));
             batch.set(docRef, userToSeed);
         });
         await batch.commit();
         setUsers(MOCK_USERS);
+        return MOCK_USERS;
       } else {
         const usersList = usersSnapshot.docs.map(doc => ({ ...doc.data() } as User));
         setUsers(usersList);
+        return usersList;
       }
     } catch(error) {
         console.warn("Error fetching users from Firestore:", error);
-        setUsers(MOCK_USERS); // Fallback to mock users on error
+        setUsers(MOCK_USERS);
+        return MOCK_USERS;
     }
   }, []);
 
   useEffect(() => {
     const initializeAuth = async () => {
       setLoading(true);
-      await fetchUsers();
+      const fetchedUsers = await fetchUsers();
       try {
         const sessionUser = sessionStorage.getItem('user');
         if (sessionUser) {
           const parsedUser = JSON.parse(sessionUser);
-          // Re-validate user data from the freshly fetched users list
-          const currentUserData = users.find((u: User) => u.id === parsedUser.id);
+          const currentUserData = fetchedUsers.find((u: User) => u.id === parsedUser.id);
           setUser(currentUserData || null);
         }
       } catch (error) {
@@ -87,7 +88,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     initializeAuth();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchUsers]);
   
   // This useEffect re-validates the session user when the users list is updated.
@@ -183,6 +183,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
         const userDocRef = doc(db, "users", String(targetUser.id));
         await deleteDoc(userDocRef);
+        // Also delete achievements
+        const achievementDocRef = doc(db, 'achievements', username);
+        await deleteDoc(achievementDocRef);
     } catch (e) {
         console.warn("Failed to delete user from Firestore", e);
     }

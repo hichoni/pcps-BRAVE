@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -34,8 +35,11 @@ export default function ChallengeConfigPage() {
       // Create a deep copy for local editing, removing the unserializable 'icon' and 'name' properties
       const editableConfig: any = {};
       AREAS.forEach(area => {
-        const { icon, name, ...rest } = challengeConfig[area];
-        editableConfig[area] = rest;
+        const config = challengeConfig[area];
+        if (config) {
+            const { icon, name, ...rest } = config;
+            editableConfig[area] = rest;
+        }
       })
       setLocalConfig(editableConfig);
     }
@@ -109,20 +113,25 @@ export default function ChallengeConfigPage() {
       </header>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {AREAS.map(area => (
+        {AREAS.map(area => {
+            const areaConfig = challengeConfig[area];
+            const localAreaConfig = localConfig[area];
+            if (!areaConfig || !localAreaConfig) return null;
+
+            return (
             <Card key={area}>
                 <CardHeader>
-                    <CardTitle>{challengeConfig[area].koreanName}</CardTitle>
-                    <CardDescription>{challengeConfig[area].name}</CardDescription>
+                    <CardTitle>{areaConfig.koreanName}</CardTitle>
+                    <CardDescription>{areaConfig.name}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor={`koreanName-${area}`}>영역 이름 (한국어)</Label>
-                        <Input id={`koreanName-${area}`} value={localConfig[area].koreanName} onChange={(e) => handleInputChange(area, 'koreanName', e.target.value)} />
+                        <Input id={`koreanName-${area}`} value={localAreaConfig.koreanName} onChange={(e) => handleInputChange(area, 'koreanName', e.target.value)} />
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor={`challengeName-${area}`}>도전 과제 이름</Label>
-                        <Input id={`challengeName-${area}`} value={localConfig[area].challengeName} onChange={(e) => handleInputChange(area, 'challengeName', e.target.value)} />
+                        <Input id={`challengeName-${area}`} value={localAreaConfig.challengeName} onChange={(e) => handleInputChange(area, 'challengeName', e.target.value)} />
                     </div>
                     <div className="space-y-2">
                         <Label>목표량 (학년별)</Label>
@@ -130,22 +139,22 @@ export default function ChallengeConfigPage() {
                           {GRADES.map(grade => (
                             <div key={grade} className="space-y-1">
                               <Label htmlFor={`goal-${area}-${grade}`} className="text-sm font-normal">{grade}학년</Label>
-                              <Input id={`goal-${area}-${grade}`} type="number" value={localConfig[area].goal[grade] ?? ''} onChange={(e) => handleGoalChange(area, grade, e.target.value)} />
+                              <Input id={`goal-${area}-${grade}`} type="number" value={localAreaConfig.goal[grade] ?? ''} onChange={(e) => handleGoalChange(area, grade, e.target.value)} />
                             </div>
                           ))}
                         </div>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor={`unit-${area}`}>단위</Label>
-                        <Input id={`unit-${area}`} value={localConfig[area].unit} onChange={(e) => handleInputChange(area, 'unit', e.target.value)} />
+                        <Input id={`unit-${area}`} value={localAreaConfig.unit} onChange={(e) => handleInputChange(area, 'unit', e.target.value)} />
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor={`requirements-${area}`}>인증 기준 설명</Label>
-                        <Textarea id={`requirements-${area}`} value={localConfig[area].requirements} onChange={(e) => handleInputChange(area, 'requirements', e.target.value)} rows={4}/>
+                        <Textarea id={`requirements-${area}`} value={localAreaConfig.requirements} onChange={(e) => handleInputChange(area, 'requirements', e.target.value)} rows={4}/>
                     </div>
                 </CardContent>
             </Card>
-        ))}
+        )})}
       </div>
     </div>
   );

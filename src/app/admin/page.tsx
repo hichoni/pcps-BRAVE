@@ -182,7 +182,9 @@ export default function AdminPage() {
                       <TableRow>
                           <TableHead className="w-[220px]">학생 정보</TableHead>
                           {AREAS.map(area => (
+                              challengeConfig[area] ? 
                               <TableHead key={area} className="text-center">{challengeConfig[area].koreanName}</TableHead>
+                              : null
                           ))}
                           <TableHead className="text-center w-[220px]">관리</TableHead>
                       </TableRow>
@@ -196,6 +198,7 @@ export default function AdminPage() {
                                       {`${student.grade}학년 ${student.classNum}반 ${student.studentNum}번 ${student.name}`}
                                   </TableCell>
                                   {AREAS.map(area => {
+                                      if (!challengeConfig[area]) return null;
                                       const progress = studentAchievements?.[area]?.progress ?? 0;
                                       const isCertified = studentAchievements?.[area]?.isCertified ?? false;
                                       return (

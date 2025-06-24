@@ -1,10 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { cn } from '@/lib/utils';
-import { AchievementsProvider } from '@/context/AchievementsContext';
-import { AuthProvider } from '@/context/AuthContext';
-import { Toaster } from '@/components/ui/toaster';
-import { ChallengeConfigProvider } from '@/context/ChallengeConfigContext';
+import { Providers } from '@/components/Providers';
 
 export const metadata: Metadata = {
   title: '풍천풍서초등학교 학교장 인증제',
@@ -32,14 +29,9 @@ export default function RootLayout({
         />
       </head>
       <body className={cn('font-body antialiased min-h-screen bg-background')}>
-        <AuthProvider>
-          <ChallengeConfigProvider>
-            <AchievementsProvider>
-              {children}
-            </AchievementsProvider>
-          </ChallengeConfigProvider>
-        </AuthProvider>
-        <Toaster />
+        <Providers>
+          {children}
+        </Providers>
       </body>
     </html>
   );
