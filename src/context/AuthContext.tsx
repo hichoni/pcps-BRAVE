@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
@@ -26,7 +27,7 @@ interface AuthContextType {
   logout: () => void;
   updatePin: (newPin: string) => Promise<void>;
   resetPin: (username: string) => Promise<void>;
-  deleteUser: (username: string) => Promise<void>;
+  deleteUser: (username:string) => Promise<void>;
   addUser: (studentData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>) => Promise<{ success: boolean; message: string }>;
   bulkAddUsers: (studentsData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>[]) => Promise<{ successCount: number; failCount: number; errors: string[] }>;
 }
@@ -156,32 +157,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!user) {
       throw new Error("Cannot update PIN: user is not logged in.");
     }
+    
+    // First, try to persist the change to the database.
+    if (db) {
+      try {
+        const userDocRef = doc(db, "users", String(user.id));
+        // Use setDoc with merge:true. This is safer than updateDoc as it won't fail if the document doesn't exist.
+        await setDoc(userDocRef, { pin: newPin }, { merge: true });
+      } catch (e) {
+        console.error("Failed to update PIN in Firestore.", e);
+        // If the database call fails, notify the user by re-throwing the error.
+        // The local state is not changed, so no reversion is needed.
+        throw e;
+      }
+    }
 
-    const originalUser = { ...user };
+    // If the database update is successful (or if we're in mock mode), update the local state.
     const updatedUser = { ...user, pin: newPin };
-
-    // Optimistic UI update
     setUser(updatedUser);
     sessionStorage.setItem('user', JSON.stringify(updatedUser));
     setUsers(prevUsers => prevUsers.map(u => (u.id === user.id ? updatedUser : u)));
-    
-    if (!db) {
-        return; // Success in mock mode
-    }
 
-    try {
-        const userDocRef = doc(db, "users", String(user.id));
-        await updateDoc(userDocRef, { pin: newPin });
-    } catch (e) {
-        console.warn("Failed to update PIN in Firestore, reverting.", e);
-        // Revert on failure
-        setUser(originalUser);
-        sessionStorage.setItem('user', JSON.stringify(originalUser));
-        setUsers(prevUsers => prevUsers.map(u => (u.id === user.id ? originalUser : u)));
-        // Propagate error to the UI
-        throw e;
-    }
-  }, [user]);
+  }, [user, setUsers]);
+
 
   const resetPin = useCallback(async (username: string) => {
     const currentUsers = await ensureUsersLoaded();
