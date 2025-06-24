@@ -138,7 +138,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { success: false, message: `${grade}학년 ${classNum}반 ${studentNum}번 학생은 이미 존재합니다.` };
     }
 
-    const newId = Math.max(...users.map(u => u.id), 0) + 1;
+    const newId = Math.max(0, ...users.map(u => u.id)) + 1;
     const newUsername = `s-${grade}-${classNum}-${studentNum}`;
 
     const newUser: User = {
@@ -160,12 +160,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let successCount = 0;
     let failCount = 0;
     const errors: string[] = [];
-    const newUsers: User[] = [];
-    const currentUsers = [...users];
+    const usersToAdd: User[] = [];
+    
+    const allUsers = [...users];
+    let lastId = Math.max(0, ...allUsers.map(u => u.id));
 
     studentsData.forEach((student, index) => {
       const { grade, classNum, studentNum, name } = student;
-      const studentExists = currentUsers.some(u =>
+      const studentExists = allUsers.some(u =>
         u.role === 'student' &&
         u.grade === grade &&
         u.classNum === classNum &&
@@ -176,11 +178,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         failCount++;
         errors.push(`${index + 1}번째 줄: ${grade}-${classNum}-${studentNum} ${name} 학생은 이미 존재합니다.`);
       } else {
-        const newId = Math.max(...currentUsers.map(u => u.id).filter(id => !isNaN(id)), 0) + 1;
-        const newUsername = `s-${grade}-${classNum}-${studentNum}`;
+        lastId++;
         const newUser: User = {
-          id: newId,
-          username: newUsername,
+          id: lastId,
+          username: `s-${grade}-${classNum}-${studentNum}`,
           pin: '0000',
           role: 'student',
           grade,
@@ -188,14 +189,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           studentNum,
           name,
         };
-        newUsers.push(newUser);
-        currentUsers.push(newUser);
+        usersToAdd.push(newUser);
+        allUsers.push(newUser);
         successCount++;
       }
     });
 
-    if (newUsers.length > 0) {
-      persistUsers(currentUsers);
+    if (usersToAdd.length > 0) {
+      persistUsers([...users, ...usersToAdd]);
     }
     
     return { successCount, failCount, errors };
