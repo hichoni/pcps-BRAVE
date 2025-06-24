@@ -7,14 +7,14 @@ import { Providers } from '@/components/Providers';
 export const metadata: Metadata = {
   title: '풍천풍서초등학교 학교장 인증제',
   description: '도전! 꿈 성취 학교장 인증제를 통해 나의 성장을 기록하고 인증받아보세요.',
-  manifest: '/manifest.json',
+  // manifest: '/manifest.json', // Temporarily disabled to prevent build errors
   icons: {
     apple: '/icons/icon-192x192.png',
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: '#2f5c88',
+  // themeColor: '#2f5c88', // Temporarily disabled to prevent build errors
 };
 
 export default function RootLayout({
