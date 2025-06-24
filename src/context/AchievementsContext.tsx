@@ -39,49 +39,31 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const loadData = async () => {
-      // If auth is still loading, we can't do anything yet.
+      // If auth is still loading, we are also loading. Wait for the next run.
       if (authLoading) {
+        setLoading(true);
         return;
       }
-      
-      // If there's no user logged in, we're done. No achievements to fetch.
+
+      // If there is no user, we are done loading (with empty data).
       if (!user) {
         setAllAchievements({});
         setLoading(false);
         return;
       }
-
-      // If we're here, we have a user. Let's fetch their data.
+      
+      // If we have a user and auth is done, start loading their achievements.
       setLoading(true);
       try {
-        if (!db) {
-            // Handle case where firebase is not configured
-            console.warn("Firebase is not configured. No achievements will be loaded.");
-            setAllAchievements({ [user.username]: generateInitialStateForUser() });
-            return;
-        }
-
-        const achievementsCollectionRef = collection(db, 'achievements');
         const fetchedAchievements: AllAchievementsState = {};
-
-        if (user.role === 'teacher') {
-          const querySnapshot = await getDocs(achievementsCollectionRef);
-          querySnapshot.forEach(doc => {
-              const data = doc.data();
-              const achievements = generateInitialStateForUser();
-              Object.keys(achievements).forEach(key => {
-                  const area = key as AreaName;
-                  if (data[area]) {
-                      achievements[area] = { ...achievements[area], ...data[area] };
-                  }
-              });
-              fetchedAchievements[doc.id] = achievements;
-          });
-        } else if (user.role === 'student') {
-            const studentDocRef = doc(db, 'achievements', user.username);
-            const docSnap = await getDoc(studentDocRef);
-            if (docSnap.exists()) {
-                const data = docSnap.data();
+        if (!db) {
+          console.warn("Firebase is not configured. No achievements will be loaded.");
+          fetchedAchievements[user.username] = generateInitialStateForUser();
+        } else {
+          if (user.role === 'teacher') {
+            const querySnapshot = await getDocs(collection(db, 'achievements'));
+            querySnapshot.forEach(doc => {
+                const data = doc.data();
                 const achievements = generateInitialStateForUser();
                 Object.keys(achievements).forEach(key => {
                     const area = key as AreaName;
@@ -89,12 +71,26 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
                         achievements[area] = { ...achievements[area], ...data[area] };
                     }
                 });
-                fetchedAchievements[user.username] = achievements;
-            } else {
-                fetchedAchievements[user.username] = generateInitialStateForUser();
-            }
+                fetchedAchievements[doc.id] = achievements;
+            });
+          } else if (user.role === 'student') {
+              const studentDocRef = doc(db, 'achievements', user.username);
+              const docSnap = await getDoc(studentDocRef);
+              if (docSnap.exists()) {
+                  const data = docSnap.data();
+                  const achievements = generateInitialStateForUser();
+                  Object.keys(achievements).forEach(key => {
+                      const area = key as AreaName;
+                      if (data[area]) {
+                          achievements[area] = { ...achievements[area], ...data[area] };
+                      }
+                  });
+                  fetchedAchievements[user.username] = achievements;
+              } else {
+                  fetchedAchievements[user.username] = generateInitialStateForUser();
+              }
+          }
         }
-        
         setAllAchievements(fetchedAchievements);
       } catch (error) {
         console.warn("Failed to fetch achievements from Firestore", error);
