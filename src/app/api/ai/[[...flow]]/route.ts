@@ -1,3 +1,1 @@
-import { createApi } from '@genkit-ai/next';
-
-export const { GET, POST } = createApi();
+// This file is temporarily empty to resolve a build issue.
