@@ -20,7 +20,7 @@ export function Header() {
               className="rounded-full shadow-md"
             />
             <div>
-                <p className="text-lg font-semibold text-muted-foreground">풍천풍서초등학교</p>
+                <p className="text-lg font-semibold text-muted-foreground">2025학년도</p>
                 <h1 className="text-4xl font-bold font-headline text-primary">
                     도전! 꿈 성취 학교장 인증제
                 </h1>
