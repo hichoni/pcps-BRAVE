@@ -9,6 +9,10 @@ export const metadata: Metadata = {
   description: '도전! 꿈 성취 학교장 인증제를 통해 나의 성장을 기록하고 인증받아보세요.',
 };
 
+export const viewport: Viewport = {
+  themeColor: 'hsl(var(--background))',
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
