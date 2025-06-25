@@ -40,7 +40,7 @@ const submitEvidenceFlow = ai.defineFlow(
     let mediaUrl: string | undefined = undefined;
 
     if (storage && input.mediaDataUri && input.mediaType) {
-        const fileExtension = input.mediaFile?.type.split('/')[1] || 'jpeg';
+        const fileExtension = input.mediaType.split('/')[1] || 'jpeg';
         const storageRef = ref(storage, `evidence/${input.userId}/${Date.now()}.${fileExtension}`);
         
         // The first part of the data URI is metadata, not the actual data.
