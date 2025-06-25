@@ -1,27 +1,29 @@
 import admin from 'firebase-admin';
+import path from 'path';
+import fs from 'fs';
 
-// This setup requires the GOOGLE_APPLICATION_CREDENTIALS environment variable
-// to be set in your deployment environment. It points to the JSON file
-// containing your service account key.
+// This setup requires the service account key file to be placed in the project root.
+// It must be named 'service-account.json'.
 
 if (!admin.apps.length) {
   try {
-    // We prioritize the new JSON variable, but fallback to the standard one.
-    const serviceAccountJson = process.env.FIREBASE_ADMIN_CREDENTIALS_JSON || process.env.GOOGLE_APPLICATION_CREDENTIALS;
-    if (!serviceAccountJson) {
-      throw new Error("Firebase Admin credentials not found. Please set FIREBASE_ADMIN_CREDENTIALS_JSON in your .env.local file.");
+    const serviceAccountPath = path.resolve(process.cwd(), 'service-account.json');
+
+    if (!fs.existsSync(serviceAccountPath)) {
+        throw new Error("Service account key file 'service-account.json' not found in the project root. Please download the key from your Firebase project settings, rename it to 'service-account.json', and place it in the root directory.");
     }
-    const serviceAccount = JSON.parse(serviceAccountJson);
+    
+    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
     
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     });
-    console.log('Firebase Admin SDK initialized successfully.');
+    console.log('Firebase Admin SDK initialized successfully from service-account.json.');
   } catch (error: any) {
     let message = error.message;
     if (error instanceof SyntaxError && message.includes('JSON')) {
-        message = `Failed to parse FIREBASE_ADMIN_CREDENTIALS_JSON. Please ensure it's a valid JSON string and correctly quoted in your .env.local file. Original error: ${error.message}`;
+        message = `Failed to parse service-account.json. Please ensure it's the original, unmodified file downloaded from Firebase. Original error: ${error.message}`;
     }
     console.error('Firebase Admin SDK initialization error: ' + message);
   }
