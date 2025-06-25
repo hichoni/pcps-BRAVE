@@ -34,6 +34,7 @@ const formSchema = z.object({
     '6': z.coerce.number().optional(),
   }),
   options: z.array(z.object({ value: z.string().min(1, '옵션 값은 비워둘 수 없습니다.') })),
+  externalUrl: z.string().url({ message: "올바른 URL 형식을 입력해주세요." }).optional().or(z.literal('')),
 }).refine(data => {
     if (data.goalType === 'numeric') {
         return data.goal['4'] !== undefined && data.goal['5'] !== undefined && data.goal['6'] !== undefined;
@@ -72,6 +73,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
       unit: '',
       goal: { '4': 0, '5': 0, '6': 0 },
       options: [],
+      externalUrl: '',
     },
   });
 
@@ -94,7 +96,8 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
         goalType: area.config.goalType,
         unit: area.config.unit,
         goal: area.config.goal,
-        options: area.config.options?.map(o => ({ value: o })) || []
+        options: area.config.options?.map(o => ({ value: o })) || [],
+        externalUrl: area.config.externalUrl || '',
       });
     } else {
       form.reset({
@@ -107,6 +110,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
         unit: '',
         goal: { '4': 0, '5': 0, '6': 0 },
         options: [{ value: '' }],
+        externalUrl: '',
       });
     }
   }, [area, form, open]);
@@ -130,6 +134,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
       unit: data.unit,
       goal: data.goalType === 'numeric' ? data.goal : {},
       options: data.goalType === 'objective' ? data.options.map(o => o.value) : [],
+      externalUrl: data.externalUrl || undefined,
     };
     
     try {
@@ -322,6 +327,20 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
                     </Button>
                 </div>
               )}
+
+              <FormField
+                  control={form.control}
+                  name="externalUrl"
+                  render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>바로가기 URL</FormLabel>
+                          <FormControl>
+                              <Input type="url" placeholder="https://padlet.com/..." {...field} />
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                  )}
+              />
                 
               <DialogFooter>
                   <DialogClose asChild><Button type="button" variant="outline">취소</Button></DialogClose>

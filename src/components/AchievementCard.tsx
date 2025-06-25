@@ -7,9 +7,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Progress } from '@/components/ui/progress';
 import { AchievementStatusDialog } from './AchievementStatusDialog';
 import { Badge } from './ui/badge';
-import { CheckCircle2, XCircle, Trophy } from 'lucide-react';
+import { XCircle, Trophy } from 'lucide-react';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
 import { Skeleton } from './ui/skeleton';
+import { cn } from '@/lib/utils';
+import { ExternalUrlDialog } from './ExternalUrlDialog';
 
 interface AchievementCardProps {
   areaName: AreaName;
@@ -64,17 +66,27 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
   }
 
   return (
-    <Card className="flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300 border">
+    <Card className={cn(
+      "flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300 border",
+      isCertified && "border-primary/50 shadow-primary/20"
+    )}>
       <CardHeader>
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3 mb-2">
             <AreaIcon className="w-8 h-8 text-primary" />
             <CardTitle className="font-headline text-xl">{areaConfig.koreanName}</CardTitle>
           </div>
-          <Badge variant={isCertified ? 'default' : 'secondary'} className="shrink-0">
-            {isCertified ? <CheckCircle2 className="mr-1 h-4 w-4" /> : <XCircle className="mr-1 h-4 w-4" />}
-            {isCertified ? '인증됨' : '미인증'}
-          </Badge>
+          {isCertified ? (
+            <Badge variant="default" className="shrink-0 bg-yellow-400 text-yellow-900 hover:bg-yellow-400/90">
+              <Trophy className="mr-1 h-4 w-4" />
+              인증 완료!
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="shrink-0">
+              <XCircle className="mr-1 h-4 w-4" />
+              미인증
+            </Badge>
+          )}
         </div>
         <CardDescription className="text-sm text-muted-foreground pt-1 !mt-0 h-10">
           {areaConfig.challengeName}
@@ -83,8 +95,11 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
       <CardContent className="flex-grow flex flex-col items-center justify-center">
         {renderProgress()}
       </CardContent>
-      <CardFooter>
+      <CardFooter className="flex flex-col sm:flex-row gap-2 w-full">
         <AchievementStatusDialog areaName={areaName} />
+        {areaConfig.externalUrl && (
+          <ExternalUrlDialog url={areaConfig.externalUrl} areaName={areaConfig.koreanName} />
+        )}
       </CardFooter>
     </Card>
   );

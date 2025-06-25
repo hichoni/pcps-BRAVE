@@ -1,4 +1,4 @@
-import { BookOpen, HeartHandshake, Bike, Palette, Laptop, Award, Medal, Gem, ShieldOff, BrainCircuit } from 'lucide-react';
+import { BookOpen, HeartHandshake, Bike, Palette, Laptop, Award, Medal, Gem, ShieldOff, BrainCircuit, ExternalLink } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export type AreaName = string;
@@ -62,9 +62,13 @@ export type AreaConfig = {
   goal: Record<string, number>; // For 'numeric' type
   options?: string[];             // For 'objective' type
   unit: string;                  // Unit for 'numeric', or a descriptive noun for 'objective'
+  externalUrl?: string;
 };
 
-export type StoredAreaConfig = Omit<AreaConfig, 'icon' | 'name'> & { iconName: string };
+export type StoredAreaConfig = Omit<AreaConfig, 'icon' | 'name'> & { 
+  iconName: string;
+  externalUrl?: string;
+};
 
 export const ICONS: Record<string, LucideIcon> = {
     BookOpen,
@@ -76,6 +80,7 @@ export const ICONS: Record<string, LucideIcon> = {
     Award,
     Medal,
     Gem,
+    ExternalLink,
 };
 
 export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
@@ -87,6 +92,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goalType: 'numeric',
     goal: { '4': 5, '5': 5, '6': 5 },
     unit: '권',
+    externalUrl: 'https://padlet.com/gallery/featured',
   },
   Volunteering: {
     koreanName: '봉사',
@@ -115,6 +121,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goalType: 'numeric',
     goal: { '4': 1, '5': 1, '6': 1 },
     unit: '회 참여',
+    externalUrl: 'https://padlet.com/gallery/portfolios',
   },
   Information: {
     koreanName: '정보',

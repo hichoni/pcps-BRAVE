@@ -17,11 +17,28 @@ import { ChangePinDialog } from './ChangePinDialog';
 
 export function Dashboard() {
   const { user, loading: authLoading } = useAuth();
-  const { loading: achievementsLoading } = useAchievements();
+  const { getAchievements, loading: achievementsLoading } = useAchievements();
   const { challengeConfig, loading: configLoading } = useChallengeConfig();
   const [isChangePinDialogOpen, setChangePinDialogOpen] = useState(false);
 
   const loading = authLoading || achievementsLoading || configLoading;
+
+  const sortedAreaNames = (user && challengeConfig && !loading)
+    ? Object.keys(challengeConfig).sort((a, b) => {
+        const userAchievements = getAchievements(user.username);
+        const aIsCertified = userAchievements[a]?.isCertified ?? false;
+        const bIsCertified = userAchievements[b]?.isCertified ?? false;
+
+        if (aIsCertified && !bIsCertified) {
+          return -1; // Certified 'a' comes first
+        }
+        if (!aIsCertified && bIsCertified) {
+          return 1; // Certified 'b' comes first
+        }
+        // If both have same certification status, sort alphabetically by Korean name
+        return challengeConfig[a].koreanName.localeCompare(challengeConfig[b].koreanName);
+      })
+    : [];
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -85,7 +102,7 @@ export function Dashboard() {
                   </div>
                 </div>
               ))
-            : Object.keys(challengeConfig).sort().map(areaName => (
+            : sortedAreaNames.map(areaName => (
                 <AchievementCard key={areaName} areaName={areaName} />
               ))}
         </div>
