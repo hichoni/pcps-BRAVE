@@ -171,6 +171,7 @@ export default function LoginPage() {
               alt="풍천풍서초등학교 로고"
               width={80}
               height={80}
+              priority
               className="mx-auto rounded-full shadow-md mb-4"
             />
             <CardTitle className="font-headline text-2xl text-primary">학교장 인증제 로그인</CardTitle>
