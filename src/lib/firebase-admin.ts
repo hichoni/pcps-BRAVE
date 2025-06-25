@@ -6,9 +6,12 @@ import admin from 'firebase-admin';
 
 if (!admin.apps.length) {
   try {
-    const serviceAccount = JSON.parse(
-        process.env.GOOGLE_APPLICATION_CREDENTIALS || '{}'
-    );
+    // We prioritize the new JSON variable, but fallback to the standard one.
+    const serviceAccountJson = process.env.FIREBASE_ADMIN_CREDENTIALS_JSON || process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    if (!serviceAccountJson) {
+      throw new Error("Firebase Admin credentials not found. Please set FIREBASE_ADMIN_CREDENTIALS_JSON in your .env.local file.");
+    }
+    const serviceAccount = JSON.parse(serviceAccountJson);
     
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
@@ -17,11 +20,9 @@ if (!admin.apps.length) {
     console.log('Firebase Admin SDK initialized successfully.');
   } catch (error: any) {
     console.error('Firebase Admin SDK initialization error: ' + error.message);
-    if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-        console.warn("GOOGLE_APPLICATION_CREDENTIALS env variable is not set. File uploads will not work in the backend.");
-    }
   }
 }
 
-const adminStorage = admin.storage();
-export { adminStorage };
+const adminInstance = admin;
+const adminStorage = adminInstance.apps.length ? adminInstance.storage() : null;
+export { adminInstance, adminStorage };

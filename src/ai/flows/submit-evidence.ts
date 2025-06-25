@@ -5,9 +5,10 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
+import { adminStorage } from '@/lib/firebase-admin';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { v4 as uuidv4 } from 'uuid';
 
 export const SubmitEvidenceInputSchema = z.object({
   userId: z.string().describe("The student's unique username."),
@@ -40,21 +41,36 @@ const submitEvidenceFlow = ai.defineFlow(
     let mediaUrl: string | undefined = undefined;
 
     if (input.mediaDataUri && input.mediaType) {
-        if (!storage) {
-            throw new Error("Firebase Storage is not configured. Please check your firebase.ts and .env files.");
+        if (!adminStorage) {
+            throw new Error("Firebase Admin Storage is not configured. Please check your .env.local file for FIREBASE_ADMIN_CREDENTIALS_JSON.");
         }
         try {
-            const fileExtension = input.mediaType.split('/')[1] || 'jpeg';
-            const storageRef = ref(storage, `evidence/${input.userId}/${Date.now()}.${fileExtension}`);
-            const uploadableString = input.mediaDataUri.split(',')[1];
-            await uploadString(storageRef, uploadableString, 'base64');
-            mediaUrl = await getDownloadURL(storageRef);
-        } catch (error: any) {
-            console.error("Firebase Storage upload error:", error);
-            if (error.code === 'storage/unauthorized') {
-                 throw new Error("파일 업로드 권한이 없습니다. Firebase Console의 Storage > Rules 탭에서 권한 설정을 확인해주세요.");
+            const bucket = adminStorage.bucket();
+            if (!bucket) {
+              throw new Error("Firebase Storage bucket is not available. Check that NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET is set correctly in .env.local");
             }
-            throw new Error("파일 업로드 중 오류가 발생했습니다.");
+
+            const fileExtension = input.mediaType.split('/')[1] || 'jpeg';
+            const filePath = `evidence/${input.userId}/${Date.now()}.${fileExtension}`;
+            const file = bucket.file(filePath);
+
+            const buffer = Buffer.from(input.mediaDataUri.split(',')[1], 'base64');
+            const token = uuidv4();
+
+            await file.save(buffer, {
+                metadata: {
+                    contentType: input.mediaType,
+                    metadata: {
+                        firebaseStorageDownloadTokens: token,
+                    }
+                },
+            });
+
+            mediaUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(filePath)}?alt=media&token=${token}`;
+        
+        } catch (error: any) {
+            console.error("Firebase Admin Storage upload error:", error);
+            throw new Error("파일 업로드 중 서버 오류가 발생했습니다. 관리자에게 문의해주세요.");
         }
     }
     
