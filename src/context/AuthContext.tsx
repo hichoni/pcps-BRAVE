@@ -69,7 +69,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUsers(MOCK_USERS);
         return MOCK_USERS;
       } else {
-        const usersList = usersSnapshot.docs.map(doc => ({ ...doc.data() } as User));
+        const usersList = usersSnapshot.docs.map(doc => ({
+          id: parseInt(doc.id, 10),
+          ...doc.data(),
+        } as User));
         setUsers(usersList);
         return usersList;
       }
@@ -114,9 +117,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = useCallback(async (credentials: LoginCredentials): Promise<User | null> => {
     const { pin, username, grade, classNum, studentNum } = credentials;
     const currentUsers = await ensureUsersLoaded();
-
-    console.log("Login attempt with credentials:", credentials);
-    console.log("Searching in users:", currentUsers);
     
     let targetUser: User | undefined;
 
@@ -124,7 +124,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       targetUser = currentUsers.find(u => 
         u.role === 'teacher' && 
         u.username === username && 
-        String(u.pin) === String(pin) // Ensure string comparison
+        String(u.pin) === String(pin)
       );
     } else if (grade !== undefined && classNum !== undefined && studentNum !== undefined) { // Student login
       targetUser = currentUsers.find(u =>
@@ -132,7 +132,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         Number(u.grade) === Number(grade) &&
         Number(u.classNum) === Number(classNum) &&
         Number(u.studentNum) === Number(studentNum) &&
-        String(u.pin) === String(pin) // Ensure string comparison
+        String(u.pin) === String(pin)
       );
     }
     
@@ -188,7 +188,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error(`PIN 초기화 실패 (Firestore) - 사용자: ${username}:`, error);
         throw new Error("데이터베이스 저장에 실패하여 PIN을 초기화할 수 없습니다.");
     }
-  }, [user, users, ensureUsersLoaded]);
+  }, [user, ensureUsersLoaded]);
 
   const deleteUser = useCallback(async (username: string) => {
     if (!db) throw new Error("데이터베이스에 연결되지 않았습니다. 설정을 확인해주세요.");
@@ -348,3 +348,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+    
