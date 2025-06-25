@@ -39,15 +39,23 @@ const submitEvidenceFlow = ai.defineFlow(
     
     let mediaUrl: string | undefined = undefined;
 
-    if (storage && input.mediaDataUri && input.mediaType) {
-        const fileExtension = input.mediaType.split('/')[1] || 'jpeg';
-        const storageRef = ref(storage, `evidence/${input.userId}/${Date.now()}.${fileExtension}`);
-        
-        // The first part of the data URI is metadata, not the actual data.
-        const uploadableString = input.mediaDataUri.split(',')[1];
-        
-        await uploadString(storageRef, uploadableString, 'base64');
-        mediaUrl = await getDownloadURL(storageRef);
+    if (input.mediaDataUri && input.mediaType) {
+        if (!storage) {
+            throw new Error("Firebase Storage is not configured. Please check your firebase.ts and .env files.");
+        }
+        try {
+            const fileExtension = input.mediaType.split('/')[1] || 'jpeg';
+            const storageRef = ref(storage, `evidence/${input.userId}/${Date.now()}.${fileExtension}`);
+            const uploadableString = input.mediaDataUri.split(',')[1];
+            await uploadString(storageRef, uploadableString, 'base64');
+            mediaUrl = await getDownloadURL(storageRef);
+        } catch (error: any) {
+            console.error("Firebase Storage upload error:", error);
+            if (error.code === 'storage/unauthorized') {
+                 throw new Error("파일 업로드 권한이 없습니다. Firebase Console의 Storage > Rules 탭에서 권한 설정을 확인해주세요.");
+            }
+            throw new Error("파일 업로드 중 오류가 발생했습니다.");
+        }
     }
     
     try {
@@ -72,7 +80,7 @@ const submitEvidenceFlow = ai.defineFlow(
       console.log("Document written with ID: ", docRef.id);
       return { success: true, id: docRef.id };
     } catch (e) {
-      console.error("Error adding document: ", e);
+      console.error("Error adding document to Firestore: ", e);
       throw new Error("Failed to submit evidence to the database.");
     }
   }
