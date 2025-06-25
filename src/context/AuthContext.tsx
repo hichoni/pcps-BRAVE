@@ -3,9 +3,9 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, MOCK_USERS, AreaName, AchievementsState } from '@/lib/config';
+import { User, MOCK_USERS, AreaName, AchievementsState, DEFAULT_AREAS_CONFIG } from '@/lib/config';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, setDoc, query, where, writeBatch, deleteDoc, updateDoc, addDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, query, where, writeBatch, deleteDoc, updateDoc, addDoc, getDoc } from 'firebase/firestore';
 
 
 interface LoginCredentials {
@@ -50,7 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUsers = useCallback(async (): Promise<User[]> => {
     setUsersLoading(true);
     if (!db) {
-      console.warn("Firebase is disabled.");
+      console.warn("Firebase is disabled. Using mock users.");
       setUsers(MOCK_USERS);
       setUsersLoading(false);
       return MOCK_USERS;
@@ -58,24 +58,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const usersCollectionRef = collection(db, "users");
       const usersSnapshot = await getDocs(usersCollectionRef);
-      if (usersSnapshot.empty) {
-        console.log("No users found in Firestore. Seeding with mock data...");
-        const batch = writeBatch(db);
-        MOCK_USERS.forEach(userToSeed => {
-            const docRef = doc(db, "users", String(userToSeed.id));
-            batch.set(docRef, userToSeed);
-        });
-        await batch.commit();
-        setUsers(MOCK_USERS);
-        return MOCK_USERS;
-      } else {
-        const usersList = usersSnapshot.docs.map(doc => ({
-          id: parseInt(doc.id, 10),
-          ...(doc.data() as Omit<User, 'id'>),
-        }));
-        setUsers(usersList);
-        return usersList;
-      }
+      const usersList = usersSnapshot.docs.map(doc => ({
+        id: parseInt(doc.id, 10),
+        ...(doc.data() as Omit<User, 'id'>),
+      }));
+      setUsers(usersList);
+      return usersList;
     } catch(error) {
         console.error("Error fetching users from Firestore:", error);
         throw new Error("Failed to fetch users from database.");
@@ -85,17 +73,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
+    const seedInitialData = async () => {
+        if (!db) return;
+        const masterUserRef = doc(db, "users", "99"); // Master user ID is 99
+        const masterUserSnap = await getDoc(masterUserRef);
+
+        if (!masterUserSnap.exists()) {
+            console.log("Master user not found. Seeding database with initial mock users and config...");
+            const batch = writeBatch(db);
+            
+            // Seed users
+            MOCK_USERS.forEach(userToSeed => {
+                const docRef = doc(db, "users", String(userToSeed.id));
+                batch.set(docRef, userToSeed);
+            });
+
+            // Seed challenge config
+            const configDocRef = doc(db, 'config/challengeConfig');
+            batch.set(configDocRef, DEFAULT_AREAS_CONFIG);
+            
+            await batch.commit();
+            console.log("Database seeded successfully.");
+        }
+    }
+
     const initializeAuth = async () => {
       setLoading(true);
+      await seedInitialData();
       const sessionUser = sessionStorage.getItem('user');
       if (sessionUser) {
         setUser(JSON.parse(sessionUser));
       }
-      try {
-        await fetchUsers();
-      } catch (e) {
-        console.error("Auth initialization failed:", e)
-      }
+      await fetchUsers();
       setLoading(false);
     };
     initializeAuth();
@@ -122,14 +131,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let targetUser: User | undefined;
 
     if (username) { // Teacher login
-      console.log(`Attempting teacher login for username: "${username}" with PIN: "${pin}"`);
+      console.log(`Attempting teacher login for username: "${username}"`);
       targetUser = currentUsers.find(u => 
         u.role === 'teacher' && 
         u.username === username && 
         String(u.pin) === String(pin)
       );
     } else if (grade !== undefined && classNum !== undefined && studentNum !== undefined) { // Student login
-      console.log(`Attempting student login for ${grade}-${classNum}-${studentNum} with PIN: "${pin}"`);
+      console.log(`Attempting student login for ${grade}-${classNum}-${studentNum}`);
       targetUser = currentUsers.find(u =>
         u.role === 'student' &&
         Number(u.grade) === Number(grade) &&
@@ -140,7 +149,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     
     if (targetUser) {
-      console.log("Login successful for user:", targetUser);
+      console.log("Login successful for user:", targetUser.name);
       setUser(targetUser);
       sessionStorage.setItem('user', JSON.stringify(targetUser));
       return targetUser;

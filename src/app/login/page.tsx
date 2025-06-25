@@ -49,6 +49,7 @@ export default function LoginPage() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [foundStudent, setFoundStudent] = useState<User | null>(null);
+  const [studentNotFound, setStudentNotFound] = useState(false);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -69,26 +70,32 @@ export default function LoginPage() {
   const watchedStudentNum = studentForm.watch('studentNum');
 
   useEffect(() => {
-    if (watchedGrade && watchedClassNum && watchedStudentNum) {
-      const grade = parseInt(watchedGrade, 10);
-      const classNum = parseInt(watchedClassNum, 10);
-      const studentNum = parseInt(watchedStudentNum, 10);
-      if (!isNaN(grade) && !isNaN(classNum) && !isNaN(studentNum)) {
-        if (!usersLoading) {
-            const student = users.find(u =>
-              u.role === 'student' &&
-              u.grade === grade &&
-              u.classNum === classNum &&
-              u.studentNum === studentNum
-            );
-            setFoundStudent(student || null);
+    const findStudent = () => {
+        if (watchedGrade && watchedClassNum && watchedStudentNum) {
+          const grade = parseInt(watchedGrade, 10);
+          const classNum = parseInt(watchedClassNum, 10);
+          const studentNum = parseInt(watchedStudentNum, 10);
+          if (!isNaN(grade) && !isNaN(classNum) && !isNaN(studentNum)) {
+            if (!usersLoading) {
+                const student = users.find(u =>
+                  u.role === 'student' &&
+                  u.grade === grade &&
+                  u.classNum === classNum &&
+                  u.studentNum === studentNum
+                );
+                setFoundStudent(student || null);
+                setStudentNotFound(!student);
+            }
+          } else {
+            setFoundStudent(null);
+            setStudentNotFound(false);
+          }
+        } else {
+          setFoundStudent(null);
+          setStudentNotFound(false);
         }
-      } else {
-        setFoundStudent(null);
-      }
-    } else {
-      setFoundStudent(null);
-    }
+    };
+    findStudent();
   }, [watchedGrade, watchedClassNum, watchedStudentNum, users, usersLoading]);
 
   const onStudentSubmit = async (data: StudentLoginFormValues) => {
@@ -204,9 +211,13 @@ export default function LoginPage() {
                   {studentForm.formState.errors.classNum && <p className="text-sm text-destructive">{studentForm.formState.errors.classNum.message}</p>}
                   {studentForm.formState.errors.studentNum && <p className="text-sm text-destructive">{studentForm.formState.errors.studentNum.message}</p>}
                   
-                  {foundStudent && (
+                  {foundStudent ? (
                       <div className="p-3 bg-secondary rounded-md text-center text-secondary-foreground font-semibold">
                           {maskName(foundStudent.name)}
+                      </div>
+                  ) : studentNotFound && (
+                      <div className="p-3 bg-destructive/10 rounded-md text-center text-destructive text-sm font-semibold">
+                          해당 정보의 학생을 찾을 수 없습니다.
                       </div>
                   )}
                   

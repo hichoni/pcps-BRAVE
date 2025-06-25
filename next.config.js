@@ -17,11 +17,8 @@ const nextConfig = {
       },
     ],
   },
-  experimental: {
-    // This is the experimental block.
-  },
-  // The 'allowedDevOrigins' key should be at the top level, not inside 'experimental'.
   // This configuration is necessary to prevent cross-origin errors in the development environment.
+  // It should be at the top level, not inside 'experimental'.
   allowedDevOrigins: ["*.cloudworkstations.dev"],
 };
 
