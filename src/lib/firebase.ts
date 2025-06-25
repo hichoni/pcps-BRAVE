@@ -2,8 +2,8 @@ import { initializeApp, getApps, getApp, FirebaseOptions } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
 // IMPORTANT: To connect to Firebase, you must:
-// 1. Fill in your Firebase project credentials in the .env file.
-// 2. Set NEXT_PUBLIC_USE_FIREBASE to 'true' in the .env file.
+// 1. Fill in your Firebase project credentials in the .env.local file.
+// 2. Set NEXT_PUBLIC_USE_FIREBASE to 'true' in the .env.local file.
 
 const USE_FIREBASE = process.env.NEXT_PUBLIC_USE_FIREBASE === 'true';
 
@@ -25,11 +25,11 @@ if (USE_FIREBASE) {
     db = getFirestore(app);
     console.log("✅ Firebase connection initialized successfully. The app is now using live data from Firestore.");
   } catch (e) {
-    console.error("Firebase initialization error. This usually means the credentials in your .env file are incorrect or missing.", e);
-    console.warn("The app will continue to use local mock data. Please check your .env file and Firebase project settings.");
+    console.error("Firebase initialization error. This usually means the credentials in your .env.local file are incorrect or missing.", e);
+    console.warn("The app will continue to use local mock data. Please check your .env.local file and Firebase project settings.");
   }
 } else {
-  console.log("Firebase is disabled. Using local mock data. To enable live data, set NEXT_PUBLIC_USE_FIREBASE=true in your .env file and fill in your project credentials.");
+  console.log("Firebase is disabled. Using local mock data. To enable live data, set NEXT_PUBLIC_USE_FIREBASE=true in your .env.local file and fill in your project credentials.");
 }
 
 export { app, db };
