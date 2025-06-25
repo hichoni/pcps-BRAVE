@@ -10,7 +10,23 @@ import { adminStorage } from '@/lib/firebase-admin';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 
-export const SubmitEvidenceInputSchema = z.object({
+export interface SubmitEvidenceInput {
+  userId: string;
+  userName: string;
+  areaName: string;
+  koreanName: string;
+  challengeName: string;
+  evidence: string;
+  mediaDataUri?: string;
+  mediaType?: string;
+}
+
+export async function submitEvidence(input: SubmitEvidenceInput): Promise<{ success: boolean; id: string }> {
+  return submitEvidenceFlow(input);
+}
+
+// Define the schema here, but do not export it to comply with 'use server' file constraints.
+const SubmitEvidenceInputSchema = z.object({
   userId: z.string().describe("The student's unique username."),
   userName: z.string().describe("The student's name."),
   areaName: z.string().describe('The achievement area ID.'),
@@ -20,11 +36,7 @@ export const SubmitEvidenceInputSchema = z.object({
   mediaDataUri: z.string().optional().describe("A media file (image or video) as a data URI."),
   mediaType: z.string().optional().describe("The MIME type of the media file."),
 });
-export type SubmitEvidenceInput = z.infer<typeof SubmitEvidenceInputSchema>;
 
-export async function submitEvidence(input: SubmitEvidenceInput): Promise<{ success: boolean; id: string }> {
-  return submitEvidenceFlow(input);
-}
 
 const submitEvidenceFlow = ai.defineFlow(
   {

@@ -19,7 +19,11 @@ if (!admin.apps.length) {
     });
     console.log('Firebase Admin SDK initialized successfully.');
   } catch (error: any) {
-    console.error('Firebase Admin SDK initialization error: ' + error.message);
+    let message = error.message;
+    if (error instanceof SyntaxError && message.includes('JSON')) {
+        message = `Failed to parse FIREBASE_ADMIN_CREDENTIALS_JSON. Please ensure it's a valid JSON string and correctly quoted in your .env.local file. Original error: ${error.message}`;
+    }
+    console.error('Firebase Admin SDK initialization error: ' + message);
   }
 }
 
