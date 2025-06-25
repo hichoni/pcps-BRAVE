@@ -1,4 +1,4 @@
-import { BookOpen, HeartHandshake, Bike, Palette, Laptop, Award, Medal, Gem, ShieldOff, BrainCircuit, ExternalLink } from 'lucide-react';
+import { BookOpen, HeartHandshake, Bike, Palette, Laptop, Award, Medal, Gem, ShieldOff, BrainCircuit, ExternalLink, UploadCloud } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export type AreaName = string;
@@ -63,11 +63,13 @@ export type AreaConfig = {
   options?: string[];             // For 'objective' type
   unit: string;                  // Unit for 'numeric', or a descriptive noun for 'objective'
   externalUrl?: string;
+  requiresPhoto?: boolean;
 };
 
 export type StoredAreaConfig = Omit<AreaConfig, 'icon' | 'name'> & { 
   iconName: string;
   externalUrl?: string;
+  requiresPhoto?: boolean;
 };
 
 export const ICONS: Record<string, LucideIcon> = {
@@ -81,6 +83,7 @@ export const ICONS: Record<string, LucideIcon> = {
     Medal,
     Gem,
     ExternalLink,
+    UploadCloud,
 };
 
 export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
@@ -98,10 +101,11 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     koreanName: '봉사',
     challengeName: '탄소 줄임 실천 ♥',
     iconName: 'HeartHandshake',
-    requirements: '최소 10시간 이상의 봉사활동을 완료했다는 증빙 자료를 제출해야 합니다. (예: 탄소중립포인트 실천 활동)',
+    requirements: '최소 10시간 이상의 봉사활동을 완료하고 활동 사진을 제출해야 합니다.',
     goalType: 'numeric',
     goal: { '4': 10, '5': 10, '6': 10 },
     unit: '시간',
+    requiresPhoto: true,
   },
   'Physical-Education': {
     koreanName: '체육',
@@ -117,11 +121,12 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     koreanName: '예술',
     challengeName: '풍풍 쇼케이스 💥',
     iconName: 'Palette',
-    requirements: '풍풍 쇼케이스 또는 교내외 예술 관련 대회/공연에 참여하여 자신의 재능을 선보여야 합니다.',
+    requirements: '풍풍 쇼케이스 또는 교내외 예술 관련 대회/공연에 참여하고 활동 사진을 제출해야 합니다.',
     goalType: 'numeric',
     goal: { '4': 1, '5': 1, '6': 1 },
     unit: '회 참여',
     externalUrl: 'https://padlet.com/gallery/portfolios',
+    requiresPhoto: true,
   },
   Information: {
     koreanName: '정보',

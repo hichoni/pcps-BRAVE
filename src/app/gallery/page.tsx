@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, orderBy, query, Timestamp } from 'firebase/firestore';
 import { Loader2, ArrowLeft, User as UserIcon, Calendar as CalendarIcon, GalleryThumbnails } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
@@ -22,6 +23,8 @@ interface Submission {
   challengeName: string;
   evidence: string;
   createdAt: Date;
+  mediaUrl?: string;
+  mediaType?: string;
 }
 
 const maskName = (name: string) => {
@@ -49,7 +52,7 @@ function GalleryCard({ submission }: { submission: Submission }) {
             <CardTitle className="text-base font-bold">{maskName(submission.userName)} 학생</CardTitle>
             <CardDescription className="flex items-center gap-1 text-xs pt-1">
                 <CalendarIcon className="w-3 h-3"/>
-                {formatDistanceToNow(submission.createdAt, { addSuffix: true, locale: ko })}
+                {submission.createdAt ? formatDistanceToNow(submission.createdAt, { addSuffix: true, locale: ko }) : '방금 전'}
             </CardDescription>
          </div>
       </CardHeader>
@@ -60,6 +63,28 @@ function GalleryCard({ submission }: { submission: Submission }) {
                 <span>{submission.koreanName} - {submission.challengeName}</span>
             </div>
         </div>
+
+        {submission.mediaUrl && submission.mediaType && (
+            <div className="my-2 rounded-lg border overflow-hidden">
+                {submission.mediaType.startsWith('image/') && (
+                    <Image 
+                        src={submission.mediaUrl}
+                        alt={`${submission.koreanName} 활동 증명`}
+                        width={400}
+                        height={300}
+                        className="w-full h-auto object-cover aspect-video"
+                    />
+                )}
+                {submission.mediaType.startsWith('video/') && (
+                    <video 
+                        src={submission.mediaUrl}
+                        controls
+                        className="w-full aspect-video"
+                    />
+                )}
+            </div>
+        )}
+
         <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">
             {submission.evidence}
         </p>
@@ -107,8 +132,10 @@ export default function GalleryPage() {
       }
     };
 
-    fetchSubmissions();
-  }, []);
+    if (user) {
+      fetchSubmissions();
+    }
+  }, [user]);
 
   if (authLoading || !user) {
     return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -127,7 +154,7 @@ export default function GalleryPage() {
       
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {Array.from({length: 3}).map((_, i) => <Card key={i} className="h-64 animate-pulse bg-muted"/>)}
+            {Array.from({length: 3}).map((_, i) => <Card key={i} className="h-80 animate-pulse bg-muted"/>)}
         </div>
       ) : submissions.length === 0 ? (
         <div className="text-center py-20">

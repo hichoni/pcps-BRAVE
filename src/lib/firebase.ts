@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp, FirebaseOptions } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 // IMPORTANT: To connect to Firebase, you must:
 // 1. Fill in your Firebase project credentials in the .env.local file.
@@ -18,11 +19,13 @@ const firebaseConfig: FirebaseOptions = {
 
 let app: any = null;
 let db: any = null;
+let storage: any = null;
 
 if (USE_FIREBASE) {
   try {
     app = getApps().length ? getApp() : initializeApp(firebaseConfig);
     db = getFirestore(app);
+    storage = getStorage(app);
     console.log("✅ Firebase connection initialized successfully. The app is now using live data from Firestore.");
   } catch (e) {
     console.error("Firebase initialization error. This usually means the credentials in your .env.local file are incorrect or missing.", e);
@@ -32,4 +35,4 @@ if (USE_FIREBASE) {
   console.log("Firebase is disabled. Using local mock data. To enable live data, set NEXT_PUBLIC_USE_FIREBASE=true in your .env.local file and fill in your project credentials.");
 }
 
-export { app, db };
+export { app, db, storage };

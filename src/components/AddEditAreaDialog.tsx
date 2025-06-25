@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, PlusCircle, Trash2, Save } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { ICONS, AreaName, StoredAreaConfig } from '@/lib/config';
+import { Checkbox } from './ui/checkbox';
 
 const formSchema = z.object({
   id: z.string().refine(val => /^[a-zA-Z0-9-_]+$/.test(val), {
@@ -35,6 +36,7 @@ const formSchema = z.object({
   }),
   options: z.array(z.object({ value: z.string().min(1, '옵션 값은 비워둘 수 없습니다.') })),
   externalUrl: z.string().url({ message: "올바른 URL 형식을 입력해주세요." }).optional().or(z.literal('')),
+  mediaRequired: z.boolean().optional(),
 }).refine(data => {
     if (data.goalType === 'numeric') {
         return data.goal['4'] !== undefined && data.goal['5'] !== undefined && data.goal['6'] !== undefined;
@@ -74,6 +76,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
       goal: { '4': 0, '5': 0, '6': 0 },
       options: [],
       externalUrl: '',
+      mediaRequired: false,
     },
   });
 
@@ -98,6 +101,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
         goal: area.config.goal,
         options: area.config.options?.map(o => ({ value: o })) || [],
         externalUrl: area.config.externalUrl || '',
+        mediaRequired: area.config.mediaRequired || false,
       });
     } else {
       form.reset({
@@ -111,6 +115,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
         goal: { '4': 0, '5': 0, '6': 0 },
         options: [{ value: '' }],
         externalUrl: '',
+        mediaRequired: false,
       });
     }
   }, [area, form, open]);
@@ -135,6 +140,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
       goal: data.goalType === 'numeric' ? data.goal : {},
       options: data.goalType === 'objective' ? data.options.map(o => o.value) : [],
       externalUrl: data.externalUrl || undefined,
+      mediaRequired: data.mediaRequired,
     };
     
     try {
@@ -340,6 +346,26 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
                           <FormMessage />
                       </FormItem>
                   )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="mediaRequired"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
+                     <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>
+                        미디어(사진/영상) 제출 필수
+                      </FormLabel>
+                    </div>
+                  </FormItem>
+                )}
               />
                 
               <DialogFooter>

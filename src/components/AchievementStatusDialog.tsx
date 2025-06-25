@@ -12,34 +12,35 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogClose,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { useAchievements } from '@/context/AchievementsContext';
 import { useAuth } from '@/context/AuthContext';
-import { AreaName, User } from '@/lib/config';
+import { AreaName } from '@/lib/config';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
 import { ListChecks, Send, Loader2, CircleCheck } from 'lucide-react';
-import { Badge } from './ui/badge';
 import { submitEvidence } from '@/ai/flows/submit-evidence';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { Input } from './ui/input';
 
 const evidenceSchema = z.object({
   evidence: z.string().min(10, { message: '최소 10자 이상 자세하게 입력해주세요.' }).max(1000, { message: '1000자 이내로 입력해주세요.'}),
+  media: z.any().optional(),
 });
 
 type EvidenceFormValues = z.infer<typeof evidenceSchema>;
 
 export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const { user } = useAuth();
-  const { getAchievements } = useAchievements();
   const { challengeConfig } = useChallengeConfig();
   const { toast } = useToast();
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
 
   const form = useForm<EvidenceFormValues>({
     resolver: zodResolver(evidenceSchema),
@@ -48,17 +49,39 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
 
   if (!user || !challengeConfig || !user.grade) return null;
   
-  const achievements = getAchievements(user.username);
   const areaConfig = challengeConfig[areaName];
-  const areaState = achievements?.[areaName];
 
-  if (!areaState || !areaConfig) return null;
+  if (!areaConfig) return null;
   
-  const { progress, isCertified } = areaState;
-  const { unit, koreanName, challengeName, requirements } = areaConfig;
+  const { koreanName, challengeName } = areaConfig;
+  const isMediaRequired = areaName === 'Volunteering' || areaName === 'Arts';
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setMediaFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setMediaPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+        setMediaFile(null);
+        setMediaPreview(null);
+    }
+  };
 
   const handleFormSubmit = async (data: EvidenceFormValues) => {
     if (!user || !user.name) return;
+
+    if (isMediaRequired && !mediaFile) {
+        toast({
+            variant: 'destructive',
+            title: '파일 누락',
+            description: '이 영역은 사진이나 영상 제출이 필수입니다.',
+        });
+        return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -69,12 +92,16 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
         koreanName: areaConfig.koreanName,
         challengeName: areaConfig.challengeName,
         evidence: data.evidence,
+        mediaDataUri: mediaPreview ?? undefined,
+        mediaType: mediaFile?.type ?? undefined,
       });
       toast({
         title: '제출 완료!',
         description: '도전 내용이 갤러리에 성공적으로 제출되었습니다.',
       });
       form.reset();
+      setMediaFile(null);
+      setMediaPreview(null);
       setDialogOpen(false);
     } catch (error) {
       console.error('Evidence Submission Error:', error);
@@ -87,62 +114,32 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
       setIsSubmitting(false);
     }
   };
-
-  const renderStatus = () => {
-    if (areaConfig.goalType === 'numeric') {
-        const goalForGrade = areaConfig.goal[user.grade ?? '4'] ?? 0;
-        return (
-             <div className="py-4 text-center">
-                <div className="text-lg text-muted-foreground">현재 달성도</div>
-                <div className="text-4xl font-bold text-primary my-2">
-                    {progress as number || 0} <span className="text-2xl text-muted-foreground">{unit}</span>
-                </div>
-                <div className="text-sm text-muted-foreground">목표: {goalForGrade} {unit}</div>
-            </div>
-        );
-    }
-     if (areaConfig.goalType === 'objective') {
-        return (
-             <div className="py-4 text-center">
-                <div className="text-lg text-muted-foreground">현재 달성 상태</div>
-                <div className="text-4xl font-bold text-primary my-2 h-12 flex items-center justify-center">
-                   {progress ? progress : <span className="text-lg text-muted-foreground font-normal">선택 없음</span>}
-                </div>
-                <div className="text-sm text-muted-foreground mt-4">선택 가능 {unit}:</div>
-                <div className="flex flex-wrap gap-2 justify-center mt-2">
-                    {areaConfig.options?.map(opt => (
-                        <Badge key={opt} variant={progress === opt ? 'default' : 'secondary'}>{opt}</Badge>
-                    ))}
-                </div>
-            </div>
-        );
-     }
-     return null;
-  };
+  
+  const onDialogClose = (isOpen: boolean) => {
+      if (!isOpen) {
+          form.reset();
+          setMediaFile(null);
+          setMediaPreview(null);
+      }
+      setDialogOpen(isOpen);
+  }
 
   return (
-    <Dialog open={dialogOpen} onOpenChange={(isOpen) => {
-      if (!isOpen) form.reset();
-      setDialogOpen(isOpen);
-    }}>
+    <Dialog open={dialogOpen} onOpenChange={onDialogClose}>
       <DialogTrigger asChild>
         <Button variant="outline" className="w-full font-bold">
-          <ListChecks className="mr-2 h-4 w-4" /> 인증 현황
+          <ListChecks className="mr-2 h-4 w-4" /> 갤러리에 공유
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-headline text-2xl">{koreanName} 영역 현황</DialogTitle>
+          <DialogTitle className="font-headline text-2xl">{koreanName} 활동 공유</DialogTitle>
           <DialogDescription>
-            {challengeName}
+            {challengeName} - 나의 도전 과정을 친구들에게 공유해보세요!
           </DialogDescription>
         </DialogHeader>
         
         <div className="py-2">
-            <h3 className="text-sm font-semibold mb-2">활동 내용 제출하기</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-                친구들에게 나의 도전 과정을 공유해보세요! 여기에 작성한 내용은 도전 갤러리에 게시됩니다.
-            </p>
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
                    <FormField
@@ -150,7 +147,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                       name="evidence"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="sr-only">활동 내용</FormLabel>
+                          <FormLabel>활동 내용</FormLabel>
                           <FormControl>
                             <Textarea
                               placeholder="여기에 나의 실천 내용을 자세히 적어주세요. (예: 어떤 책을 읽고 무엇을 느꼈는지, 봉사활동을 통해 무엇을 배우고 실천했는지 등)"
@@ -162,6 +159,47 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                         </FormItem>
                       )}
                     />
+                    
+                    {isMediaRequired && (
+                        <>
+                            <Alert variant="default" className="border-primary/50 text-primary [&>svg]:text-primary">
+                                <CircleCheck className="h-4 w-4" />
+                                <AlertTitle className="font-bold">사진/영상 제출 필수!</AlertTitle>
+                                <AlertDescription>
+                                이 영역은 활동을 증명할 수 있는 사진이나 영상을 필수로 제출해야 합니다.
+                                </AlertDescription>
+                            </Alert>
+                            <FormField
+                                control={form.control}
+                                name="media" // Dummy name for react-hook-form
+                                render={() => (
+                                <FormItem>
+                                    <FormLabel>증명 파일 (사진/영상)</FormLabel>
+                                    <FormControl>
+                                    <Input 
+                                        type="file" 
+                                        accept="image/*,video/*"
+                                        onChange={handleFileChange}
+                                        className="file:text-primary file:font-semibold"
+                                    />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                                )}
+                            />
+
+                            {mediaPreview && mediaFile && (
+                                <div className="mt-4">
+                                    <p className="text-sm font-medium mb-2">미리보기:</p>
+                                    {mediaFile.type.startsWith('image/') ? (
+                                        <img src={mediaPreview} alt="미리보기" className="rounded-md max-h-60 w-auto mx-auto border" />
+                                    ) : (
+                                        <video src={mediaPreview} controls className="rounded-md max-h-60 w-auto mx-auto border" />
+                                    )}
+                                </div>
+                            )}
+                        </>
+                    )}
                     
                     <Button type="submit" className="w-full" disabled={isSubmitting}>
                         {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2"/>}

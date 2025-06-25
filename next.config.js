@@ -14,13 +14,17 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
+        port: '',
+        pathname: '/**',
+      }
     ],
   },
   async headers() {
     return [
       {
-        // This is a broad rule to allow all cross-origin requests in development.
-        // It's a workaround for the dynamic preview URLs in this environment.
         source: '/:path*',
         headers: [
           { key: 'Access-Control-Allow-Credentials', value: 'true' },
