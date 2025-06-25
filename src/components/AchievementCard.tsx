@@ -68,16 +68,16 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
   return (
     <Card className={cn(
       "flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300 border",
-      isCertified && "border-primary/50 shadow-primary/20"
+      isCertified && "bg-gradient-to-br from-yellow-50 via-amber-50 to-yellow-100 border-amber-400 shadow-amber-500/20"
     )}>
       <CardHeader>
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3 mb-2">
-            <AreaIcon className="w-8 h-8 text-primary" />
-            <CardTitle className="font-headline text-xl">{areaConfig.koreanName}</CardTitle>
+            <AreaIcon className={cn("w-8 h-8", isCertified ? "text-amber-500" : "text-primary")} />
+            <CardTitle className={cn("font-headline text-xl", isCertified && "text-amber-700")}>{areaConfig.koreanName}</CardTitle>
           </div>
           {isCertified ? (
-            <Badge variant="default" className="shrink-0 bg-yellow-400 text-yellow-900 hover:bg-yellow-400/90">
+            <Badge variant="default" className="shrink-0 bg-amber-400 text-amber-900 hover:bg-amber-400/90 shadow">
               <Trophy className="mr-1 h-4 w-4" />
               인증 완료!
             </Badge>
@@ -88,7 +88,7 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
             </Badge>
           )}
         </div>
-        <CardDescription className="text-sm text-muted-foreground pt-1 !mt-0 h-10">
+        <CardDescription className="text-sm pt-1 !mt-0 h-10">
           {areaConfig.challengeName}
         </CardDescription>
       </CardHeader>
