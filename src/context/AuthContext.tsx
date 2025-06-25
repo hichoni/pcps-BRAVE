@@ -71,8 +71,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
         const usersList = usersSnapshot.docs.map(doc => ({
           id: parseInt(doc.id, 10),
-          ...doc.data(),
-        } as User));
+          ...(doc.data() as Omit<User, 'id'>),
+        }));
         setUsers(usersList);
         return usersList;
       }
@@ -116,17 +116,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = useCallback(async (credentials: LoginCredentials): Promise<User | null> => {
     const { pin, username, grade, classNum, studentNum } = credentials;
-    const currentUsers = await ensureUsersLoaded();
+    // Always fetch the latest user data directly from the source for maximum reliability
+    const currentUsers = await fetchUsers();
     
     let targetUser: User | undefined;
 
     if (username) { // Teacher login
+      console.log(`Attempting teacher login for username: "${username}" with PIN: "${pin}"`);
       targetUser = currentUsers.find(u => 
         u.role === 'teacher' && 
         u.username === username && 
         String(u.pin) === String(pin)
       );
     } else if (grade !== undefined && classNum !== undefined && studentNum !== undefined) { // Student login
+      console.log(`Attempting student login for ${grade}-${classNum}-${studentNum} with PIN: "${pin}"`);
       targetUser = currentUsers.find(u =>
         u.role === 'student' &&
         Number(u.grade) === Number(grade) &&
@@ -145,7 +148,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     console.error("Login failed. No user found with provided credentials.");
     return null;
-  }, [ensureUsersLoaded]);
+  }, [fetchUsers]);
 
   const updatePin = useCallback(async (newPin: string) => {
     if (!user) throw new Error("사용자 정보가 없습니다. 다시 로그인해주세요.");
@@ -348,5 +351,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
-    
