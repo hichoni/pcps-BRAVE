@@ -1,41 +1,9 @@
-"use client";
 
-import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Dashboard } from '@/components/Dashboard';
-import { Loader2 } from "lucide-react";
+import { redirect } from 'next/navigation';
 
-export default function Home() {
-  const { user, loading } = useAuth();
-  const router = useRouter();
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  useEffect(() => {
-    if (!loading && isClient) {
-      if (!user) {
-        router.push('/login');
-      } else if (user.role === 'teacher') {
-        router.push('/admin');
-      }
-    }
-  }, [user, loading, router, isClient]);
-
-  if (!isClient || loading || !user || user.role === 'teacher') {
-    return (
-      <div className="flex h-screen w-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (user.role === 'student') {
-    return <Dashboard />;
-  }
-  
-  return null;
+// This is the new root page.
+// It immediately redirects to the login page,
+// providing a stable and robust entry point for the application.
+export default function RootPage() {
+  redirect('/login');
 }

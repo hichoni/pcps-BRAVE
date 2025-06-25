@@ -136,7 +136,7 @@ export default function LoginPage() {
       if (loggedInUser.role === 'teacher') {
         router.push('/admin');
       } else {
-        router.push('/');
+        router.push('/dashboard');
       }
     } else {
       throw new Error('Invalid credentials');

@@ -120,7 +120,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = useCallback(() => {
     setUser(null);
     sessionStorage.removeItem('user');
-    router.push('/login');
+    router.push('/');
   }, [router]);
 
   const login = useCallback(async (credentials: LoginCredentials): Promise<User | null> => {
