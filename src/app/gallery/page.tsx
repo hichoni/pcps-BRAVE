@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, orderBy, query, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, orderBy, query, Timestamp, limit, startAfter, QueryDocumentSnapshot } from 'firebase/firestore';
 import { Loader2, ArrowLeft, User as UserIcon, Calendar as CalendarIcon, GalleryThumbnails } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -99,6 +99,10 @@ export default function GalleryPage() {
   const router = useRouter();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const PAGE_SIZE = 9;
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -107,14 +111,18 @@ export default function GalleryPage() {
   }, [user, authLoading, router]);
 
   useEffect(() => {
-    const fetchSubmissions = async () => {
+    const fetchInitialSubmissions = async () => {
       if (!db) {
           setLoading(false);
           return;
       };
       setLoading(true);
       try {
-        const q = query(collection(db, "challengeSubmissions"), orderBy("createdAt", "desc"));
+        const q = query(
+            collection(db, "challengeSubmissions"), 
+            orderBy("createdAt", "desc"),
+            limit(PAGE_SIZE)
+        );
         const querySnapshot = await getDocs(q);
         const fetchedSubmissions = querySnapshot.docs.map(doc => {
           const data = doc.data();
@@ -125,6 +133,16 @@ export default function GalleryPage() {
           } as Submission;
         });
         setSubmissions(fetchedSubmissions);
+        
+        const lastVisible = querySnapshot.docs[querySnapshot.docs.length - 1];
+        setLastDoc(lastVisible);
+
+        if (querySnapshot.docs.length < PAGE_SIZE) {
+            setHasMore(false);
+        } else {
+            setHasMore(true);
+        }
+
       } catch (error) {
         console.error("Error fetching submissions: ", error);
       } finally {
@@ -133,9 +151,47 @@ export default function GalleryPage() {
     };
 
     if (user) {
-      fetchSubmissions();
+      fetchInitialSubmissions();
     }
   }, [user]);
+  
+  const fetchMoreSubmissions = async () => {
+    if (!db || !lastDoc || !hasMore || loadingMore) return;
+    
+    setLoadingMore(true);
+    try {
+        const q = query(
+            collection(db, "challengeSubmissions"),
+            orderBy("createdAt", "desc"),
+            startAfter(lastDoc),
+            limit(PAGE_SIZE)
+        );
+        const querySnapshot = await getDocs(q);
+        const newSubmissions = querySnapshot.docs.map(doc => {
+             const data = doc.data();
+             return {
+                id: doc.id,
+                ...data,
+                createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
+            } as Submission;
+        });
+
+        setSubmissions(prev => [...prev, ...newSubmissions]);
+        
+        const lastVisible = querySnapshot.docs[querySnapshot.docs.length - 1];
+        setLastDoc(lastVisible);
+
+        if (querySnapshot.docs.length < PAGE_SIZE) {
+            setHasMore(false);
+        }
+
+    } catch (error) {
+        console.error("Error fetching more submissions: ", error);
+    } finally {
+        setLoadingMore(false);
+    }
+  };
+
 
   if (authLoading || !user) {
     return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -162,9 +218,19 @@ export default function GalleryPage() {
           <p className="text-sm text-muted-foreground">가장 먼저 도전 내용을 제출하고 갤러리를 채워보세요.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {submissions.map(sub => <GalleryCard key={sub.id} submission={sub} />)}
-        </div>
+        <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {submissions.map(sub => <GalleryCard key={sub.id} submission={sub} />)}
+            </div>
+            {hasMore && (
+                <div className="mt-12 text-center">
+                    <Button onClick={fetchMoreSubmissions} disabled={loadingMore}>
+                        {loadingMore ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        더 보기
+                    </Button>
+                </div>
+            )}
+        </>
       )}
     </div>
   );

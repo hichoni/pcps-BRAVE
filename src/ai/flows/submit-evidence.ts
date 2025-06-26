@@ -91,10 +91,8 @@ const submitEvidenceFlow = ai.defineFlow(
 
             const buffer = Buffer.from(input.mediaDataUri.split(',')[1], 'base64');
             
-            // This token is the key to creating a public, unguessable URL.
             const token = uuidv4();
 
-            // Save the file with the correct metadata for public access via token.
             await file.save(buffer, {
                 metadata: {
                     contentType: input.mediaType,
@@ -104,7 +102,6 @@ const submitEvidenceFlow = ai.defineFlow(
                 },
             });
 
-            // Construct the public URL
             mediaUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(filePath)}?alt=media&token=${token}`;
         
         } catch (error: any) {
@@ -145,8 +142,6 @@ const submitEvidenceFlow = ai.defineFlow(
       const docRef = await addDoc(submissionsCollection, docData);
       console.log("Document written with ID: ", docRef.id);
 
-      // AI-powered progress update logic starts here
-      // 1. Fetch challenge config
       const configDocRef = doc(db, 'config', 'challengeConfig');
       const configDocSnap = await getDoc(configDocRef);
       if (!configDocSnap.exists()) {
@@ -158,7 +153,6 @@ const submitEvidenceFlow = ai.defineFlow(
           throw new Error(`'${input.koreanName}' 도전 영역의 설정을 찾을 수 없습니다.`);
       }
 
-      // 2. Call AI certification checker
       const aiCheckResult = await checkCertification({
           areaName: input.koreanName,
           requirements: areaConfig.requirements,
@@ -168,7 +162,6 @@ const submitEvidenceFlow = ai.defineFlow(
       let progressUpdated = false;
       let updateMessage = '';
 
-      // 3. If sufficient, update progress
       if (aiCheckResult.isSufficient) {
           const achievementDocRef = doc(db, 'achievements', input.userId);
           
@@ -177,11 +170,11 @@ const submitEvidenceFlow = ai.defineFlow(
               const achievements = achievementDocSnap.exists() ? achievementDocSnap.data() : {};
               const areaState = achievements[input.areaName] || { progress: 0 };
               const newProgress = (Number(areaState.progress) || 0) + 1;
-              await setDoc(achievementDocRef, { [input.areaName]: { progress: newProgress } }, { merge: true });
+              await setDoc(achievementDocRef, { [input.areaName]: { ...areaState, progress: newProgress } }, { merge: true });
               progressUpdated = true;
               updateMessage = `'${input.koreanName}' 영역의 진행도가 1만큼 증가했습니다! (현재: ${newProgress}${areaConfig.unit})`;
           } else {
-              updateMessage = 'AI가 활동을 확인했지만, 이 영역은 선생님의 확인이 필요해요.';
+              updateMessage = `AI가 활동을 확인했지만, 이 영역(유형: ${areaConfig.goalType})은 선생님의 확인이 필요해요.`;
           }
       } else {
           updateMessage = 'AI가 활동을 확인했지만, 아직 인증 기준에는 미치지 못했어요. 더 노력해주세요!';
