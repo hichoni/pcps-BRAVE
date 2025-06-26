@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -59,45 +60,44 @@ export default function Dashboard() {
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-          <div className="space-y-8 flex flex-col">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
             <CertificateStatus />
-            <Link href="/gallery" passHref>
+          
+            <Card className="h-full flex flex-col justify-center p-4 text-center shadow-lg border bg-card">
+                <CardHeader className="p-2">
+                <CardTitle className="font-headline text-lg sm:text-xl">✨ 참여 안내 ✨</CardTitle>
+                </CardHeader>
+                <CardContent className="p-2 flex-grow flex flex-col items-center justify-center">
+                <p className="font-semibold text-sm">4~6학년 친구들만 인증할 수 있어요!</p>
+                <p className="text-muted-foreground mb-3 text-xs">인증 기간: 2025년 5월 1일 ~ 10월 31일</p>
+                <Separator className="my-3"/>
+                <div className="space-y-1 text-left">
+                    <p className="font-semibold flex items-center gap-2 text-sm">
+                        <span className="text-lg sm:text-xl">🥇</span> 
+                        <span><strong className="text-primary">금장:</strong> 4개 영역 인증</span>
+                    </p>
+                    <p className="font-semibold flex items-center gap-2 text-sm">
+                        <span className="text-lg sm:text-xl">🥈</span>
+                        <span><strong className="text-primary">은장:</strong> 3개 영역 인증</span>
+                    </p>
+                    <p className="font-semibold flex items-center gap-2 text-sm">
+                        <span className="text-lg sm:text-xl">🥉</span>
+                        <span><strong className="text-primary">동장:</strong> 2개 영역 인증</span>
+                    </p>
+                </div>
+                </CardContent>
+            </Card>
+
+            <Link href="/gallery" passHref className="h-full">
               <Card className={cn(
-                  "flex-grow flex flex-col items-center justify-center p-4 sm:p-6 text-center shadow-lg border bg-card",
+                  "h-full flex flex-col items-center justify-center p-4 text-center shadow-lg border bg-card",
                   "hover:shadow-xl hover:border-primary/50 transition-all duration-300 cursor-pointer group"
               )}>
-                  <GalleryThumbnails className="w-16 h-16 text-muted-foreground group-hover:text-primary transition-colors duration-300"/>
-                  <p className="font-headline text-lg sm:text-xl mt-4 text-primary font-semibold">도전 갤러리 가기</p>
-                  <p className="text-muted-foreground text-sm">다른 친구들의 도전을 구경해보세요!</p>
+                  <GalleryThumbnails className="w-12 h-12 text-muted-foreground group-hover:text-primary transition-colors duration-300"/>
+                  <p className="font-headline text-base sm:text-lg mt-3 text-primary font-semibold">도전 갤러리 가기</p>
+                  <p className="text-muted-foreground text-xs">다른 친구들의 도전을 구경해보세요!</p>
               </Card>
             </Link>
-          </div>
-          
-          <Card className="h-full flex flex-col justify-center p-4 sm:p-6 text-center shadow-lg border bg-card">
-            <CardHeader className="p-2">
-              <CardTitle className="font-headline text-xl sm:text-2xl">✨ 참여 안내 ✨</CardTitle>
-            </CardHeader>
-            <CardContent className="p-2 flex-grow flex flex-col items-center justify-center">
-              <p className="font-semibold text-sm sm:text-base">4~6학년 친구들만 인증할 수 있어요!</p>
-              <p className="text-muted-foreground mb-4 text-xs sm:text-sm">인증 기간: 2025년 5월 1일 ~ 10월 31일</p>
-              <Separator className="my-4"/>
-              <div className="space-y-2 text-left">
-                  <p className="font-semibold flex items-center gap-2 text-sm sm:text-base">
-                      <span className="text-xl sm:text-2xl">🥇</span> 
-                      <span><strong className="text-primary">금장:</strong> 4개 영역 인증</span>
-                  </p>
-                  <p className="font-semibold flex items-center gap-2 text-sm sm:text-base">
-                      <span className="text-xl sm:text-2xl">🥈</span>
-                      <span><strong className="text-primary">은장:</strong> 3개 영역 인증</span>
-                  </p>
-                  <p className="font-semibold flex items-center gap-2 text-sm sm:text-base">
-                      <span className="text-xl sm:text-2xl">🥉</span>
-                      <span><strong className="text-primary">동장:</strong> 2개 영역 인증</span>
-                  </p>
-              </div>
-            </CardContent>
-          </Card>
         </div>
         
         <div className="text-center mb-12">
