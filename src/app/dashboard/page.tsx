@@ -85,7 +85,7 @@ export default function Dashboard() {
               <div className="space-y-2 text-left">
                   <p className="font-semibold flex items-center gap-2 text-sm sm:text-base">
                       <span className="text-xl sm:text-2xl">🥇</span> 
-                      <span><strong className="text-primary">금장:</strong> 4개 영역 이상 인증</span>
+                      <span><strong className="text-primary">금장:</strong> 4개 영역 인증</span>
                   </p>
                   <p className="font-semibold flex items-center gap-2 text-sm sm:text-base">
                       <span className="text-xl sm:text-2xl">🥈</span>
