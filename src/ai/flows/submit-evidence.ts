@@ -61,6 +61,10 @@ const submitEvidenceFlow = ai.defineFlow(
             if (!bucketName) {
                 throw new Error("서버 설정 오류: .env.local 파일에 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값이 설정되지 않았습니다.");
             }
+            if (bucketName.startsWith('gs://')) {
+                throw new Error("서버 설정 오류: .env.local 파일의 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값에 'gs://'를 포함해서는 안 됩니다. 'gs://'를 제외하고 입력해주세요.");
+            }
+
             const bucket = adminStorage.bucket(bucketName);
 
             const fileExtension = input.mediaType.split('/')[1] || 'jpeg';
