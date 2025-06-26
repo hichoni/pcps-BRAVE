@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -68,6 +68,11 @@ export default function LoginPage() {
   const watchedGrade = studentForm.watch('grade');
   const watchedClassNum = studentForm.watch('classNum');
   const watchedStudentNum = studentForm.watch('studentNum');
+
+  const availableGrades = useMemo(() => {
+    const studentUsers = users.filter(u => u.role === 'student');
+    return [...new Set(studentUsers.map(u => u.grade))].sort((a, b) => (a ?? 0) - (b ?? 0));
+  }, [users]);
 
   useEffect(() => {
     const findStudent = () => {
@@ -193,9 +198,9 @@ export default function LoginPage() {
                           <SelectValue placeholder="학년"/>
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="4">4학년</SelectItem>
-                          <SelectItem value="5">5학년</SelectItem>
-                          <SelectItem value="6">6학년</SelectItem>
+                          {availableGrades.map(grade => (
+                            grade != null && <SelectItem key={grade} value={String(grade)}>{grade}학년</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
