@@ -25,12 +25,6 @@ export const MOCK_USERS: User[] = [
     { id: 103, username: '체육', pin: '1234', name: '체육 선생님', role: 'teacher', areaName: 'Physical-Education' },
     { id: 104, username: '예술', pin: '1234', name: '예술 선생님', role: 'teacher', areaName: 'Arts' },
     { id: 105, username: '정보', pin: '1234', name: '정보 선생님', role: 'teacher', areaName: 'Information' },
-    { id: 11, username: 's-4-1-1', pin: '0000', name: '김철수', role: 'student', grade: 4, classNum: 1, studentNum: 1 },
-    { id: 12, username: 's-4-1-2', pin: '1111', name: '이영희', role: 'student', grade: 4, classNum: 1, studentNum: 2 },
-    { id: 13, username: 's-5-2-3', pin: '0000', name: '박바둑', role: 'student', grade: 5, classNum: 2, studentNum: 3 },
-    { id: 14, username: 's-5-2-4', pin: '1111', name: '최미미', role: 'student', grade: 5, classNum: 2, studentNum: 4 },
-    { id: 15, username: 's-6-1-5', pin: '1111', name: '강현우', role: 'student', grade: 6, classNum: 1, studentNum: 5 },
-    { id: 16, username: 's-4-1-111', pin: '0000', name: '홍길동', role: 'student', grade: 4, classNum: 1, studentNum: 111 },
 ];
 
 export type AreaState = {

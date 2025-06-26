@@ -5,7 +5,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { useRouter } from 'next/navigation';
 import { User, MOCK_USERS, AreaName, AchievementsState, DEFAULT_AREAS_CONFIG } from '@/lib/config';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, setDoc, query, where, writeBatch, deleteDoc, updateDoc, addDoc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, query, where, writeBatch, deleteDoc, updateDoc, addDoc, getDoc, limit } from 'firebase/firestore';
 
 
 interface LoginCredentials {
@@ -82,16 +82,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const batch = writeBatch(db);
             let writesMade = false;
 
-            // Upsert users from MOCK_USERS list
-            for (const userToSeed of MOCK_USERS) {
-                const docRef = doc(db, "users", String(userToSeed.id));
-                const docSnap = await getDoc(docRef);
-                if (!docSnap.exists()) {
-                    batch.set(docRef, userToSeed);
-                    writesMade = true;
+            // Seed users only if the collection is completely empty.
+            // This prevents re-adding deleted users on app restart.
+            const usersQuery = query(collection(db, "users"), limit(1));
+            const usersSnapshot = await getDocs(usersQuery);
+            if (usersSnapshot.empty) {
+                console.log("Users collection is empty. Seeding initial user data...");
+                for (const userToSeed of MOCK_USERS) {
+                    const userDocRef = doc(db, "users", String(userToSeed.id));
+                    batch.set(userDocRef, userToSeed);
                 }
+                writesMade = true;
             }
-
+            
             // Check and seed config if it doesn't exist
             const configDocRef = doc(db, 'config/challengeConfig');
             const configDocSnap = await getDoc(configDocRef);
