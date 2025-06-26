@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useAuth, User } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, orderBy, query, Timestamp, limit, startAfter, QueryDocumentSnapshot } from 'firebase/firestore';
-import { Loader2, ArrowLeft, User as UserIcon, Calendar as CalendarIcon, GalleryThumbnails, Trash2 } from 'lucide-react';
+import { Loader2, ArrowLeft, User as UserIcon, Calendar as CalendarIcon, GalleryThumbnails, Trash2, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -16,6 +16,8 @@ import { useChallengeConfig } from '@/context/ChallengeConfigContext';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { deleteSubmission } from '@/ai/flows/delete-submission';
+import { toggleLike } from '@/ai/flows/toggle-like';
+import { cn } from '@/lib/utils';
 
 interface Submission {
   id: string;
@@ -28,6 +30,7 @@ interface Submission {
   createdAt: Date;
   mediaUrl?: string;
   mediaType?: string;
+  likes: string[];
 }
 
 const maskName = (name: string) => {
@@ -46,6 +49,9 @@ function GalleryCard({ submission, user, onSubmissionDeleted }: { submission: Su
   const AreaIcon = challengeConfig?.[submission.areaName]?.icon || UserIcon;
 
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLiking, setIsLiking] = useState(false);
+  const [isLiked, setIsLiked] = useState(user ? submission.likes.includes(user.username) : false);
+  const [likeCount, setLikeCount] = useState(submission.likes.length);
 
   const handleDelete = async () => {
     if (!user) return;
@@ -60,6 +66,29 @@ function GalleryCard({ submission, user, onSubmissionDeleted }: { submission: Su
     }
   };
 
+  const handleLike = async () => {
+    if (!user || isLiking) return;
+    
+    setIsLiking(true);
+
+    const originalIsLiked = isLiked;
+    const originalLikeCount = likeCount;
+
+    setIsLiked(!originalIsLiked);
+    setLikeCount(originalIsLiked ? originalLikeCount - 1 : originalLikeCount + 1);
+
+    try {
+      const result = await toggleLike({ submissionId: submission.id, userId: user.username });
+      setIsLiked(result.isLiked);
+      setLikeCount(result.newLikeCount);
+    } catch (error: any) {
+      setIsLiked(originalIsLiked);
+      setLikeCount(originalLikeCount);
+      toast({ variant: 'destructive', title: '오류', description: error.message || '좋아요 처리 중 오류가 발생했습니다.' });
+    } finally {
+      setIsLiking(false);
+    }
+  };
 
   return (
     <Card className="flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300 border">
@@ -131,6 +160,18 @@ function GalleryCard({ submission, user, onSubmissionDeleted }: { submission: Su
             {submission.evidence}
         </p>
       </CardContent>
+      <CardFooter className="flex justify-start items-center p-4 pt-0">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleLike}
+          disabled={isLiking || !user}
+          className="flex items-center gap-1.5 text-muted-foreground hover:text-rose-500 px-2"
+        >
+          <Heart className={cn("h-5 w-5 transition-all", isLiked ? 'text-rose-500 fill-rose-500' : 'text-muted-foreground')} />
+          <span className="font-semibold text-sm">{likeCount}</span>
+        </Button>
+      </CardFooter>
     </Card>
   );
 }
@@ -172,6 +213,7 @@ export default function GalleryPage() {
             id: doc.id,
             ...data,
             createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
+            likes: data.likes || [],
           } as Submission;
         });
         setSubmissions(fetchedSubmissions);
@@ -215,6 +257,7 @@ export default function GalleryPage() {
                 id: doc.id,
                 ...data,
                 createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
+                likes: data.likes || [],
             } as Submission;
         });
 

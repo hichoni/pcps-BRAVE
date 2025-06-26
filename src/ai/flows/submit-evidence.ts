@@ -114,6 +114,7 @@ const submitEvidenceFlow = ai.defineFlow(
         challengeName: input.challengeName,
         evidence: input.evidence,
         createdAt: serverTimestamp(),
+        likes: [],
       };
       
       if (mediaUrl) {
