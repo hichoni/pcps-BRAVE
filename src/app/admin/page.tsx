@@ -251,7 +251,9 @@ export default function AdminPage() {
                           {challengeAreaKeys.map(area => (
                               <TableHead key={area} className="text-center min-w-[170px]">{challengeConfig[area].koreanName}</TableHead>
                           ))}
-                          <TableHead className="text-center w-[120px]">관리</TableHead>
+                          {!user.areaName && (
+                            <TableHead className="text-center w-[120px]">관리</TableHead>
+                          )}
                       </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -316,36 +318,38 @@ export default function AdminPage() {
                                           </TableCell>
                                       )
                                   })}
-                                  <TableCell className="text-center w-[120px] px-2 py-1 align-middle">
-                                      <div className="flex items-center justify-center gap-1">
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setStudentToEdit(student)}>
-                                                        <Edit className="h-4 w-4" />
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent><p>학생 정보 수정</p></TooltipContent>
-                                            </Tooltip>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleResetPin(student.username)}>
-                                                        <Undo className="h-4 w-4" />
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent><p>PIN 초기화</p></TooltipContent>
-                                            </Tooltip>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <AlertDialogTrigger asChild>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setStudentToDelete(student)}>
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </AlertDialogTrigger>
-                                                </TooltipTrigger>
-                                                <TooltipContent><p>학생 삭제</p></TooltipContent>
-                                            </Tooltip>
-                                      </div>
-                                  </TableCell>
+                                  {!user.areaName && (
+                                    <TableCell className="text-center w-[120px] px-2 py-1 align-middle">
+                                        <div className="flex items-center justify-center gap-1">
+                                              <Tooltip>
+                                                  <TooltipTrigger asChild>
+                                                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setStudentToEdit(student)}>
+                                                          <Edit className="h-4 w-4" />
+                                                      </Button>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent><p>학생 정보 수정</p></TooltipContent>
+                                              </Tooltip>
+                                              <Tooltip>
+                                                  <TooltipTrigger asChild>
+                                                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleResetPin(student.username)}>
+                                                          <Undo className="h-4 w-4" />
+                                                      </Button>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent><p>PIN 초기화</p></TooltipContent>
+                                              </Tooltip>
+                                              <Tooltip>
+                                                  <TooltipTrigger asChild>
+                                                      <AlertDialogTrigger asChild>
+                                                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setStudentToDelete(student)}>
+                                                              <Trash2 className="h-4 w-4" />
+                                                          </Button>
+                                                      </AlertDialogTrigger>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent><p>학생 삭제</p></TooltipContent>
+                                              </Tooltip>
+                                        </div>
+                                    </TableCell>
+                                  )}
                               </TableRow>
                           )
                       })}
