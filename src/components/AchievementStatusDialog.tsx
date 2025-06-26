@@ -18,7 +18,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useAuth } from '@/context/AuthContext';
 import { AreaName } from '@/lib/config';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
-import { ListChecks, Send, Loader2, CircleCheck } from 'lucide-react';
+import { ListChecks, Send, Loader2, UploadCloud } from 'lucide-react';
 import { submitEvidence } from '@/ai/flows/submit-evidence';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
@@ -30,6 +30,69 @@ const evidenceSchema = z.object({
 });
 
 type EvidenceFormValues = z.infer<typeof evidenceSchema>;
+
+const MAX_FILE_SIZE_MB = 10;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
+const resizeImage = (file: File, maxWidth: number, maxHeight: number, quality: number): Promise<{ dataUri: string; file: File }> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height *= maxWidth / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width *= maxHeight / height;
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          return reject(new Error('Could not get canvas context'));
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              return reject(new Error('Canvas to Blob conversion failed'));
+            }
+            const resizedFile = new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            });
+            
+            const resizedReader = new FileReader();
+            resizedReader.onloadend = () => {
+                resolve({ dataUri: resizedReader.result as string, file: resizedFile });
+            };
+            resizedReader.readAsDataURL(blob);
+
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      img.onerror = reject;
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
+
 
 export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const { user } = useAuth();
@@ -55,15 +118,46 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const { koreanName, challengeName } = areaConfig;
   const isMediaRequired = !!areaConfig.mediaRequired;
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setMediaFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setMediaPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+            toast({
+                variant: 'destructive',
+                title: '파일 크기 초과',
+                description: `동영상 등 미디어 파일의 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`,
+            });
+            event.target.value = ''; // Reset the file input
+            return;
+        }
+
+        if (!file.type.startsWith('image/')) {
+            setMediaFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setMediaPreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+            return;
+        }
+
+        setIsSubmitting(true); // Show loader while resizing
+        try {
+            const { dataUri, file: resizedFile } = await resizeImage(file, 1280, 720, 0.8);
+            setMediaFile(resizedFile);
+            setMediaPreview(dataUri);
+        } catch (error) {
+            console.error("Image resize error:", error);
+            toast({
+                variant: 'destructive',
+                title: '이미지 처리 오류',
+                description: '이미지 크기를 조절하는 데 실패했습니다. 다른 파일을 시도해주세요.',
+            });
+            setMediaFile(null);
+            setMediaPreview(null);
+        } finally {
+            setIsSubmitting(false);
+        }
     } else {
         setMediaFile(null);
         setMediaPreview(null);
@@ -171,11 +265,12 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                     
                     {isMediaRequired && (
                         <>
-                            <Alert variant="default" className="border-primary/50 text-primary [&>svg]:text-primary">
-                                <CircleCheck className="h-4 w-4" />
-                                <AlertTitle className="font-bold">사진/영상 제출 필수!</AlertTitle>
+                            <Alert>
+                                <UploadCloud className="h-4 w-4" />
+                                <AlertTitle>파일 업로드 안내</AlertTitle>
                                 <AlertDescription>
-                                이 영역은 활동을 증명할 수 있는 사진이나 영상을 필수로 제출해야 합니다.
+                                    10MB 이하의 사진 또는 동영상 파일을 제출할 수 있습니다. 큰 사진은 자동으로 최적화됩니다.
+                                    {isMediaRequired && <p className="font-semibold text-primary mt-1">이 영역은 사진/영상 제출이 필수입니다.</p>}
                                 </AlertDescription>
                             </Alert>
                             <FormField
@@ -190,6 +285,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                                         accept="image/*,video/*"
                                         onChange={handleFileChange}
                                         className="file:text-primary file:font-semibold"
+                                        disabled={isSubmitting}
                                     />
                                     </FormControl>
                                     <FormMessage />
@@ -212,7 +308,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                     
                     <Button type="submit" className="w-full" disabled={isSubmitting}>
                         {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2"/>}
-                        갤러리에 제출하기
+                        {isSubmitting && !mediaFile ? '제출 중...' : (isSubmitting && mediaFile ? '파일 처리 중...' : '갤러리에 제출하기')}
                     </Button>
                 </form>
             </Form>
