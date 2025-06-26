@@ -9,7 +9,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
-export const AnalyzeMediaInputSchema = z.object({
+const AnalyzeMediaInputSchema = z.object({
   photoDataUri: z
     .string()
     .describe(
@@ -21,7 +21,7 @@ export const AnalyzeMediaInputSchema = z.object({
 });
 export type AnalyzeMediaInput = z.infer<typeof AnalyzeMediaInputSchema>;
 
-export const AnalyzeMediaOutputSchema = z.object({
+const AnalyzeMediaOutputSchema = z.object({
   isSufficient: z.boolean().describe('Whether the media evidence meets the provided requirements.'),
   reasoning: z.string().describe('A brief, one-sentence reasoning for the decision in Korean.'),
 });
