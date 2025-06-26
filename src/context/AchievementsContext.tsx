@@ -25,9 +25,22 @@ const generateInitialStateForUser = (challengeConfig: any): AchievementsState =>
     if (!challengeConfig) return studentAchievements;
     
     Object.keys(challengeConfig).forEach(area => {
-        const config = challengeConfig[area];
+        const config = challengeConfig[area as AreaName];
+        let initialProgress: string | number = '';
+        if (config.goalType === 'numeric') {
+            initialProgress = 0;
+        } else if (config.goalType === 'objective') {
+            if (area === 'Information') {
+                initialProgress = '입문';
+            } else if (area === 'Physical-Education') {
+                initialProgress = '5등급';
+            } else {
+                initialProgress = '';
+            }
+        }
+
         studentAchievements[area] = {
-            progress: config.goalType === 'numeric' ? 0 : '',
+            progress: initialProgress,
             isCertified: false
         };
     });
