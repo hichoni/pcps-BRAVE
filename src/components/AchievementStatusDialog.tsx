@@ -330,8 +330,8 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   return (
     <Dialog open={dialogOpen} onOpenChange={onDialogClose}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="w-full font-bold">
-          <ListChecks className="mr-2 h-4 w-4" /> 내 활동 현황 / 공유
+        <Button variant="outline" className="flex-grow font-bold">
+          <Send className="mr-2 h-4 w-4" /> 도전하기
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">

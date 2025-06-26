@@ -51,8 +51,8 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
 
         return (
             <div className="text-center">
-                <p className="text-sm text-muted-foreground">목표: {goal}{unit}</p>
-                <p className="font-bold text-lg text-primary h-7">
+                <p className="text-xs sm:text-sm text-muted-foreground">목표: {goal}{unit}</p>
+                <p className="font-bold text-base sm:text-lg text-primary h-7">
                     현재: {currentProgress}{unit}
                 </p>
             </div>
@@ -62,15 +62,15 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
         const hasProgress = !!progress;
         return (
             <div className="text-center">
-                 <p className="text-sm text-muted-foreground">목표: {areaConfig.goalDescription || '완료'}</p>
-                 <div className="font-bold text-lg text-primary flex items-center justify-center gap-2 h-7">
+                 <p className="text-xs sm:text-sm text-muted-foreground">목표: {areaConfig.goalDescription || '완료'}</p>
+                 <div className="font-bold text-base sm:text-lg text-primary flex items-center justify-center gap-2 h-7">
                     {hasProgress ? (
                         <>
                             <Trophy className="w-5 h-5"/>
                             <span>{progress}</span>
                         </>
                     ) : (
-                        <span className="text-sm font-normal text-muted-foreground">아직 인증된 등급이 없습니다.</span>
+                        <span className="text-xs sm:text-sm font-normal text-muted-foreground">아직 인증된 등급이 없습니다.</span>
                     )}
                 </div>
             </div>
@@ -84,11 +84,11 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
       "flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300 border",
       isCertified && "bg-gradient-to-br from-yellow-50 via-amber-50 to-yellow-100 border-amber-400 shadow-amber-500/20"
     )}>
-      <CardHeader>
+      <CardHeader className="p-4">
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3 mb-2">
             <AreaIcon className={cn("w-8 h-8", isCertified ? "text-amber-500" : "text-primary")} />
-            <CardTitle className={cn("font-headline text-xl", isCertified && "text-amber-700")}>{areaConfig.koreanName}</CardTitle>
+            <CardTitle className={cn("font-headline text-lg sm:text-xl", isCertified && "text-amber-700")}>{areaConfig.koreanName}</CardTitle>
           </div>
           {isCertified ? (
             <Badge variant="default" className="shrink-0 bg-amber-400 text-amber-900 hover:bg-amber-400/90 shadow">
@@ -102,14 +102,14 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
             </Badge>
           )}
         </div>
-        <CardDescription className="text-sm pt-1 !mt-0 h-10">
+        <CardDescription className="text-xs sm:text-sm pt-1 !mt-0 h-10">
           {areaConfig.challengeName}
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex-grow flex flex-col items-center justify-center">
+      <CardContent className="p-4 pt-0 flex-grow flex flex-col items-center justify-center">
         {renderProgress()}
       </CardContent>
-      <CardFooter className="flex flex-col sm:flex-row gap-2 w-full">
+      <CardFooter className="p-4 pt-0 flex items-center gap-2 w-full">
         <AchievementStatusDialog areaName={areaName} />
         {areaConfig.externalUrl && (
           <ExternalUrlDialog url={areaConfig.externalUrl} areaName={areaConfig.koreanName} />

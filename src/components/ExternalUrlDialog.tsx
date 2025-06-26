@@ -22,8 +22,8 @@ export function ExternalUrlDialog({ url, areaName }: ExternalUrlDialogProps) {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="secondary" className="w-full font-bold">
-          바로가기 <ExternalLink className="ml-2 h-4 w-4" />
+        <Button variant="secondary" size="icon" className="shrink-0" title={`${areaName} 관련 사이트 바로가기`}>
+          <ExternalLink className="h-4 w-4" />
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-2 sm:p-4">
