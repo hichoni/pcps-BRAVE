@@ -4,7 +4,6 @@ import { useAchievements } from '@/context/AchievementsContext';
 import { useAuth } from '@/context/AuthContext';
 import { AreaName } from '@/lib/config';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { AchievementStatusDialog } from './AchievementStatusDialog';
 import { Badge } from './ui/badge';
 import { XCircle, Trophy } from 'lucide-react';
@@ -47,8 +46,17 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
   const renderProgress = () => {
     if (areaConfig.goalType === 'numeric') {
         const goal = areaConfig.goal[user.grade ?? '4'] ?? 0;
-        const progressValue = goal > 0 ? ((progress as number || 0) / goal) * 100 : 0;
-        return <Progress value={progressValue} className="w-full h-2.5 transition-all duration-500" />;
+        const currentProgress = (progress as number) || 0;
+        const unit = areaConfig.unit;
+
+        return (
+            <div className="text-center">
+                <p className="text-sm text-muted-foreground">목표: {goal}{unit}</p>
+                <p className="font-bold text-lg text-primary h-7">
+                    현재: {currentProgress}{unit}
+                </p>
+            </div>
+        );
     }
     if (areaConfig.goalType === 'objective') {
         const hasProgress = !!progress;
