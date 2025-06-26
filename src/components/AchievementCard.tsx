@@ -37,7 +37,7 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
   const areaConfig = challengeConfig[areaName];
   const areaState = achievements?.[areaName];
   
-  if (!areaState || !areaConfig || !user.grade) return null;
+  if (!areaState || !areaConfig || user.grade === undefined) return null;
 
   const { isCertified, progress } = areaState;
   
