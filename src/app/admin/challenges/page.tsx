@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -119,18 +120,28 @@ export default function ChallengeConfigPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
   useEffect(() => {
-    if (isClient && !authLoading && user?.role !== 'teacher') {
-      router.push('/login');
+    if (isClient && !authLoading) {
+      if (user?.role !== 'teacher') {
+        router.push('/login');
+      } else if (user.areaName) {
+        toast({
+            variant: 'destructive',
+            title: '접근 불가',
+            description: '이 페이지는 마스터 관리자만 접근할 수 있습니다.',
+        });
+        router.push('/admin');
+      }
     }
-  }, [user, authLoading, router, isClient]);
+  }, [user, authLoading, router, isClient, toast]);
 
-  if (!isClient || authLoading || !user) {
+  if (!isClient || authLoading || !user || user.areaName) {
     return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
   

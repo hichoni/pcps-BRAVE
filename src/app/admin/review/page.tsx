@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -5,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, Timestamp, Query } from 'firebase/firestore';
 import { Loader2, ArrowLeft, User as UserIcon, Calendar as CalendarIcon, MailCheck, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -119,11 +120,22 @@ export default function ReviewPage() {
         if (!db || !user || user.role !== 'teacher') return;
 
         setIsLoading(true);
-        const q = query(
-            collection(db, "challengeSubmissions"),
-            where("status", "==", "pending_review"),
-            orderBy("createdAt", "asc")
-        );
+
+        let q: Query;
+        if (user.areaName) {
+             q = query(
+                collection(db, "challengeSubmissions"),
+                where("status", "==", "pending_review"),
+                where("areaName", "==", user.areaName),
+                orderBy("createdAt", "asc")
+            );
+        } else {
+             q = query(
+                collection(db, "challengeSubmissions"),
+                where("status", "==", "pending_review"),
+                orderBy("createdAt", "asc")
+            );
+        }
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedSubmissions = snapshot.docs.map(doc => {
@@ -156,7 +168,7 @@ export default function ReviewPage() {
         <div className="container mx-auto px-4 py-8">
             <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 pb-4 border-b">
                 <h1 className="text-2xl sm:text-3xl font-bold font-headline text-primary flex items-center gap-2">
-                    <MailCheck /> 도전 활동 검토
+                    <MailCheck /> 도전 활동 검토 {user?.areaName && `(${user.name})`}
                 </h1>
                 <Button variant="outline" onClick={() => router.push('/admin')} className="self-end sm:self-auto">
                     <ArrowLeft className="mr-2"/> 학생 관리로

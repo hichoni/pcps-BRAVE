@@ -14,12 +14,17 @@ export interface User {
   grade?: number;
   classNum?: number;
   studentNum?: number;
+  areaName?: AreaName;
 }
 
 export const MOCK_USERS: User[] = [
-    { id: 1, username: 'teacher1', pin: '1234', name: '김선생', role: 'teacher' },
-    { id: 2, username: 'teacher2', pin: '1234', name: '이선생', role: 'teacher' },
+    { id: 1, username: 'master-teacher', pin: '1234', name: '김선생', role: 'teacher' },
     { id: 99, username: 'master', pin: '1234', name: '마스터선생', role: 'teacher' },
+    { id: 101, username: '인문', pin: '1234', name: '인문 선생님', role: 'teacher', areaName: 'Humanities' },
+    { id: 102, username: '봉사', pin: '1234', name: '봉사 선생님', role: 'teacher', areaName: 'Volunteering' },
+    { id: 103, username: '체육', pin: '1234', name: '체육 선생님', role: 'teacher', areaName: 'Physical-Education' },
+    { id: 104, username: '예술', pin: '1234', name: '예술 선생님', role: 'teacher', areaName: 'Arts' },
+    { id: 105, username: '정보', pin: '1234', name: '정보 선생님', role: 'teacher', areaName: 'Information' },
     { id: 11, username: 's-4-1-1', pin: '0000', name: '김철수', role: 'student', grade: 4, classNum: 1, studentNum: 1 },
     { id: 12, username: 's-4-1-2', pin: '1111', name: '이영희', role: 'student', grade: 4, classNum: 1, studentNum: 2 },
     { id: 13, username: 's-5-2-3', pin: '0000', name: '박바둑', role: 'student', grade: 5, classNum: 2, studentNum: 3 },
@@ -103,6 +108,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goal: { '4': 5, '5': 5, '6': 5 },
     unit: '권',
     autoApprove: true,
+    externalUrl: '',
   },
   Volunteering: {
     koreanName: '봉사',
@@ -137,6 +143,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     unit: '회 참여',
     mediaRequired: true,
     autoApprove: false, // Requires photo/video review
+    externalUrl: '',
   },
   Information: {
     koreanName: '정보',

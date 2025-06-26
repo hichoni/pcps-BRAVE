@@ -26,18 +26,29 @@ import { db } from '@/lib/firebase';
 import { Badge } from '@/components/ui/badge';
 
 function PendingReviewsBadge() {
+    const { user } = useAuth();
     const [count, setCount] = useState(0);
 
     useEffect(() => {
-        if (!db) return;
-        const q = query(collection(db, "challengeSubmissions"), where("status", "==", "pending_review"));
+        if (!db || !user) return;
+
+        let q;
+        if (user.areaName) {
+            q = query(
+                collection(db, "challengeSubmissions"), 
+                where("status", "==", "pending_review"),
+                where("areaName", "==", user.areaName)
+            );
+        } else {
+             q = query(collection(db, "challengeSubmissions"), where("status", "==", "pending_review"));
+        }
         
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setCount(snapshot.size);
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [user]);
 
     if (count === 0) return null;
 
@@ -144,7 +155,7 @@ export default function AdminPage() {
         return (a.studentNum ?? 0) - (b.studentNum ?? 0);
     });
     
-  const challengeAreaKeys = Object.keys(challengeConfig).sort();
+  const challengeAreaKeys = user.areaName ? [user.areaName] : Object.keys(challengeConfig).sort();
 
   return (
     <TooltipProvider>
@@ -160,12 +171,14 @@ export default function AdminPage() {
                 <PendingReviewsBadge />
             </Link>
           </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/admin/challenges">
-                <Settings className="h-4 w-4 sm:mr-2"/>
-                <span className="hidden sm:inline">도전 영역 관리</span>
-            </Link>
-          </Button>
+          {!user.areaName && (
+            <Button asChild variant="outline" size="sm">
+                <Link href="/admin/challenges">
+                    <Settings className="h-4 w-4 sm:mr-2"/>
+                    <span className="hidden sm:inline">도전 영역 관리</span>
+                </Link>
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={logout}>
             <LogOut className="h-4 w-4 sm:mr-2"/>
             <span className="hidden sm:inline">로그아웃</span>
@@ -181,14 +194,16 @@ export default function AdminPage() {
                         <CardTitle>학생 명렬표</CardTitle>
                         <CardDescription>학생들의 성취 현황을 관리하고 검색, 필터링할 수 있습니다.</CardDescription>
                     </div>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                        <Button onClick={() => setIsAddStudentDialogOpen(true)}>
-                            <PlusCircle className="mr-2"/> 학생 등록
-                        </Button>
-                        <Button variant="outline" onClick={() => setIsBulkAddDialogOpen(true)}>
-                            <Upload className="mr-2"/> 일괄 등록
-                        </Button>
-                    </div>
+                    {!user.areaName && (
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <Button onClick={() => setIsAddStudentDialogOpen(true)}>
+                                <PlusCircle className="mr-2"/> 학생 등록
+                            </Button>
+                            <Button variant="outline" onClick={() => setIsBulkAddDialogOpen(true)}>
+                                <Upload className="mr-2"/> 일괄 등록
+                            </Button>
+                        </div>
+                    )}
                 </div>
                 <div className="mt-4 flex flex-col md:flex-row items-stretch gap-2">
                     <div className="flex items-center gap-2">
