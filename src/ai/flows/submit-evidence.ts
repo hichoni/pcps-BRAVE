@@ -1,14 +1,16 @@
 'use server';
 /**
  * @fileOverview A flow to submit student's challenge evidence to Firestore.
+ * It now includes an AI check to automatically update progress if the evidence is sufficient.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { db } from '@/lib/firebase';
 import { adminStorage } from '@/lib/firebase-admin';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc, setDoc } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
+import { checkCertification } from './certification-checker';
 
 export interface SubmitEvidenceInput {
   userId: string;
@@ -21,7 +23,15 @@ export interface SubmitEvidenceInput {
   mediaType?: string;
 }
 
-export async function submitEvidence(input: SubmitEvidenceInput): Promise<{ success: boolean; id: string }> {
+export interface SubmitEvidenceOutput {
+    success: boolean;
+    id: string;
+    progressUpdated: boolean;
+    updateMessage: string;
+    aiReasoning: string;
+}
+
+export async function submitEvidence(input: SubmitEvidenceInput): Promise<SubmitEvidenceOutput> {
   return submitEvidenceFlow(input);
 }
 
@@ -37,12 +47,20 @@ const SubmitEvidenceInputSchema = z.object({
   mediaType: z.string().optional().describe("The MIME type of the media file."),
 });
 
+const SubmitEvidenceOutputSchema = z.object({
+    success: z.boolean(),
+    id: z.string(),
+    progressUpdated: z.boolean(),
+    updateMessage: z.string(),
+    aiReasoning: z.string()
+});
+
 
 const submitEvidenceFlow = ai.defineFlow(
   {
     name: 'submitEvidenceFlow',
     inputSchema: SubmitEvidenceInputSchema,
-    outputSchema: z.object({ success: z.boolean(), id: z.string() }),
+    outputSchema: SubmitEvidenceOutputSchema,
   },
   async (input) => {
     if (!db) {
@@ -125,12 +143,60 @@ const submitEvidenceFlow = ai.defineFlow(
       }
 
       const docRef = await addDoc(submissionsCollection, docData);
-
       console.log("Document written with ID: ", docRef.id);
-      return { success: true, id: docRef.id };
-    } catch (e) {
-      console.error("Error adding document to Firestore: ", e);
-      throw new Error("데이터베이스에 제출 정보를 저장하는 데 실패했습니다.");
+
+      // AI-powered progress update logic starts here
+      // 1. Fetch challenge config
+      const configDocRef = doc(db, 'config', 'challengeConfig');
+      const configDocSnap = await getDoc(configDocRef);
+      if (!configDocSnap.exists()) {
+          throw new Error("도전 영역 설정을 찾을 수 없습니다. 관리자에게 문의해주세요.");
+      }
+      const challengeConfig = configDocSnap.data();
+      const areaConfig = challengeConfig[input.areaName];
+      if (!areaConfig) {
+          throw new Error(`'${input.koreanName}' 도전 영역의 설정을 찾을 수 없습니다.`);
+      }
+
+      // 2. Call AI certification checker
+      const aiCheckResult = await checkCertification({
+          areaName: input.koreanName,
+          requirements: areaConfig.requirements,
+          evidence: input.evidence,
+      });
+
+      let progressUpdated = false;
+      let updateMessage = '';
+
+      // 3. If sufficient, update progress
+      if (aiCheckResult.isSufficient) {
+          const achievementDocRef = doc(db, 'achievements', input.userId);
+          
+          if (areaConfig.goalType === 'numeric') {
+              const achievementDocSnap = await getDoc(achievementDocRef);
+              const achievements = achievementDocSnap.exists() ? achievementDocSnap.data() : {};
+              const areaState = achievements[input.areaName] || { progress: 0 };
+              const newProgress = (Number(areaState.progress) || 0) + 1;
+              await setDoc(achievementDocRef, { [input.areaName]: { progress: newProgress } }, { merge: true });
+              progressUpdated = true;
+              updateMessage = `'${input.koreanName}' 영역의 진행도가 1만큼 증가했습니다! (현재: ${newProgress}${areaConfig.unit})`;
+          } else {
+              updateMessage = 'AI가 활동을 확인했지만, 이 영역은 선생님의 확인이 필요해요.';
+          }
+      } else {
+          updateMessage = 'AI가 활동을 확인했지만, 아직 인증 기준에는 미치지 못했어요. 더 노력해주세요!';
+      }
+
+      return { 
+          success: true, 
+          id: docRef.id,
+          progressUpdated,
+          updateMessage,
+          aiReasoning: aiCheckResult.reasoning
+      };
+    } catch (e: any) {
+      console.error("Error in submitEvidenceFlow: ", e);
+      throw new Error(e.message || "데이터베이스에 제출 정보를 저장하거나 AI 검사를 하는 데 실패했습니다.");
     }
   }
 );

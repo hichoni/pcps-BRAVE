@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
-import { useAchievements } from '@/context/AchievementsContext';
 import { useAuth } from '@/context/AuthContext';
 import { AreaName } from '@/lib/config';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
@@ -85,7 +84,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
 
     setIsSubmitting(true);
     try {
-      await submitEvidence({
+      const result = await submitEvidence({
         userId: user.username,
         userName: user.name,
         areaName: areaName,
@@ -95,10 +94,18 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
         mediaDataUri: mediaPreview ?? undefined,
         mediaType: mediaFile?.type ?? undefined,
       });
+      
       toast({
-        title: '제출 완료!',
-        description: '도전 내용이 갤러리에 성공적으로 제출되었습니다.',
+        title: result.progressUpdated ? '제출 완료 및 진행도 업데이트!' : '제출 완료!',
+        description: (
+            <div>
+                <p className="font-semibold">{result.updateMessage}</p>
+                <p className="text-xs mt-2 text-muted-foreground">AI 판단 근거: {result.aiReasoning}</p>
+            </div>
+        ),
+        duration: 9000,
       });
+
       form.reset();
       setMediaFile(null);
       setMediaPreview(null);
