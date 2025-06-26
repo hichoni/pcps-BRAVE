@@ -34,7 +34,7 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
 
   const handleDownloadExample = () => {
     const csvHeader = "학년,반,번호,이름";
-    const csvExample = "4,1,1,김철수\n4,1,2,이영희\n5,2,3,박바둑";
+    const csvExample = "4,1,1,예시학생1\n5,2,10,예시학생2\n6,3,20,예시학생3";
     const csvContent = `${csvHeader}\n${csvExample}`;
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
@@ -247,7 +247,7 @@ export function BulkAddStudentsDialog({ open, onOpenChange }: BulkAddStudentsDia
         <DialogHeader>
           <DialogTitle>학생 일괄 등록</DialogTitle>
           <DialogDescription>
-            CSV 파일을 업로드하여 여러 학생을 한 번에 등록합니다.
+            CSV 파일을 업로드하여 여러 학생을 한 번에 등록합니다. 예시 파일을 다운로드하여 형식을 확인한 후, 실제 학생 정보로 내용을 수정하여 업로드해주세요.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
