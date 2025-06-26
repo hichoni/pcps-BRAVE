@@ -17,11 +17,12 @@ import Image from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { User } from '@/lib/config';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 const studentLoginSchema = z.object({
   grade: z.string().min(1, { message: '학년을 선택해주세요.' }),
-  classNum: z.string().min(1, { message: '반을 입력해주세요.' }),
-  studentNum: z.string().min(1, { message: '번호를 입력해주세요.' }),
+  classNum: z.string().min(1, { message: '반을 선택해주세요.' }),
+  studentNum: z.string().min(1, { message: '번호를 선택해주세요.' }),
   pin: z.string().length(4, { message: 'PIN 번호는 4자리여야 합니다.' }),
 });
 
@@ -69,10 +70,27 @@ export default function LoginPage() {
   const watchedClassNum = studentForm.watch('classNum');
   const watchedStudentNum = studentForm.watch('studentNum');
 
+  const studentUsers = useMemo(() => users.filter(u => u.role === 'student'), [users]);
+
   const availableGrades = useMemo(() => {
-    const studentUsers = users.filter(u => u.role === 'student');
     return [...new Set(studentUsers.map(u => u.grade))].sort((a, b) => (a ?? 0) - (b ?? 0));
-  }, [users]);
+  }, [studentUsers]);
+  
+  const availableClasses = useMemo(() => {
+    if (!watchedGrade) return [];
+    const gradeNum = parseInt(watchedGrade, 10);
+    const studentsInGrade = studentUsers.filter(u => u.grade === gradeNum);
+    return [...new Set(studentsInGrade.map(u => u.classNum))].sort((a, b) => (a ?? 0) - (b ?? 0));
+  }, [studentUsers, watchedGrade]);
+
+  const availableStudentNums = useMemo(() => {
+    if (!watchedGrade || !watchedClassNum) return [];
+    const gradeNum = parseInt(watchedGrade, 10);
+    const classNum = parseInt(watchedClassNum, 10);
+    const studentsInClass = studentUsers.filter(u => u.grade === gradeNum && u.classNum === classNum);
+    return [...new Set(studentsInClass.map(u => u.studentNum))].sort((a, b) => (a ?? 0) - (b ?? 0));
+  }, [studentUsers, watchedGrade, watchedClassNum]);
+
 
   useEffect(() => {
     const findStudent = () => {
@@ -188,65 +206,121 @@ export default function LoginPage() {
               <TabsTrigger value="teacher"><ShieldCheck className="mr-2"/> 교사</TabsTrigger>
             </TabsList>
             <TabsContent value="student">
-              <form onSubmit={studentForm.handleSubmit(onStudentSubmit)}>
-                <CardContent className="space-y-4 pt-4">
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="grade">학년</Label>
-                      <Select onValueChange={(value) => studentForm.setValue('grade', value)} defaultValue={studentForm.getValues('grade')}>
-                        <SelectTrigger id="grade">
-                          <SelectValue placeholder="학년"/>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableGrades.map(grade => (
-                            grade != null && <SelectItem key={grade} value={String(grade)}>{grade}학년</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+              <Form {...studentForm}>
+                <form onSubmit={studentForm.handleSubmit(onStudentSubmit)}>
+                  <CardContent className="space-y-4 pt-4">
+                    <div className="grid grid-cols-3 gap-2">
+                      <FormField
+                          control={studentForm.control}
+                          name="grade"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>학년</FormLabel>
+                              <Select
+                                onValueChange={(value) => {
+                                  field.onChange(value);
+                                  studentForm.setValue('classNum', '');
+                                  studentForm.setValue('studentNum', '');
+                                }}
+                                value={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger><SelectValue placeholder="학년" /></SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {availableGrades.map(grade => (
+                                    grade != null && <SelectItem key={grade} value={String(grade)}>{grade}학년</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={studentForm.control}
+                          name="classNum"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>반</FormLabel>
+                              <Select
+                                onValueChange={(value) => {
+                                  field.onChange(value);
+                                  studentForm.setValue('studentNum', '');
+                                }}
+                                value={field.value}
+                                disabled={!watchedGrade || availableClasses.length === 0}
+                              >
+                                <FormControl>
+                                  <SelectTrigger><SelectValue placeholder="반" /></SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {availableClasses.map(classNum => (
+                                    classNum != null && <SelectItem key={classNum} value={String(classNum)}>{classNum}반</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={studentForm.control}
+                          name="studentNum"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>번호</FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                value={field.value}
+                                disabled={!watchedClassNum || availableStudentNums.length === 0}
+                              >
+                                <FormControl>
+                                  <SelectTrigger><SelectValue placeholder="번호" /></SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {availableStudentNums.map(num => (
+                                    num != null && <SelectItem key={num} value={String(num)}>{num}번</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                     </div>
+                    
+                    {foundStudent ? (
+                        <div className="p-3 bg-secondary rounded-md text-center text-secondary-foreground font-semibold">
+                            {maskName(foundStudent.name)}
+                        </div>
+                    ) : studentNotFound && (
+                        <div className="p-3 bg-destructive/10 rounded-md text-center text-destructive text-sm font-semibold">
+                            해당 정보의 학생을 찾을 수 없습니다.
+                        </div>
+                    )}
+                    
                     <div className="space-y-2">
-                      <Label htmlFor="classNum">반</Label>
-                      <Input id="classNum" type="number" placeholder="반" {...studentForm.register('classNum')} />
+                      <Label htmlFor="pin-student">PIN 번호</Label>
+                      <Input
+                        id="pin-student"
+                        type="password"
+                        maxLength={4}
+                        placeholder="4자리 숫자"
+                        {...studentForm.register('pin')}
+                        className="text-lg"
+                      />
+                      {studentForm.formState.errors.pin && <p className="text-sm text-destructive">{studentForm.formState.errors.pin.message}</p>}
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="studentNum">번호</Label>
-                      <Input id="studentNum" type="number" placeholder="번호" {...studentForm.register('studentNum')} />
-                    </div>
-                  </div>
-                  {studentForm.formState.errors.grade && <p className="text-sm text-destructive">{studentForm.formState.errors.grade.message}</p>}
-                  {studentForm.formState.errors.classNum && <p className="text-sm text-destructive">{studentForm.formState.errors.classNum.message}</p>}
-                  {studentForm.formState.errors.studentNum && <p className="text-sm text-destructive">{studentForm.formState.errors.studentNum.message}</p>}
-                  
-                  {foundStudent ? (
-                      <div className="p-3 bg-secondary rounded-md text-center text-secondary-foreground font-semibold">
-                          {maskName(foundStudent.name)}
-                      </div>
-                  ) : studentNotFound && (
-                      <div className="p-3 bg-destructive/10 rounded-md text-center text-destructive text-sm font-semibold">
-                          해당 정보의 학생을 찾을 수 없습니다.
-                      </div>
-                  )}
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="pin-student">PIN 번호</Label>
-                    <Input
-                      id="pin-student"
-                      type="password"
-                      maxLength={4}
-                      placeholder="4자리 숫자"
-                      {...studentForm.register('pin')}
-                      className="text-lg"
-                    />
-                    {studentForm.formState.errors.pin && <p className="text-sm text-destructive">{studentForm.formState.errors.pin.message}</p>}
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button type="submit" className="w-full font-bold" disabled={combinedLoading}>
-                    {combinedLoading ? <Loader2 className="animate-spin" /> : <LogIn />}
-                    로그인
-                  </Button>
-                </CardFooter>
-              </form>
+                  </CardContent>
+                  <CardFooter>
+                    <Button type="submit" className="w-full font-bold" disabled={combinedLoading}>
+                      {combinedLoading ? <Loader2 className="animate-spin" /> : <LogIn />}
+                      로그인
+                    </Button>
+                  </CardFooter>
+                </form>
+              </Form>
             </TabsContent>
             <TabsContent value="teacher">
               <form onSubmit={teacherForm.handleSubmit(onTeacherSubmit)}>
@@ -280,3 +354,6 @@ export default function LoginPage() {
     </div>
   );
 }
+
+
+    
