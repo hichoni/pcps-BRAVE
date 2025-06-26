@@ -66,20 +66,20 @@ export default function Dashboard() {
               <CardTitle className="font-headline text-xl sm:text-2xl">✨ 참여 안내 ✨</CardTitle>
             </CardHeader>
             <CardContent className="p-2 flex-grow flex flex-col items-center justify-center">
-              <p className="font-semibold">4~6학년 친구들만 인증할 수 있어요!</p>
-              <p className="text-muted-foreground mb-4">인증 기간: 2025년 5월 1일 ~ 10월 31일</p>
+              <p className="font-semibold text-sm sm:text-base">4~6학년 친구들만 인증할 수 있어요!</p>
+              <p className="text-muted-foreground mb-4 text-xs sm:text-sm">인증 기간: 2025년 5월 1일 ~ 10월 31일</p>
               <Separator className="my-4"/>
               <div className="space-y-2 text-left">
-                  <p className="font-semibold flex items-center gap-2">
-                      <span className="text-2xl">🥇</span> 
+                  <p className="font-semibold flex items-center gap-2 text-sm sm:text-base">
+                      <span className="text-xl sm:text-2xl">🥇</span> 
                       <span><strong className="text-primary">금장:</strong> 4개 영역 이상 인증</span>
                   </p>
-                  <p className="font-semibold flex items-center gap-2">
-                      <span className="text-2xl">🥈</span>
+                  <p className="font-semibold flex items-center gap-2 text-sm sm:text-base">
+                      <span className="text-xl sm:text-2xl">🥈</span>
                       <span><strong className="text-primary">은장:</strong> 3개 영역 인증</span>
                   </p>
-                  <p className="font-semibold flex items-center gap-2">
-                      <span className="text-2xl">🥉</span>
+                  <p className="font-semibold flex items-center gap-2 text-sm sm:text-base">
+                      <span className="text-xl sm:text-2xl">🥉</span>
                       <span><strong className="text-primary">동장:</strong> 2개 영역 인증</span>
                   </p>
               </div>
