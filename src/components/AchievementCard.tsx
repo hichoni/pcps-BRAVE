@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAchievements } from '@/context/AchievementsContext';
@@ -42,6 +43,7 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
   const { isCertified, progress } = areaState;
   
   const AreaIcon = areaConfig.icon;
+  const isTeacherInput = areaConfig.goalType === 'objective';
 
   const renderProgress = () => {
     if (areaConfig.goalType === 'numeric') {
@@ -62,7 +64,7 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
         const hasProgress = !!progress;
         return (
             <div className="text-center">
-                 <p className="text-xs sm:text-sm text-muted-foreground">목표: {areaConfig.goalDescription || '완료'}</p>
+                 <p className="text-xs sm:text-sm text-muted-foreground">목표: {areaConfig.goalDescription || '교사 확인'}</p>
                  <div className="font-bold text-base sm:text-lg text-primary flex items-center justify-center gap-2 h-7">
                     {hasProgress ? (
                         <>
@@ -110,7 +112,7 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
         {renderProgress()}
       </CardContent>
       <CardFooter className="p-4 pt-0 flex items-center gap-2 w-full">
-        <AchievementStatusDialog areaName={areaName} />
+        { !isTeacherInput && <AchievementStatusDialog areaName={areaName} /> }
         {areaConfig.externalUrl && (
           <ExternalUrlDialog url={areaConfig.externalUrl} areaName={areaConfig.koreanName} />
         )}

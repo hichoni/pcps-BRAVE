@@ -13,7 +13,7 @@ import { adminStorage } from '@/lib/firebase-admin';
 import { collection, addDoc, serverTimestamp, doc, getDoc, runTransaction } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { checkCertification } from './certification-checker';
-import { analyzeTypingTest } from './analyze-typing-test';
+import { analyzeMediaEvidence } from './analyze-typing-test'; // Now a generic media analyzer
 import { type SubmitEvidenceInput, type SubmitEvidenceOutput, SubmissionStatus } from '@/lib/config';
 
 export async function submitEvidence(input: SubmitEvidenceInput): Promise<SubmitEvidenceOutput> {
@@ -122,29 +122,31 @@ const submitEvidenceFlow = ai.defineFlow(
       let aiReasoning = '';
       let submissionStatus: SubmissionStatus;
 
-      if (input.areaName === 'Information' && areaConfig.autoApprove) {
-          if (!input.mediaDataUri) {
-              throw new Error('정보 영역은 타자 연습 결과 스크린샷이 필수입니다.');
-          }
-          const visionResult = await analyzeTypingTest({ photoDataUri: input.mediaDataUri });
-          aiSufficient = visionResult.isValid;
-          aiReasoning = visionResult.reasoning;
-          
-          if (!visionResult.isTypingTest) {
-              submissionStatus = 'pending_review'; // If not a typing test, let teacher decide
+      // Check if AI auto-approval is enabled for this area
+      if (areaConfig.autoApprove) {
+          // Prioritize Vision check if it's enabled and media is provided
+          if (areaConfig.aiVisionCheck && input.mediaDataUri && areaConfig.aiVisionPrompt) {
+              const visionResult = await analyzeMediaEvidence({ 
+                  photoDataUri: input.mediaDataUri, 
+                  prompt: areaConfig.aiVisionPrompt 
+              });
+              aiSufficient = visionResult.isSufficient;
+              aiReasoning = visionResult.reasoning;
           } else {
-              submissionStatus = aiSufficient ? 'approved' : 'rejected';
+              // Fallback to text-based check
+              const textCheckResult = await checkCertification({
+                  areaName: input.koreanName,
+                  requirements: areaConfig.requirements,
+                  evidence: input.evidence,
+              });
+              aiSufficient = textCheckResult.isSufficient;
+              aiReasoning = textCheckResult.reasoning;
           }
+          submissionStatus = aiSufficient ? 'approved' : 'rejected';
       } else {
-          // Fallback to original text-based check
-          const textCheckResult = await checkCertification({
-              areaName: input.koreanName,
-              requirements: areaConfig.requirements,
-              evidence: input.evidence,
-          });
-          aiSufficient = textCheckResult.isSufficient;
-          aiReasoning = textCheckResult.reasoning;
-          submissionStatus = areaConfig.autoApprove && aiSufficient ? 'approved' : 'pending_review';
+          // If auto-approval is off, all submissions go to pending
+          submissionStatus = 'pending_review';
+          aiReasoning = 'AI 자동 인증이 비활성화된 영역입니다. 선생님의 확인이 필요합니다.';
       }
 
       const isAutoApproved = submissionStatus === 'approved';
@@ -161,14 +163,10 @@ const submitEvidenceFlow = ai.defineFlow(
               transaction.set(achievementDocRef, { [input.areaName]: { ...areaState, progress: newProgress } }, { merge: true });
               updateMessage = `AI가 활동을 확인하고 바로 승인했어요! 진행도가 1만큼 증가했습니다. (현재: ${newProgress}${areaConfig.unit})`;
           });
-        } else {
-            updateMessage = `AI가 활동을 확인했지만, 이 영역은 선생님의 최종 확인이 필요합니다.`;
         }
       } else {
           if (submissionStatus === 'rejected') {
               updateMessage = `AI 심사 결과, 반려되었습니다. 사유: ${aiReasoning}`;
-          } else if (submissionStatus === 'pending_review' && input.areaName === 'Information') {
-              updateMessage = `AI가 타자 연습 결과를 명확히 인식하지 못했습니다. 선생님이 직접 확인할 예정입니다.`;
           } else {
               updateMessage = '제출 완료! 선생님이 확인하신 후, 진행도에 반영될 거예요.';
           }
@@ -185,6 +183,7 @@ const submitEvidenceFlow = ai.defineFlow(
         createdAt: serverTimestamp(),
         likes: [],
         status: submissionStatus,
+        showInGallery: areaConfig.showInGallery ?? true,
       };
       
       if (mediaUrl) {

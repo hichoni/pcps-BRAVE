@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth, User } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, orderBy, query, Timestamp, limit, startAfter, QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, getDocs, orderBy, query, Timestamp, limit, startAfter, QueryDocumentSnapshot, where } from 'firebase/firestore';
 import { Loader2, ArrowLeft, User as UserIcon, Calendar as CalendarIcon, GalleryThumbnails, Trash2, Heart, Search, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -230,6 +230,7 @@ export default function GalleryPage() {
       try {
         const q = query(
             collection(db, "challengeSubmissions"), 
+            where("showInGallery", "==", true),
             orderBy("createdAt", "desc"),
             limit(PAGE_SIZE)
         );
@@ -274,6 +275,7 @@ export default function GalleryPage() {
     try {
         const q = query(
             collection(db, "challengeSubmissions"),
+            where("showInGallery", "==", true),
             orderBy("createdAt", "desc"),
             startAfter(lastDoc),
             limit(PAGE_SIZE)

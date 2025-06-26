@@ -67,6 +67,9 @@ export type AreaConfig = {
   mediaRequired?: boolean;
   autoApprove?: boolean;
   goalDescription?: string;
+  showInGallery?: boolean;
+  aiVisionCheck?: boolean;
+  aiVisionPrompt?: string;
 };
 
 export type StoredAreaConfig = Omit<AreaConfig, 'icon' | 'name'> & { 
@@ -75,6 +78,9 @@ export type StoredAreaConfig = Omit<AreaConfig, 'icon' | 'name'> & {
   mediaRequired?: boolean;
   autoApprove?: boolean;
   goalDescription?: string;
+  showInGallery?: boolean;
+  aiVisionCheck?: boolean;
+  aiVisionPrompt?: string;
 };
 
 export const ICONS: Record<string, LucideIcon> = {
@@ -106,6 +112,9 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     unit: '권',
     autoApprove: true,
     externalUrl: '',
+    showInGallery: true,
+    aiVisionCheck: false,
+    aiVisionPrompt: '',
   },
   Volunteering: {
     koreanName: '봉사',
@@ -117,6 +126,9 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     unit: '시간',
     mediaRequired: true,
     autoApprove: false, // Requires photo review
+    showInGallery: true,
+    aiVisionCheck: false,
+    aiVisionPrompt: '',
   },
   'Physical-Education': {
     koreanName: '체육',
@@ -129,6 +141,9 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     unit: '등급',
     autoApprove: false, // Teacher must check official results
     goalDescription: 'PAPS 기준 충족',
+    showInGallery: false,
+    aiVisionCheck: false,
+    aiVisionPrompt: '',
   },
   Arts: {
     koreanName: '예술',
@@ -141,6 +156,9 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     mediaRequired: true,
     autoApprove: false, // Requires photo/video review
     externalUrl: '',
+    showInGallery: true,
+    aiVisionCheck: false,
+    aiVisionPrompt: '',
   },
   Information: {
     koreanName: '정보',
@@ -151,7 +169,17 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goal: { '4': 10, '5': 15, '6': 20 },
     unit: '회',
     mediaRequired: true,
-    autoApprove: true, // AI will auto-approve based on vision
+    autoApprove: true,
+    showInGallery: true,
+    aiVisionCheck: true,
+    aiVisionPrompt: `You are an AI assistant that analyzes screenshots of Korean typing tests.
+Your task is to determine if the image is a typing test result and if the typing speed (타수) is 200 or greater.
+
+1.  Analyze the provided image.
+2.  Check if the image appears to be a typing test result. If not, the evidence is insufficient.
+3.  Look for a number representing the typing speed, often labeled as "타수", "현재 타수", or similar. Extract this number. If you cannot find a speed, the evidence is insufficient.
+4.  Compare the extracted typing speed to 200. If the speed is 200 or greater, the evidence is sufficient. Otherwise, it is not.
+5.  Provide a brief, one-sentence reasoning for your decision in Korean. For example: "타자 속도(350타)가 200타 이상이므로 유효합니다." or "타자 연습 결과 이미지가 아니거나 타수를 인식할 수 없습니다."`,
   },
 };
 
