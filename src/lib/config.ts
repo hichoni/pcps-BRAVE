@@ -64,12 +64,14 @@ export type AreaConfig = {
   unit: string;                  // Unit for 'numeric', or a descriptive noun for 'objective'
   externalUrl?: string;
   mediaRequired?: boolean;
+  goalDescription?: string;
 };
 
 export type StoredAreaConfig = Omit<AreaConfig, 'icon' | 'name'> & { 
   iconName: string;
   externalUrl?: string;
   mediaRequired?: boolean;
+  goalDescription?: string;
 };
 
 export const ICONS: Record<string, LucideIcon> = {
@@ -116,6 +118,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goal: {},
     options: ['1등급', '2등급', '3등급', '4등급', '5등급'],
     unit: '등급',
+    goalDescription: '3등급 이상',
   },
   Arts: {
     koreanName: '예술',
@@ -137,5 +140,6 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goal: {},
     options: ['입문', '초보', '중수', '고수', '달인'],
     unit: '레벨',
+    goalDescription: "'고수' 등급",
   },
 };

@@ -62,11 +62,17 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
         const hasProgress = !!progress;
         return (
             <div className="text-center">
-                <p className="text-sm text-muted-foreground">현재 상태</p>
-                <p className="font-bold text-lg text-primary flex items-center justify-center gap-2 h-7">
-                    {hasProgress && <Trophy className="w-5 h-5"/>}
-                    {progress}
-                </p>
+                 <p className="text-sm text-muted-foreground">목표: {areaConfig.goalDescription || '완료'}</p>
+                 <div className="font-bold text-lg text-primary flex items-center justify-center gap-2 h-7">
+                    {hasProgress ? (
+                        <>
+                            <Trophy className="w-5 h-5"/>
+                            <span>{progress}</span>
+                        </>
+                    ) : (
+                        <span className="text-sm font-normal text-muted-foreground">아직 인증된 등급이 없습니다.</span>
+                    )}
+                </div>
             </div>
         );
     }

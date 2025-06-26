@@ -1,18 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, User } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, orderBy, query, Timestamp, limit, startAfter, QueryDocumentSnapshot } from 'firebase/firestore';
-import { Loader2, ArrowLeft, User as UserIcon, Calendar as CalendarIcon, GalleryThumbnails } from 'lucide-react';
+import { Loader2, ArrowLeft, User as UserIcon, Calendar as CalendarIcon, GalleryThumbnails, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
+import { useToast } from '@/hooks/use-toast';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { deleteSubmission } from '@/ai/flows/delete-submission';
 
 interface Submission {
   id: string;
@@ -37,10 +40,26 @@ const maskName = (name: string) => {
   return name;
 };
 
-function GalleryCard({ submission }: { submission: Submission }) {
+function GalleryCard({ submission, user, onSubmissionDeleted }: { submission: Submission; user: User | null, onSubmissionDeleted: (id: string) => void; }) {
   const { challengeConfig } = useChallengeConfig();
-  const areaConfig = challengeConfig?.[submission.areaName];
-  const AreaIcon = areaConfig?.icon || UserIcon;
+  const { toast } = useToast();
+  const AreaIcon = challengeConfig?.[submission.areaName]?.icon || UserIcon;
+
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!user) return;
+    setIsDeleting(true);
+    try {
+      await deleteSubmission({ submissionId: submission.id, userId: user.username });
+      toast({ title: '삭제 완료', description: '게시글이 삭제되었습니다.' });
+      onSubmissionDeleted(submission.id);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: '삭제 오류', description: error.message || '게시글 삭제 중 오류가 발생했습니다.' });
+      setIsDeleting(false);
+    }
+  };
+
 
   return (
     <Card className="flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300 border">
@@ -55,6 +74,29 @@ function GalleryCard({ submission }: { submission: Submission }) {
                 {submission.createdAt ? formatDistanceToNow(submission.createdAt, { addSuffix: true, locale: ko }) : '방금 전'}
             </CardDescription>
          </div>
+         {user && user.username === submission.userId && (
+           <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" disabled={isDeleting}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>정말로 삭제하시겠습니까?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    이 게시글을 삭제하면 되돌릴 수 없습니다. 갤러리에서 영구적으로 사라집니다.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isDeleting}>취소</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : '삭제'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+         )}
       </CardHeader>
       <CardContent className="flex-grow space-y-4">
         <div className="p-3 bg-secondary/50 rounded-md">
@@ -192,6 +234,9 @@ export default function GalleryPage() {
     }
   };
 
+  const handleSubmissionDeleted = useCallback((deletedId: string) => {
+    setSubmissions(prev => prev.filter(s => s.id !== deletedId));
+  }, []);
 
   if (authLoading || !user) {
     return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -220,7 +265,7 @@ export default function GalleryPage() {
       ) : (
         <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {submissions.map(sub => <GalleryCard key={sub.id} submission={sub} />)}
+              {submissions.map(sub => <GalleryCard key={sub.id} submission={sub} user={user} onSubmissionDeleted={handleSubmissionDeleted} />)}
             </div>
             {hasMore && (
                 <div className="mt-12 text-center">
