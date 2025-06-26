@@ -339,9 +339,9 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
                   name="externalUrl"
                   render={({ field }) => (
                       <FormItem>
-                          <FormLabel>바로가기 URL</FormLabel>
+                          <FormLabel>바로가기 URL (선택)</FormLabel>
                           <FormControl>
-                              <Input type="url" placeholder="https://padlet.com/..." {...field} />
+                              <Input type="url" placeholder="https://... (비워두면 삭제됨)" {...field} />
                           </FormControl>
                           <FormMessage />
                       </FormItem>

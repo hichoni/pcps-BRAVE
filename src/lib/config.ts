@@ -97,7 +97,6 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goalType: 'numeric',
     goal: { '4': 5, '5': 5, '6': 5 },
     unit: '권',
-    externalUrl: 'https://padlet.com/gallery/featured',
   },
   Volunteering: {
     koreanName: '봉사',
@@ -128,7 +127,6 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goalType: 'numeric',
     goal: { '4': 1, '5': 1, '6': 1 },
     unit: '회 참여',
-    externalUrl: 'https://padlet.com/gallery/portfolios',
     mediaRequired: true,
   },
   Information: {
