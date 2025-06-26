@@ -3,25 +3,22 @@
  * @fileOverview An AI-powered certification checker.
  *
  * - checkCertification - A function that checks if provided evidence is sufficient for certification.
- * - CertificationCheckInput - The input type for the checkCertification function.
- * - CertificationCheckOutput - The return type for the checkCertification function.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { type CertificationCheckInput, type CertificationCheckOutput } from '@/lib/config';
 
-export const CertificationCheckInputSchema = z.object({
+const CertificationCheckInputSchema = z.object({
   areaName: z.string().describe('The achievement area to check.'),
   requirements: z.string().describe('The requirements for certification in this area.'),
   evidence: z.string().describe('The evidence provided by the student.'),
 });
-export type CertificationCheckInput = z.infer<typeof CertificationCheckInputSchema>;
 
-export const CertificationCheckOutputSchema = z.object({
+const CertificationCheckOutputSchema = z.object({
   isSufficient: z.boolean().describe('Whether the evidence meets the certification requirements.'),
   reasoning: z.string().describe('The reasoning behind the decision.'),
 });
-export type CertificationCheckOutput = z.infer<typeof CertificationCheckOutputSchema>;
 
 export async function checkCertification(input: CertificationCheckInput): Promise<CertificationCheckOutput> {
   return certificationCheckerFlow(input);

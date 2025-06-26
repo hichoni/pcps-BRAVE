@@ -143,3 +143,48 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goalDescription: "'고수' 등급",
   },
 };
+
+// --- Types for Server Actions ---
+
+// For submit-evidence.ts
+export interface SubmitEvidenceInput {
+  userId: string;
+  userName: string;
+  areaName: string;
+  koreanName: string;
+  challengeName: string;
+  evidence: string;
+  mediaDataUri?: string;
+  mediaType?: string;
+}
+
+export interface SubmitEvidenceOutput {
+    success: boolean;
+    id: string;
+    progressUpdated: boolean;
+    updateMessage: string;
+    aiReasoning: string;
+}
+
+// For certification-checker.ts
+export interface CertificationCheckInput {
+  areaName: string;
+  requirements: string;
+  evidence: string;
+}
+
+export interface CertificationCheckOutput {
+  isSufficient: boolean;
+  reasoning: string;
+}
+
+// For delete-submission.ts
+export interface DeleteSubmissionInput {
+  submissionId: string;
+  userId: string;
+}
+
+export interface DeleteSubmissionOutput {
+  success: boolean;
+  message: string;
+}

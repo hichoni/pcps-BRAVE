@@ -11,25 +11,7 @@ import { adminStorage } from '@/lib/firebase-admin';
 import { collection, addDoc, serverTimestamp, doc, getDoc, setDoc } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { checkCertification } from './certification-checker';
-
-export interface SubmitEvidenceInput {
-  userId: string;
-  userName: string;
-  areaName: string;
-  koreanName: string;
-  challengeName: string;
-  evidence: string;
-  mediaDataUri?: string;
-  mediaType?: string;
-}
-
-export interface SubmitEvidenceOutput {
-    success: boolean;
-    id: string;
-    progressUpdated: boolean;
-    updateMessage: string;
-    aiReasoning: string;
-}
+import { type SubmitEvidenceInput, type SubmitEvidenceOutput } from '@/lib/config';
 
 export async function submitEvidence(input: SubmitEvidenceInput): Promise<SubmitEvidenceOutput> {
   return submitEvidenceFlow(input);

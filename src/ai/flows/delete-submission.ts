@@ -9,18 +9,17 @@ import { z } from 'genkit';
 import { db } from '@/lib/firebase';
 import { adminStorage } from '@/lib/firebase-admin';
 import { doc, getDoc, deleteDoc } from 'firebase/firestore';
+import { type DeleteSubmissionInput, type DeleteSubmissionOutput } from '@/lib/config';
 
-export const DeleteSubmissionInputSchema = z.object({
+const DeleteSubmissionInputSchema = z.object({
   submissionId: z.string().describe("The ID of the submission document to delete."),
   userId: z.string().describe("The user ID of the person requesting the deletion, for permission checking."),
 });
-export type DeleteSubmissionInput = z.infer<typeof DeleteSubmissionInputSchema>;
 
-export const DeleteSubmissionOutputSchema = z.object({
+const DeleteSubmissionOutputSchema = z.object({
   success: z.boolean(),
   message: z.string(),
 });
-export type DeleteSubmissionOutput = z.infer<typeof DeleteSubmissionOutputSchema>;
 
 export async function deleteSubmission(input: DeleteSubmissionInput): Promise<DeleteSubmissionOutput> {
   return deleteSubmissionFlow(input);
