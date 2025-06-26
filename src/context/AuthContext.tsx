@@ -81,17 +81,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (db) {
             try {
-                // --- Forceful Cleanup: Remove '김철수' if he exists ---
+                // --- Definitive Cleanup: Remove all 6 initial mock students if they exist ---
+                const mockStudentUsernames = ['s-4-1-1', 's-4-1-2', 's-5-2-3', 's-5-2-4', 's-6-3-5', 's-6-3-6'];
                 const usersRef = collection(db, "users");
-                const q = query(usersRef, where("name", "==", "김철수"));
+                const q = query(usersRef, where("username", "in", mockStudentUsernames));
                 const querySnapshot = await getDocs(q);
                 
                 if (!querySnapshot.empty) {
-                    console.log("Found '김철수' in the database. Deleting now...");
+                    console.log("Found initial mock students in the database. Deleting them now...");
                     const batch = writeBatch(db);
                     querySnapshot.forEach((docToDelete) => {
                         const userData = docToDelete.data() as User;
-                        console.log(`Deleting user: ${userData.name} (ID: ${docToDelete.id}, Username: ${userData.username})`);
+                        console.log(`Deleting mock user: ${userData.name} (Username: ${userData.username})`);
                         batch.delete(docToDelete.ref);
 
                         // Also delete their achievements document
@@ -99,7 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         batch.delete(achievementDocRef);
                     });
                     await batch.commit();
-                    console.log("'김철수' has been permanently deleted.");
+                    console.log("Initial mock students have been permanently deleted.");
                 }
 
                 // --- Robust Seeding Logic ---
