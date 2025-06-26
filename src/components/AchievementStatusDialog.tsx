@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -144,8 +145,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     const q = query(
         collection(db, "challengeSubmissions"),
         where("userId", "==", user.username),
-        where("areaName", "==", areaName),
-        orderBy("createdAt", "desc")
+        where("areaName", "==", areaName)
     );
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -158,12 +158,21 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                 status: data.status,
             } as Submission;
         });
+        fetchedSubmissions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
         setSubmissions(fetchedSubmissions);
+        setSubmissionsLoading(false);
+    }, (error) => {
+        console.error("Error fetching submissions for dialog:", error);
+        toast({
+            variant: "destructive",
+            title: "오류",
+            description: "활동 목록을 불러오는 데 실패했습니다."
+        });
         setSubmissionsLoading(false);
     });
 
     return () => unsubscribe();
-  }, [dialogOpen, user, areaName]);
+  }, [dialogOpen, user, areaName, toast]);
 
 
   if (!user || !challengeConfig || !user.grade) return null;
@@ -194,6 +203,11 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
         setAiFeedback(result);
       } catch (error) {
         console.error("Real-time AI check failed:", error);
+        toast({
+            variant: "destructive",
+            title: "AI 분석 실패",
+            description: "AI 피드백을 가져오는 데 실패했습니다. 네트워크 연결을 확인해주세요."
+        });
       } finally {
         setIsChecking(false);
       }
@@ -202,7 +216,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     return () => {
       clearTimeout(handler);
     };
-  }, [evidenceValue, areaName, koreanName, areaConfig]);
+  }, [evidenceValue, areaName, koreanName, areaConfig, toast]);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

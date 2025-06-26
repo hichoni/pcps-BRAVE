@@ -183,6 +183,7 @@ function GalleryCard({ submission, user, onSubmissionDeleted }: { submission: Su
 
 export default function GalleryPage() {
   const { user, users, loading: authLoading, usersLoading } = useAuth();
+  const { loading: configLoading } = useChallengeConfig();
   const router = useRouter();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
@@ -314,7 +315,7 @@ export default function GalleryPage() {
   }, [submissions, userMap, gradeFilter, classFilter, searchQuery]);
 
 
-  if (authLoading || usersLoading || !user) {
+  if (authLoading || usersLoading || configLoading || !user) {
     return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
   
