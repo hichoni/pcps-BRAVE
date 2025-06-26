@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,18 +12,34 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
+  DialogClose
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from './ui/form';
 import { useAuth } from '@/context/AuthContext';
-import { AreaName } from '@/lib/config';
+import { AreaName, SubmissionStatus } from '@/lib/config';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
-import { ListChecks, Send, Loader2, UploadCloud, ThumbsUp, ThumbsDown, BrainCircuit } from 'lucide-react';
+import { ListChecks, Send, Loader2, UploadCloud, ThumbsUp, ThumbsDown, BrainCircuit, FileCheck, FileX, History } from 'lucide-react';
 import { submitEvidence } from '@/ai/flows/submit-evidence';
 import { checkCertification } from '@/ai/flows/certification-checker';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Input } from './ui/input';
+import { db } from '@/lib/firebase';
+import { collection, query, where, onSnapshot, orderBy, Timestamp } from 'firebase/firestore';
+import { Separator } from './ui/separator';
+import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+import { ScrollArea } from './ui/scroll-area';
+
+interface Submission {
+  id: string;
+  evidence: string;
+  createdAt: Date;
+  status: SubmissionStatus;
+}
 
 const evidenceSchema = z.object({
   evidence: z.string().min(10, { message: '최소 10자 이상 자세하게 입력해주세요.' }).max(1000, { message: '1000자 이내로 입력해주세요.'}),
@@ -94,12 +110,19 @@ const resizeImage = (file: File, maxWidth: number, maxHeight: number, quality: n
   });
 };
 
+const StatusInfo = {
+    approved: { icon: FileCheck, text: '승인됨', color: 'text-green-600' },
+    pending_review: { icon: History, text: '검토 중', color: 'text-yellow-600' },
+    rejected: { icon: FileX, text: '반려됨', color: 'text-red-600' }
+}
 
 export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const { user } = useAuth();
   const { challengeConfig } = useChallengeConfig();
   const { toast } = useToast();
   
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [submissionsLoading, setSubmissionsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
@@ -113,6 +136,35 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   });
 
   const evidenceValue = form.watch('evidence');
+
+  useEffect(() => {
+    if (!user || !dialogOpen || !db) return;
+
+    setSubmissionsLoading(true);
+    const q = query(
+        collection(db, "challengeSubmissions"),
+        where("userId", "==", user.username),
+        where("areaName", "==", areaName),
+        orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const fetchedSubmissions = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                evidence: data.evidence,
+                createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
+                status: data.status,
+            } as Submission;
+        });
+        setSubmissions(fetchedSubmissions);
+        setSubmissionsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [dialogOpen, user, areaName]);
+
 
   if (!user || !challengeConfig || !user.grade) return null;
   
@@ -161,7 +213,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                 title: '파일 크기 초과',
                 description: `동영상 등 미디어 파일의 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`,
             });
-            event.target.value = ''; // Reset the file input
+            event.target.value = '';
             return;
         }
 
@@ -175,7 +227,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
             return;
         }
 
-        setIsSubmitting(true); // Show loader while resizing
+        setIsSubmitting(true);
         try {
             const { dataUri, file: resizedFile } = await resizeImage(file, 1280, 720, 0.8);
             setMediaFile(resizedFile);
@@ -224,7 +276,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
       });
       
       toast({
-        title: result.progressUpdated ? '제출 완료 및 진행도 업데이트!' : '제출 완료!',
+        title: result.status === 'approved' ? '제출 및 자동 승인 완료!' : '제출 완료!',
         description: (
             <div>
                 <p className="font-semibold">{result.updateMessage}</p>
@@ -237,7 +289,6 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
       form.reset();
       setMediaFile(null);
       setMediaPreview(null);
-      setDialogOpen(false);
     } catch (error: unknown) {
       console.error('Evidence Submission Error:', error);
       const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
@@ -266,106 +317,148 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     <Dialog open={dialogOpen} onOpenChange={onDialogClose}>
       <DialogTrigger asChild>
         <Button variant="outline" className="w-full font-bold">
-          <ListChecks className="mr-2 h-4 w-4" /> 갤러리에 공유
+          <ListChecks className="mr-2 h-4 w-4" /> 내 활동 현황 / 공유
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="font-headline text-2xl">{koreanName} 활동 공유</DialogTitle>
+          <DialogTitle className="font-headline text-2xl">{koreanName} 활동 현황</DialogTitle>
           <DialogDescription>
-            {challengeName} - 나의 도전 과정을 친구들에게 공유해보세요!
+            {challengeName} - 이제까지의 활동 내역을 확인하고, 새로운 활동을 공유해보세요.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="py-2">
-            <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-3">
-                   <FormField
-                      control={form.control}
-                      name="evidence"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>활동 내용</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="여기에 나의 실천 내용을 자세히 적어주세요. (예: 어떤 책을 읽고 무엇을 느꼈는지, 봉사활동을 통해 무엇을 배우고 실천했는지 등)"
-                              {...field}
-                              rows={5}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <div className="flex items-center justify-center min-h-[5rem]">
-                        {isChecking && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse p-2">
-                                <BrainCircuit className="h-4 w-4" />
-                                <span>AI가 실시간으로 내용을 분석하고 있습니다...</span>
-                            </div>
+        <div className="py-2 space-y-4">
+            <div>
+                <h3 className="text-sm font-semibold mb-2">내 활동 목록</h3>
+                <ScrollArea className="h-40 w-full rounded-md border p-2">
+                    {submissionsLoading ? (
+                        <div className="flex items-center justify-center h-full text-muted-foreground">
+                            <Loader2 className="h-5 w-5 animate-spin"/>
+                        </div>
+                    ) : submissions.length === 0 ? (
+                        <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                            아직 제출한 활동이 없습니다.
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {submissions.map(sub => {
+                                const status = StatusInfo[sub.status];
+                                const Icon = status.icon;
+                                return (
+                                    <div key={sub.id} className="text-sm p-2 bg-secondary/50 rounded-md">
+                                        <div className="flex justify-between items-start">
+                                            <p className="text-muted-foreground truncate pr-4 flex-grow">{sub.evidence}</p>
+                                            <div className={cn("flex items-center gap-1 font-semibold text-xs shrink-0", status.color)}>
+                                                <Icon className="h-3.5 w-3.5"/>
+                                                <span>{status.text}</span>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground/70 mt-1">{format(sub.createdAt, "yyyy.MM.dd HH:mm", { locale: ko })}</p>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
+                </ScrollArea>
+            </div>
+            
+            <Separator />
+            
+            <div>
+                <h3 className="text-sm font-semibold mb-2">새 활동 공유하기</h3>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-3">
+                    <FormField
+                        control={form.control}
+                        name="evidence"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel className="sr-only">활동 내용</FormLabel>
+                            <FormControl>
+                                <Textarea
+                                placeholder="여기에 나의 실천 내용을 자세히 적어주세요. (예: 어떤 책을 읽고 무엇을 느꼈는지, 봉사활동을 통해 무엇을 배우고 실천했는지 등)"
+                                {...field}
+                                rows={3}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
                         )}
-                        {!isChecking && aiFeedback && (
-                            <Alert variant={aiFeedback.isSufficient ? "default" : "destructive"} className="p-3 w-full">
-                                {aiFeedback.isSufficient ? <ThumbsUp className="h-4 w-4" /> : <ThumbsDown className="h-4 w-4" />}
-                                <AlertTitle className="text-sm font-semibold mb-1">
-                                    {aiFeedback.isSufficient ? "AI 피드백: 좋은 내용입니다!" : "AI 피드백: 기준에 조금 부족해요."}
-                                </AlertTitle>
-                                <AlertDescription className="text-xs">
-                                    {aiFeedback.reasoning}
-                                </AlertDescription>
-                            </Alert>
-                        )}
-                    </div>
-                    
-                    {areaConfig.mediaRequired && (
-                        <>
-                            <FormField
-                                control={form.control}
-                                name="media"
-                                render={() => (
-                                <FormItem>
-                                    <FormLabel>
-                                        증명 파일 (사진/영상)
-                                        {areaConfig.mediaRequired && <span className="text-destructive ml-1">*필수</span>}
-                                    </FormLabel>
-                                    <FormControl>
-                                    <Input 
-                                        type="file" 
-                                        accept="image/*,video/*"
-                                        onChange={handleFileChange}
-                                        className="file:text-primary file:font-semibold"
-                                        disabled={isSubmitting}
-                                    />
-                                    </FormControl>
-                                    <FormDescription>
-                                        10MB 이하의 사진/동영상. 큰 사진은 자동으로 최적화됩니다.
-                                    </FormDescription>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
+                        />
 
-                            {mediaPreview && mediaFile && (
-                                <div className="mt-2">
-                                    <p className="text-sm font-medium mb-2">미리보기:</p>
-                                    {mediaFile.type.startsWith('image/') ? (
-                                        <img src={mediaPreview} alt="미리보기" className="rounded-md max-h-48 w-auto mx-auto border" />
-                                    ) : (
-                                        <video src={mediaPreview} controls className="rounded-md max-h-48 w-auto mx-auto border" />
-                                    )}
+                        <div className="flex items-center justify-center min-h-[4rem]">
+                            {isChecking && (
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse p-2">
+                                    <BrainCircuit className="h-4 w-4" />
+                                    <span>AI가 실시간으로 내용을 분석하고 있습니다...</span>
                                 </div>
                             )}
-                        </>
-                    )}
-                    
-                    <Button type="submit" className="w-full" disabled={isSubmitting || isChecking}>
-                        {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2"/>}
-                        {isSubmitting && !mediaFile ? '제출 중...' : (isSubmitting && mediaFile ? '파일 처리 중...' : '갤러리에 제출하기')}
-                    </Button>
-                </form>
-            </Form>
+                            {!isChecking && aiFeedback && (
+                                <Alert variant={aiFeedback.isSufficient ? "default" : "destructive"} className="p-2 w-full">
+                                    {aiFeedback.isSufficient ? <ThumbsUp className="h-4 w-4" /> : <ThumbsDown className="h-4 w-4" />}
+                                    <AlertTitle className="text-xs font-semibold mb-0.5">
+                                        {aiFeedback.isSufficient ? "AI 피드백: 좋은 내용입니다!" : "AI 피드백: 기준에 조금 부족해요."}
+                                    </AlertTitle>
+                                    <AlertDescription className="text-xs">
+                                        {aiFeedback.reasoning}
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+                        </div>
+                        
+                        <FormField
+                            control={form.control}
+                            name="media"
+                            render={() => (
+                            <FormItem>
+                                <FormLabel className="text-xs">
+                                    증명 파일 (사진/영상)
+                                    {areaConfig.mediaRequired && <span className="text-destructive ml-1">*필수</span>}
+                                </FormLabel>
+                                <FormControl>
+                                <Input 
+                                    type="file" 
+                                    accept="image/*,video/*"
+                                    onChange={handleFileChange}
+                                    className="file:text-primary file:font-semibold text-xs h-9"
+                                    disabled={isSubmitting}
+                                />
+                                </FormControl>
+                                <FormDescription className="text-xs">
+                                    10MB 이하. 큰 사진은 자동으로 최적화됩니다.
+                                </FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+
+                        {mediaPreview && mediaFile && (
+                            <div className="mt-2">
+                                <p className="text-xs font-medium mb-1">미리보기:</p>
+                                {mediaFile.type.startsWith('image/') ? (
+                                    <img src={mediaPreview} alt="미리보기" className="rounded-md max-h-24 w-auto mx-auto border" />
+                                ) : (
+                                    <video src={mediaPreview} controls className="rounded-md max-h-24 w-auto mx-auto border" />
+                                )}
+                            </div>
+                        )}
+                        
+                        <Button type="submit" className="w-full" disabled={isSubmitting || isChecking}>
+                            {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2"/>}
+                            {isSubmitting && !mediaFile ? '제출 중...' : (isSubmitting && mediaFile ? '파일 처리 중...' : '갤러리에 제출하기')}
+                        </Button>
+                    </form>
+                </Form>
+            </div>
         </div>
+        <DialogFooter className="sm:justify-end">
+            <DialogClose asChild>
+                <Button type="button" variant="secondary">
+                닫기
+                </Button>
+            </DialogClose>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

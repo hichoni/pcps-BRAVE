@@ -15,12 +15,38 @@ import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Loader2, Users, Undo, LogOut, Settings, Plus, Minus, Check, Trash2, PlusCircle, Upload, Search, Edit } from 'lucide-react';
+import { Loader2, Users, Undo, LogOut, Settings, Plus, Minus, Check, Trash2, PlusCircle, Upload, Search, Edit, MailCheck } from 'lucide-react';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
 import { EditStudentDialog } from '@/components/EditStudentDialog';
 import { BulkAddStudentsDialog } from '@/components/BulkAddStudentsDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { Badge } from '@/components/ui/badge';
+
+function PendingReviewsBadge() {
+    const [count, setCount] = useState(0);
+
+    useEffect(() => {
+        if (!db) return;
+        const q = query(collection(db, "challengeSubmissions"), where("status", "==", "pending_review"));
+        
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setCount(snapshot.size);
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    if (count === 0) return null;
+
+    return (
+        <Badge className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center bg-destructive text-destructive-foreground animate-pulse">
+            {count}
+        </Badge>
+    )
+}
 
 
 export default function AdminPage() {
@@ -127,6 +153,13 @@ export default function AdminPage() {
         <h1 className="text-2xl sm:text-3xl font-bold font-headline text-primary flex items-center gap-2"><Users/> 학생 성취 현황 관리</h1>
         <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap justify-end">
           <span className="font-semibold text-sm sm:text-base whitespace-nowrap">{user.name} 선생님</span>
+          <Button asChild variant="outline" size="sm" className="relative">
+            <Link href="/admin/review">
+                <MailCheck className="h-4 w-4 sm:mr-2"/>
+                <span className="hidden sm:inline">도전 활동 검토</span>
+                <PendingReviewsBadge />
+            </Link>
+          </Button>
           <Button asChild variant="outline" size="sm">
             <Link href="/admin/challenges">
                 <Settings className="h-4 w-4 sm:mr-2"/>

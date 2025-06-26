@@ -5,7 +5,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { useAuth } from './AuthContext';
 import { AreaName, AchievementsState, CertificateStatus, CERTIFICATE_THRESHOLDS, User } from '@/lib/config';
 import { db } from '@/lib/firebase';
-import { collection, doc, getDocs, setDoc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { useChallengeConfig } from './ChallengeConfigContext';
 
 type AllAchievementsState = Record<string, AchievementsState>; // Keyed by username
@@ -54,23 +54,22 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
   const { challengeConfig, loading: configLoading } = useChallengeConfig();
 
   useEffect(() => {
-    const loadData = async () => {
-      if (authLoading || configLoading) return;
+    if (authLoading || configLoading || !db || !user || !challengeConfig) {
+      if (!authLoading && !configLoading) {
+        setLoading(false);
+        setAllAchievements({});
+      }
+      return;
+    }
 
-      setLoading(true);
-      try {
-        if (!user || !challengeConfig) {
-          setAllAchievements({});
-          return;
-        }
-        
-        const fetchedAchievements: AllAchievementsState = {};
-        if (!db) {
-          console.warn("Firebase is not configured. No achievements will be loaded.");
-          fetchedAchievements[user.username] = generateInitialStateForUser(challengeConfig);
-        } else {
-          if (user.role === 'teacher') {
-            const querySnapshot = await getDocs(collection(db, 'achievements'));
+    setLoading(true);
+    
+    let unsubscribe: () => void;
+
+    if (user.role === 'teacher') {
+        const achievementsCollection = collection(db, 'achievements');
+        unsubscribe = onSnapshot(achievementsCollection, (querySnapshot) => {
+            const fetchedAchievements: AllAchievementsState = {};
             querySnapshot.forEach(doc => {
                 const data = doc.data();
                 const achievements = generateInitialStateForUser(challengeConfig);
@@ -82,10 +81,18 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
                 });
                 fetchedAchievements[doc.id] = achievements;
             });
-          } else if (user.role === 'student') {
-              const studentDocRef = doc(db, 'achievements', user.username);
-              const docSnap = await getDoc(studentDocRef);
-              if (docSnap.exists()) {
+            setAllAchievements(fetchedAchievements);
+            setLoading(false);
+        }, (error) => {
+            console.error("Failed to listen for achievement updates:", error);
+            setLoading(false);
+            setAllAchievements({});
+        });
+    } else { // student
+        const studentDocRef = doc(db, 'achievements', user.username);
+        unsubscribe = onSnapshot(studentDocRef, (docSnap) => {
+            const fetchedAchievements: AllAchievementsState = {};
+             if (docSnap.exists()) {
                   const data = docSnap.data();
                   const achievements = generateInitialStateForUser(challengeConfig);
                   Object.keys(achievements).forEach(key => {
@@ -98,25 +105,23 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
               } else {
                   fetchedAchievements[user.username] = generateInitialStateForUser(challengeConfig);
               }
-          }
-        }
-        setAllAchievements(fetchedAchievements);
-      } catch (error) {
-        console.warn("Failed to fetch achievements from Firestore", error);
-        setAllAchievements({});
-      } finally {
-        setLoading(false);
-      }
-    };
+              setAllAchievements(fetchedAchievements);
+              setLoading(false);
+        }, (error) => {
+            console.error(`Failed to listen for student ${user.username} achievement updates:`, error);
+            setLoading(false);
+            setAllAchievements({});
+        });
+    }
 
-    loadData();
+    return () => unsubscribe && unsubscribe();
+
   }, [user, authLoading, challengeConfig, configLoading]);
 
 
   const getAchievements = useCallback((username: string): AchievementsState => {
     if (!allAchievements || !challengeConfig) return generateInitialStateForUser(challengeConfig);
     
-    // Ensure all areas from current config exist for the user
     const userAchievements = allAchievements[username] || {};
     const defaultState = generateInitialStateForUser(challengeConfig);
     const finalState: AchievementsState = { ...defaultState };
@@ -131,56 +136,30 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
   }, [allAchievements, challengeConfig]);
 
   const setProgress = useCallback(async (username: string, area: AreaName, progress: number | string) => {
-    setAllAchievements(prev => {
-      if (!prev) return null;
-      const userAchievements = prev[username] || generateInitialStateForUser(challengeConfig);
-      return {
-        ...prev,
-        [username]: {
-          ...userAchievements,
-          [area]: { ...userAchievements[area], progress },
-        },
-      };
-    });
-
+    // This function is now mainly for manual teacher overrides.
     if (!db) return;
-
     try {
         const achievementDocRef = doc(db, 'achievements', username);
-        const fieldPath = `${area}.progress`;
         await setDoc(achievementDocRef, { [area]: { progress } }, { merge: true });
     } catch(e) {
         console.warn("Failed to update progress in Firestore", e);
+        // Revert UI change if Firestore fails? The real-time listener should handle this automatically.
     }
-  }, [challengeConfig]);
+  }, []);
 
   const toggleCertification = useCallback(async (username: string, area: AreaName) => {
-    const currentIsCertified = allAchievements?.[username]?.[area]?.isCertified ?? false;
-    const newIsCertified = !currentIsCertified;
-
-    setAllAchievements(prev => {
-      if (!prev) return null;
-      const userAchievements = prev[username] || generateInitialStateForUser(challengeConfig);
-      return {
-        ...prev,
-        [username]: {
-          ...userAchievements,
-          [area]: { ...userAchievements[area], isCertified: newIsCertified },
-        },
-      };
-    });
-
     if (!db) return;
-
     try {
         const achievementDocRef = doc(db, 'achievements', username);
-        const fieldPath = `${area}.isCertified`;
+        const docSnap = await getDoc(achievementDocRef);
+        const currentIsCertified = docSnap.exists() ? (docSnap.data()[area]?.isCertified ?? false) : false;
+        const newIsCertified = !currentIsCertified;
+        
         await setDoc(achievementDocRef, { [area]: { isCertified: newIsCertified } }, { merge: true });
     } catch (e) {
         console.warn("Failed to toggle certification in Firestore", e);
     }
-
-  }, [allAchievements, challengeConfig]);
+  }, []);
   
   const certificateStatus = useCallback((username: string): CertificateStatus => {
     if (!allAchievements || !allAchievements[username]) return 'Unranked';

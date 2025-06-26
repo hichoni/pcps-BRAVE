@@ -8,16 +8,15 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { db } from '@/lib/firebase';
 import { adminStorage } from '@/lib/firebase-admin';
-import { collection, addDoc, serverTimestamp, doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc, runTransaction } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { checkCertification } from './certification-checker';
-import { type SubmitEvidenceInput, type SubmitEvidenceOutput } from '@/lib/config';
+import { type SubmitEvidenceInput, type SubmitEvidenceOutput, SubmissionStatus } from '@/lib/config';
 
 export async function submitEvidence(input: SubmitEvidenceInput): Promise<SubmitEvidenceOutput> {
   return submitEvidenceFlow(input);
 }
 
-// Define the schema here, but do not export it to comply with 'use server' file constraints.
 const SubmitEvidenceInputSchema = z.object({
   userId: z.string().describe("The student's unique username."),
   userName: z.string().describe("The student's name."),
@@ -32,7 +31,7 @@ const SubmitEvidenceInputSchema = z.object({
 const SubmitEvidenceOutputSchema = z.object({
     success: z.boolean(),
     id: z.string(),
-    progressUpdated: z.boolean(),
+    status: z.nativeEnum(SubmissionStatus),
     updateMessage: z.string(),
     aiReasoning: z.string()
 });
@@ -105,26 +104,6 @@ const submitEvidenceFlow = ai.defineFlow(
     }
     
     try {
-      const submissionsCollection = collection(db, 'challengeSubmissions');
-      const docData: any = {
-        userId: input.userId,
-        userName: input.userName,
-        areaName: input.areaName,
-        koreanName: input.koreanName,
-        challengeName: input.challengeName,
-        evidence: input.evidence,
-        createdAt: serverTimestamp(),
-        likes: [],
-      };
-      
-      if (mediaUrl) {
-          docData.mediaUrl = mediaUrl;
-          docData.mediaType = input.mediaType;
-      }
-
-      const docRef = await addDoc(submissionsCollection, docData);
-      console.log("Document written with ID: ", docRef.id);
-
       const configDocRef = doc(db, 'config', 'challengeConfig');
       const configDocSnap = await getDoc(configDocRef);
       if (!configDocSnap.exists()) {
@@ -142,31 +121,53 @@ const submitEvidenceFlow = ai.defineFlow(
           evidence: input.evidence,
       });
 
-      let progressUpdated = false;
+      const isAutoApproved = areaConfig.autoApprove && aiCheckResult.isSufficient;
+      const submissionStatus: SubmissionStatus = isAutoApproved ? 'approved' : 'pending_review';
       let updateMessage = '';
 
-      if (aiCheckResult.isSufficient) {
+      if (isAutoApproved) {
+        if (areaConfig.goalType === 'numeric') {
           const achievementDocRef = doc(db, 'achievements', input.userId);
-          
-          if (areaConfig.goalType === 'numeric') {
-              const achievementDocSnap = await getDoc(achievementDocRef);
+          await runTransaction(db, async (transaction) => {
+              const achievementDocSnap = await transaction.get(achievementDocRef);
               const achievements = achievementDocSnap.exists() ? achievementDocSnap.data() : {};
               const areaState = achievements[input.areaName] || { progress: 0 };
               const newProgress = (Number(areaState.progress) || 0) + 1;
-              await setDoc(achievementDocRef, { [input.areaName]: { ...areaState, progress: newProgress } }, { merge: true });
-              progressUpdated = true;
-              updateMessage = `'${input.koreanName}' 영역의 진행도가 1만큼 증가했습니다! (현재: ${newProgress}${areaConfig.unit})`;
-          } else {
-              updateMessage = `AI가 활동을 확인했지만, 이 영역(유형: ${areaConfig.goalType})은 선생님의 확인이 필요해요.`;
-          }
+              transaction.set(achievementDocRef, { [input.areaName]: { ...areaState, progress: newProgress } }, { merge: true });
+              updateMessage = `AI가 활동을 확인하고 바로 승인했어요! 진행도가 1만큼 증가했습니다. (현재: ${newProgress}${areaConfig.unit})`;
+          });
+        } else {
+            // Objective types are never auto-approved for progress, only teacher can set it.
+            updateMessage = `AI가 활동을 확인했지만, 이 영역은 선생님의 최종 확인이 필요합니다.`;
+        }
       } else {
-          updateMessage = 'AI가 활동을 확인했지만, 아직 인증 기준에는 미치지 못했어요. 더 노력해주세요!';
+          updateMessage = '제출 완료! 선생님이 확인하신 후, 진행도에 반영될 거예요.';
       }
+      
+      const submissionsCollection = collection(db, 'challengeSubmissions');
+      const docData: any = {
+        userId: input.userId,
+        userName: input.userName,
+        areaName: input.areaName,
+        koreanName: input.koreanName,
+        challengeName: input.challengeName,
+        evidence: input.evidence,
+        createdAt: serverTimestamp(),
+        likes: [],
+        status: submissionStatus,
+      };
+      
+      if (mediaUrl) {
+          docData.mediaUrl = mediaUrl;
+          docData.mediaType = input.mediaType;
+      }
+
+      const docRef = await addDoc(submissionsCollection, docData);
 
       return { 
           success: true, 
           id: docRef.id,
-          progressUpdated,
+          status: submissionStatus,
           updateMessage,
           aiReasoning: aiCheckResult.reasoning
       };

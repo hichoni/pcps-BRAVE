@@ -37,6 +37,7 @@ const formSchema = z.object({
   options: z.array(z.object({ value: z.string().min(1, '옵션 값은 비워둘 수 없습니다.') })),
   externalUrl: z.string().url({ message: "올바른 URL 형식을 입력해주세요." }).optional().or(z.literal('')),
   mediaRequired: z.boolean().optional(),
+  autoApprove: z.boolean().optional(),
 }).refine(data => {
     if (data.goalType === 'numeric') {
         return data.goal['4'] !== undefined && data.goal['5'] !== undefined && data.goal['6'] !== undefined;
@@ -77,6 +78,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
       options: [],
       externalUrl: '',
       mediaRequired: false,
+      autoApprove: false,
     },
   });
 
@@ -102,6 +104,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
         options: area.config.options?.map(o => ({ value: o })) || [],
         externalUrl: area.config.externalUrl || '',
         mediaRequired: area.config.mediaRequired || false,
+        autoApprove: area.config.autoApprove || false,
       });
     } else {
       form.reset({
@@ -116,6 +119,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
         options: [{ value: '' }],
         externalUrl: '',
         mediaRequired: false,
+        autoApprove: false,
       });
     }
   }, [area, form, open]);
@@ -141,6 +145,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
       options: data.goalType === 'objective' ? data.options.map(o => o.value) : [],
       externalUrl: data.externalUrl || undefined,
       mediaRequired: data.mediaRequired,
+      autoApprove: data.autoApprove,
     };
     
     try {
@@ -362,6 +367,26 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
                     <div className="space-y-1 leading-none">
                       <FormLabel>
                         미디어(사진/영상) 제출 필수
+                      </FormLabel>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="autoApprove"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
+                     <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>
+                        AI 자동 인증
                       </FormLabel>
                     </div>
                   </FormItem>

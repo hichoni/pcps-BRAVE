@@ -1,4 +1,4 @@
-import { BookOpen, HeartHandshake, Bike, Palette, Laptop, Award, Medal, Gem, ShieldOff, BrainCircuit, ExternalLink, UploadCloud } from 'lucide-react';
+import { BookOpen, HeartHandshake, Bike, Palette, Laptop, Award, Medal, Gem, ShieldOff, BrainCircuit, ExternalLink, UploadCloud, FileCheck, FileX, History } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export type AreaName = string;
@@ -64,6 +64,7 @@ export type AreaConfig = {
   unit: string;                  // Unit for 'numeric', or a descriptive noun for 'objective'
   externalUrl?: string;
   mediaRequired?: boolean;
+  autoApprove?: boolean;
   goalDescription?: string;
 };
 
@@ -71,6 +72,7 @@ export type StoredAreaConfig = Omit<AreaConfig, 'icon' | 'name'> & {
   iconName: string;
   externalUrl?: string;
   mediaRequired?: boolean;
+  autoApprove?: boolean;
   goalDescription?: string;
 };
 
@@ -86,6 +88,9 @@ export const ICONS: Record<string, LucideIcon> = {
     Gem,
     ExternalLink,
     UploadCloud,
+    FileCheck,
+    FileX,
+    History,
 };
 
 export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
@@ -97,6 +102,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goalType: 'numeric',
     goal: { '4': 5, '5': 5, '6': 5 },
     unit: '권',
+    autoApprove: true,
   },
   Volunteering: {
     koreanName: '봉사',
@@ -107,6 +113,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goal: { '4': 10, '5': 10, '6': 10 },
     unit: '시간',
     mediaRequired: true,
+    autoApprove: false, // Requires photo review
   },
   'Physical-Education': {
     koreanName: '체육',
@@ -117,6 +124,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goal: {},
     options: ['1등급', '2등급', '3등급', '4등급', '5등급'],
     unit: '등급',
+    autoApprove: false, // Teacher must check official results
     goalDescription: 'PAPS 기준 충족',
   },
   Arts: {
@@ -128,6 +136,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goal: { '4': 1, '5': 1, '6': 1 },
     unit: '회 참여',
     mediaRequired: true,
+    autoApprove: false, // Requires photo/video review
   },
   Information: {
     koreanName: '정보',
@@ -138,11 +147,13 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goal: {},
     options: ['입문', '초보', '중수', '고수', '달인'],
     unit: '레벨',
+    autoApprove: false, // Teacher must check official results
     goalDescription: "'달인' 등급",
   },
 };
 
 // --- Types for Server Actions ---
+export type SubmissionStatus = 'approved' | 'rejected' | 'pending_review';
 
 // For submit-evidence.ts
 export interface SubmitEvidenceInput {
@@ -159,9 +170,9 @@ export interface SubmitEvidenceInput {
 export interface SubmitEvidenceOutput {
     success: boolean;
     id: string;
-    progressUpdated: boolean;
-    updateMessage: string;
+    status: SubmissionStatus;
     aiReasoning: string;
+    updateMessage: string;
 }
 
 // For certification-checker.ts
@@ -185,4 +196,16 @@ export interface DeleteSubmissionInput {
 export interface DeleteSubmissionOutput {
   success: boolean;
   message: string;
+}
+
+// For review-submission.ts
+export interface ReviewSubmissionInput {
+  submissionId: string;
+  isApproved: boolean;
+  teacherId: string;
+}
+
+export interface ReviewSubmissionOutput {
+    success: boolean;
+    message: string;
 }
