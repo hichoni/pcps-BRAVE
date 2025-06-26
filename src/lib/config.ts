@@ -1,3 +1,4 @@
+
 import { BookOpen, HeartHandshake, Bike, Palette, Laptop, Award, Medal, Gem, ShieldOff, BrainCircuit, ExternalLink, UploadCloud, FileCheck, FileX, History } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -17,6 +18,8 @@ export interface User {
   areaName?: AreaName;
 }
 
+// This list now only contains teacher accounts.
+// Student accounts should be added via the admin dashboard.
 export const MOCK_USERS: User[] = [
     { id: 99, username: 'master', pin: '1234', name: '마스터선생', role: 'teacher' },
     { id: 101, username: '인문', pin: '1234', name: '인문 선생님', role: 'teacher', areaName: 'Humanities' },

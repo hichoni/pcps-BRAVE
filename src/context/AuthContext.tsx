@@ -76,55 +76,69 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    const seedInitialData = async () => {
-        if (!db) return;
-        try {
-            const batch = writeBatch(db);
-            let writesMade = false;
+    const initializeAuthAndCleanup = async () => {
+        setLoading(true);
 
-            // Seed users only if the collection is completely empty.
-            // This prevents re-adding deleted users on app restart.
-            const usersQuery = query(collection(db, "users"), limit(1));
-            const usersSnapshot = await getDocs(usersQuery);
-            if (usersSnapshot.empty) {
-                console.log("Users collection is empty. Seeding initial user data...");
-                for (const userToSeed of MOCK_USERS) {
-                    const userDocRef = doc(db, "users", String(userToSeed.id));
-                    batch.set(userDocRef, userToSeed);
+        if (db) {
+            try {
+                // --- Forceful Cleanup: Remove '김철수' if he exists ---
+                const usersRef = collection(db, "users");
+                const q = query(usersRef, where("name", "==", "김철수"));
+                const querySnapshot = await getDocs(q);
+                
+                if (!querySnapshot.empty) {
+                    console.log("Found '김철수' in the database. Deleting now...");
+                    const batch = writeBatch(db);
+                    querySnapshot.forEach((docToDelete) => {
+                        const userData = docToDelete.data() as User;
+                        console.log(`Deleting user: ${userData.name} (ID: ${docToDelete.id}, Username: ${userData.username})`);
+                        batch.delete(docToDelete.ref);
+
+                        // Also delete their achievements document
+                        const achievementDocRef = doc(db, 'achievements', userData.username);
+                        batch.delete(achievementDocRef);
+                    });
+                    await batch.commit();
+                    console.log("'김철수' has been permanently deleted.");
                 }
-                writesMade = true;
-            }
-            
-            // Check and seed config if it doesn't exist
-            const configDocRef = doc(db, 'config/challengeConfig');
-            const configDocSnap = await getDoc(configDocRef);
-            if (!configDocSnap.exists()) {
-                batch.set(configDocRef, DEFAULT_AREAS_CONFIG);
-                writesMade = true;
-            }
 
-            if(writesMade) {
-                console.log("Adding missing initial data to Firestore...");
-                await batch.commit();
-                console.log("Database updated successfully.");
+                // --- Robust Seeding Logic ---
+                // Seed initial data ONLY if the users collection is completely empty.
+                const usersQuery = query(collection(db, "users"), limit(1));
+                const usersSnapshot = await getDocs(usersQuery);
+                if (usersSnapshot.empty) {
+                    console.log("Users collection is empty. Seeding initial teacher data...");
+                    const seedBatch = writeBatch(db);
+                    // MOCK_USERS now only contains teachers, so this is safe.
+                    for (const userToSeed of MOCK_USERS) {
+                        const userDocRef = doc(db, "users", String(userToSeed.id));
+                        seedBatch.set(userDocRef, userToSeed);
+                    }
+                    // Seed config as well
+                    const configDocRef = doc(db, 'config/challengeConfig');
+                    const configDocSnap = await getDoc(configDocRef);
+                     if (!configDocSnap.exists()) {
+                        seedBatch.set(configDocRef, DEFAULT_AREAS_CONFIG);
+                     }
+                    
+                    await seedBatch.commit();
+                    console.log("Initial data seeding complete.");
+                }
+            } catch (error) {
+                 console.error("AuthContext: Error during cleanup or seeding.", error);
             }
-
-        } catch (error) {
-            console.error("AuthContext: Failed to check/seed initial data. This might be a connection issue or Firestore is not enabled.", error);
         }
-    }
 
-    const initializeAuth = async () => {
-      setLoading(true);
-      await seedInitialData();
-      const sessionUser = sessionStorage.getItem('user');
-      if (sessionUser) {
-        setUser(JSON.parse(sessionUser));
-      }
-      await fetchUsers();
-      setLoading(false);
+        // --- Continue with normal startup ---
+        const sessionUser = sessionStorage.getItem('user');
+        if (sessionUser) {
+            setUser(JSON.parse(sessionUser));
+        }
+        await fetchUsers(); // Fetch the now-clean user list
+        setLoading(false);
     };
-    initializeAuth();
+
+    initializeAuthAndCleanup();
   }, [fetchUsers]);
   
   const ensureUsersLoaded = useCallback(async (): Promise<User[]> => {
@@ -445,7 +459,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
-    
-
-    
