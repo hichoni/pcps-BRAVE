@@ -47,20 +47,21 @@ const submitEvidenceFlow = ai.defineFlow(
   async (input) => {
     if (!db) {
       console.error("Firestore is not initialized.");
-      throw new Error("Database connection failed.");
+      throw new Error("데이터베이스 연결 실패: Firestore가 초기화되지 않았습니다.");
     }
     
     let mediaUrl: string | undefined = undefined;
 
     if (input.mediaDataUri && input.mediaType) {
         if (!adminStorage) {
-            throw new Error("Firebase Admin Storage is not configured. Please check your .env.local file for FIREBASE_ADMIN_CREDENTIALS_JSON.");
+            throw new Error("서버 설정 오류: Firebase Admin SDK가 초기화되지 않았습니다. service-account.json 파일이 올바른지, 혹은 서버 로그에 다른 오류가 있는지 확인해주세요.");
         }
         try {
-            const bucket = adminStorage.bucket();
-            if (!bucket) {
-              throw new Error("Firebase Storage bucket is not available. Check that NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET is set correctly in .env.local");
+            const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+            if (!bucketName) {
+                throw new Error("서버 설정 오류: .env.local 파일에 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값이 설정되지 않았습니다.");
             }
+            const bucket = adminStorage.bucket(bucketName);
 
             const fileExtension = input.mediaType.split('/')[1] || 'jpeg';
             const filePath = `evidence/${input.userId}/${Date.now()}.${fileExtension}`;
@@ -82,7 +83,13 @@ const submitEvidenceFlow = ai.defineFlow(
         
         } catch (error: any) {
             console.error("Firebase Admin Storage upload error:", error);
-            throw new Error("파일 업로드 중 서버 오류가 발생했습니다. 관리자에게 문의해주세요.");
+            let detail = "자세한 내용은 서버 로그를 확인해주세요.";
+            if (error.code === 'storage/object-not-found' || (error.message && error.message.includes('not found'))) {
+                 detail = `Firebase Storage 버킷을 찾을 수 없습니다. 버킷 이름이 올바른지 확인해주세요: '${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || ''}'`;
+            } else if (error.code === 'storage/unauthorized' || (error.message && error.message.includes('permission'))) {
+                detail = "Firebase Storage에 파일을 업로드할 권한이 없습니다. 서비스 계정(service-account.json)의 IAM 권한을 확인해주세요.";
+            }
+            throw new Error(`파일 업로드 중 서버 오류가 발생했습니다. ${detail}`);
         }
     }
     
@@ -109,7 +116,7 @@ const submitEvidenceFlow = ai.defineFlow(
       return { success: true, id: docRef.id };
     } catch (e) {
       console.error("Error adding document to Firestore: ", e);
-      throw new Error("Failed to submit evidence to the database.");
+      throw new Error("데이터베이스에 제출 정보를 저장하는 데 실패했습니다.");
     }
   }
 );

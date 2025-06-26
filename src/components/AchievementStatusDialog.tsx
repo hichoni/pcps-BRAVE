@@ -54,7 +54,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   if (!areaConfig) return null;
   
   const { koreanName, challengeName } = areaConfig;
-  const isMediaRequired = areaName === 'Volunteering' || areaName === 'Arts';
+  const isMediaRequired = !!areaConfig.mediaRequired;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -103,12 +103,14 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
       setMediaFile(null);
       setMediaPreview(null);
       setDialogOpen(false);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Evidence Submission Error:', error);
+      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
       toast({
         variant: 'destructive',
         title: '제출 오류',
-        description: '제출 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.',
+        description: errorMessage,
+        duration: 9000,
       });
     } finally {
       setIsSubmitting(false);

@@ -63,13 +63,13 @@ export type AreaConfig = {
   options?: string[];             // For 'objective' type
   unit: string;                  // Unit for 'numeric', or a descriptive noun for 'objective'
   externalUrl?: string;
-  requiresPhoto?: boolean;
+  mediaRequired?: boolean;
 };
 
 export type StoredAreaConfig = Omit<AreaConfig, 'icon' | 'name'> & { 
   iconName: string;
   externalUrl?: string;
-  requiresPhoto?: boolean;
+  mediaRequired?: boolean;
 };
 
 export const ICONS: Record<string, LucideIcon> = {
@@ -105,7 +105,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goalType: 'numeric',
     goal: { '4': 10, '5': 10, '6': 10 },
     unit: '시간',
-    requiresPhoto: true,
+    mediaRequired: true,
   },
   'Physical-Education': {
     koreanName: '체육',
@@ -126,7 +126,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goal: { '4': 1, '5': 1, '6': 1 },
     unit: '회 참여',
     externalUrl: 'https://padlet.com/gallery/portfolios',
-    requiresPhoto: true,
+    mediaRequired: true,
   },
   Information: {
     koreanName: '정보',
