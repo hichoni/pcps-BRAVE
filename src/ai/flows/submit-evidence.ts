@@ -10,7 +10,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { db } from '@/lib/firebase';
 import { adminStorage } from '@/lib/firebase-admin';
-import { collection, addDoc, serverTimestamp, doc, getDoc, runTransaction } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc, runTransaction, query, where, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { checkCertification } from './certification-checker';
 import { analyzeMediaEvidence } from './analyze-typing-test'; // Now a generic media analyzer
@@ -52,6 +52,42 @@ const submitEvidenceFlow = ai.defineFlow(
       throw new Error("데이터베이스 연결 실패: Firestore가 초기화되지 않았습니다.");
     }
     
+    const configDocRef = doc(db, 'config', 'challengeConfig');
+    const configDocSnap = await getDoc(configDocRef);
+    if (!configDocSnap.exists()) {
+        throw new Error("도전 영역 설정을 찾을 수 없습니다. 관리자에게 문의해주세요.");
+    }
+    const challengeConfig = configDocSnap.data();
+    const areaConfig = challengeConfig[input.areaName];
+    if (!areaConfig) {
+        throw new Error(`'${input.koreanName}' 도전 영역의 설정을 찾을 수 없습니다.`);
+    }
+
+    // Submission interval check
+    if (areaConfig.submissionIntervalMinutes && areaConfig.submissionIntervalMinutes > 0) {
+        const submissionsCollection = collection(db, 'challengeSubmissions');
+        const q = query(
+            submissionsCollection,
+            where("userId", "==", input.userId),
+            where("areaName", "==", input.areaName),
+            orderBy("createdAt", "desc"),
+            limit(1)
+        );
+
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+            const lastSubmission = querySnapshot.docs[0].data();
+            const lastSubmissionTime = (lastSubmission.createdAt as Timestamp).toDate();
+            const now = new Date();
+            const minutesSinceLastSubmission = (now.getTime() - lastSubmissionTime.getTime()) / (1000 * 60);
+
+            if (minutesSinceLastSubmission < areaConfig.submissionIntervalMinutes) {
+                const minutesToWait = Math.ceil(areaConfig.submissionIntervalMinutes - minutesSinceLastSubmission);
+                throw new Error(`제출 간격 제한: 다음 제출까지 ${minutesToWait}분 남았습니다.`);
+            }
+        }
+    }
+
     let mediaUrl: string | undefined = undefined;
 
     if (input.mediaDataUri && input.mediaType) {
@@ -107,17 +143,6 @@ const submitEvidenceFlow = ai.defineFlow(
     }
     
     try {
-      const configDocRef = doc(db, 'config', 'challengeConfig');
-      const configDocSnap = await getDoc(configDocRef);
-      if (!configDocSnap.exists()) {
-          throw new Error("도전 영역 설정을 찾을 수 없습니다. 관리자에게 문의해주세요.");
-      }
-      const challengeConfig = configDocSnap.data();
-      const areaConfig = challengeConfig[input.areaName];
-      if (!areaConfig) {
-          throw new Error(`'${input.koreanName}' 도전 영역의 설정을 찾을 수 없습니다.`);
-      }
-
       let aiSufficient = false;
       let aiReasoning = '';
       let submissionStatus: SubmissionStatus;

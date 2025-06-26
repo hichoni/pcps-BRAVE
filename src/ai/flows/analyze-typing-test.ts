@@ -66,6 +66,9 @@ const analyzeMediaEvidenceFlow = ai.defineFlow(
   },
   async (input) => {
     const { output } = await prompt(input);
-    return output!;
+    if (!output) {
+      throw new Error("AI 모델이 유효한 응답을 생성하지 못했습니다. 이미지나 프롬프트를 확인 후 다시 시도해주세요.");
+    }
+    return output;
   }
 );

@@ -44,6 +44,7 @@ const formSchema = z.object({
   showInGallery: z.boolean().optional(),
   aiVisionCheck: z.boolean().optional(),
   aiVisionPrompt: z.string().optional(),
+  submissionIntervalMinutes: z.coerce.number().min(0).optional(),
 }).refine(data => {
     if (data.goalType === 'numeric') {
         return data.goal['4'] !== undefined && data.goal['5'] !== undefined && data.goal['6'] !== undefined;
@@ -88,6 +89,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
       showInGallery: true,
       aiVisionCheck: false,
       aiVisionPrompt: '',
+      submissionIntervalMinutes: 0,
     },
   });
 
@@ -119,6 +121,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
         showInGallery: area.config.showInGallery ?? true,
         aiVisionCheck: area.config.aiVisionCheck ?? false,
         aiVisionPrompt: area.config.aiVisionPrompt ?? '',
+        submissionIntervalMinutes: area.config.submissionIntervalMinutes ?? 0,
       });
     } else {
       form.reset({
@@ -137,6 +140,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
         showInGallery: true,
         aiVisionCheck: false,
         aiVisionPrompt: '',
+        submissionIntervalMinutes: 0,
       });
     }
   }, [area, form, open]);
@@ -172,6 +176,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
       showInGallery: data.showInGallery,
       aiVisionCheck: data.aiVisionCheck,
       aiVisionPrompt: data.aiVisionPrompt,
+      submissionIntervalMinutes: data.submissionIntervalMinutes,
     };
     
     try {
@@ -390,6 +395,30 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
                   <h4 className="text-sm font-semibold text-foreground">세부 설정</h4>
                   {goalType === 'numeric' &&
                   <>
+                  <FormField
+                    control={form.control}
+                    name="submissionIntervalMinutes"
+                    render={({ field }) => (
+                      <FormItem>
+                         <FormLabel>
+                          제출 간격 제한 (분)
+                         </FormLabel>
+                         <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="예: 20"
+                            {...field}
+                            onChange={event => field.onChange(event.target.value === '' ? undefined : +event.target.value)}
+                            value={field.value ?? ''}
+                          />
+                        </FormControl>
+                        <FormDescription className="text-xs">
+                          학생이 활동을 다시 제출하기까지 기다려야 하는 최소 시간입니다. 0 또는 비워두면 제한이 없습니다.
+                        </FormDescription>
+                         <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <FormField
                     control={form.control}
                     name="showInGallery"

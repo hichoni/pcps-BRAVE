@@ -70,6 +70,7 @@ export type AreaConfig = {
   showInGallery?: boolean;
   aiVisionCheck?: boolean;
   aiVisionPrompt?: string;
+  submissionIntervalMinutes?: number;
 };
 
 export type StoredAreaConfig = Omit<AreaConfig, 'icon' | 'name'> & { 
@@ -81,6 +82,7 @@ export type StoredAreaConfig = Omit<AreaConfig, 'icon' | 'name'> & {
   showInGallery?: boolean;
   aiVisionCheck?: boolean;
   aiVisionPrompt?: string;
+  submissionIntervalMinutes?: number;
 };
 
 export const ICONS: Record<string, LucideIcon> = {
@@ -115,6 +117,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     showInGallery: true,
     aiVisionCheck: false,
     aiVisionPrompt: '',
+    submissionIntervalMinutes: 1440, // 1 day
   },
   Volunteering: {
     koreanName: '봉사',
@@ -129,6 +132,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     showInGallery: true,
     aiVisionCheck: false,
     aiVisionPrompt: '',
+    submissionIntervalMinutes: 0,
   },
   'Physical-Education': {
     koreanName: '체육',
@@ -144,6 +148,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     showInGallery: false,
     aiVisionCheck: false,
     aiVisionPrompt: '',
+    submissionIntervalMinutes: 0,
   },
   Arts: {
     koreanName: '예술',
@@ -159,6 +164,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     showInGallery: true,
     aiVisionCheck: false,
     aiVisionPrompt: '',
+    submissionIntervalMinutes: 0,
   },
   Information: {
     koreanName: '정보',
@@ -180,6 +186,7 @@ Your task is to determine if the image is a typing test result and if the typing
 3.  Look for a number representing the typing speed, often labeled as "타수", "현재 타수", or similar. Extract this number. If you cannot find a speed, the evidence is insufficient.
 4.  Compare the extracted typing speed to 200. If the speed is 200 or greater, the evidence is sufficient. Otherwise, it is not.
 5.  Provide a brief, one-sentence reasoning for your decision in Korean. For example: "타자 속도(350타)가 200타 이상이므로 유효합니다." or "타자 연습 결과 이미지가 아니거나 타수를 인식할 수 없습니다."`,
+    submissionIntervalMinutes: 10,
   },
 };
 
