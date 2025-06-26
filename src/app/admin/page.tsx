@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useAchievements } from '@/context/AchievementsContext';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
-import { User, AreaName } from '@/lib/config';
+import { User, AreaName, STATUS_CONFIG } from '@/lib/config';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -15,16 +15,22 @@ import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Loader2, Users, Undo, LogOut, Settings, Plus, Minus, Check, Trash2, PlusCircle, Upload, Search } from 'lucide-react';
+import { Loader2, Users, Undo, LogOut, Settings, Plus, Minus, Check, Trash2, PlusCircle, Upload, Search, Edit } from 'lucide-react';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
+import { EditStudentDialog } from '@/components/EditStudentDialog';
 import { BulkAddStudentsDialog } from '@/components/BulkAddStudentsDialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
+
 
 export default function AdminPage() {
   const { user, users, loading: authLoading, logout, resetPin, deleteUser } = useAuth();
-  const { getAchievements, setProgress, toggleCertification, loading: achievementsLoading } = useAchievements();
+  const { getAchievements, setProgress, toggleCertification, loading: achievementsLoading, certificateStatus } = useAchievements();
   const { challengeConfig, loading: configLoading } = useChallengeConfig();
   const router = useRouter();
   const { toast } = useToast();
+  
+  const [studentToEdit, setStudentToEdit] = useState<User | null>(null);
   const [studentToDelete, setStudentToDelete] = useState<User | null>(null);
   const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
   const [isBulkAddDialogOpen, setIsBulkAddDialogOpen] = useState(false);
@@ -115,6 +121,7 @@ export default function AdminPage() {
   const challengeAreaKeys = Object.keys(challengeConfig).sort();
 
   return (
+    <TooltipProvider>
     <div className="container mx-auto px-4 py-8">
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 pb-4 border-b">
         <h1 className="text-2xl sm:text-3xl font-bold font-headline text-primary flex items-center gap-2"><Users/> 학생 성취 현황 관리</h1>
@@ -191,20 +198,29 @@ export default function AdminPage() {
               <Table className="min-w-full">
                   <TableHeader>
                       <TableRow>
-                          <TableHead className="w-[220px] sticky left-0 bg-card z-10">학생 정보</TableHead>
+                          <TableHead className="w-[200px] sticky left-0 bg-card z-10">학생 정보</TableHead>
+                          <TableHead className="w-[120px] sticky left-[200px] bg-card z-10 text-center">인증 등급</TableHead>
                           {challengeAreaKeys.map(area => (
-                              <TableHead key={area} className="text-center min-w-[180px]">{challengeConfig[area].koreanName}</TableHead>
+                              <TableHead key={area} className="text-center min-w-[170px]">{challengeConfig[area].koreanName}</TableHead>
                           ))}
-                          <TableHead className="text-center w-[220px]">관리</TableHead>
+                          <TableHead className="text-center w-[120px]">관리</TableHead>
                       </TableRow>
                   </TableHeader>
                   <TableBody>
                       {students.map(student => {
                           const studentAchievements = getAchievements(student.username);
+                          const studentStatus = certificateStatus(student.username);
+                          const statusInfo = STATUS_CONFIG[studentStatus];
                           return (
-                              <TableRow key={student.id}>
-                                  <TableCell className="font-medium whitespace-nowrap sticky left-0 bg-card z-10 w-[220px]">
+                              <TableRow key={student.id} className="h-14">
+                                  <TableCell className="font-medium whitespace-nowrap sticky left-0 bg-card z-10 w-[200px] px-2 py-1 align-middle">
                                       {`${student.grade}학년 ${student.classNum}반 ${student.studentNum}번 ${student.name}`}
+                                  </TableCell>
+                                  <TableCell className="sticky left-[200px] bg-card z-10 w-[120px] px-2 py-1 align-middle">
+                                    <div className="flex items-center justify-center gap-1.5 font-semibold">
+                                        <statusInfo.icon className={cn("h-4 w-4", statusInfo.color)} />
+                                        <span className={cn(statusInfo.color)}>{statusInfo.label}</span>
+                                    </div>
                                   </TableCell>
                                   {challengeAreaKeys.map(area => {
                                       const areaConfig = challengeConfig[area];
@@ -212,7 +228,7 @@ export default function AdminPage() {
                                       const progress = studentAchievements[area]?.progress ?? (areaConfig.goalType === 'numeric' ? 0 : '');
                                       const isCertified = studentAchievements[area]?.isCertified ?? false;
                                       return (
-                                          <TableCell key={area}>
+                                          <TableCell key={area} className="px-2 py-1 align-middle">
                                               <div className="flex items-center justify-center gap-1">
                                                   {areaConfig.goalType === 'numeric' ? (
                                                       <>
@@ -229,7 +245,7 @@ export default function AdminPage() {
                                                         value={progress as string || ''}
                                                         onValueChange={(value) => handleProgressUpdate(student.username, area, value === '__NONE__' ? '' : value)}
                                                       >
-                                                        <SelectTrigger className="w-[120px] h-8">
+                                                        <SelectTrigger className="w-[110px] h-8 text-xs">
                                                             <SelectValue placeholder="선택" />
                                                         </SelectTrigger>
                                                         <SelectContent>
@@ -252,16 +268,34 @@ export default function AdminPage() {
                                           </TableCell>
                                       )
                                   })}
-                                  <TableCell className="text-center w-[220px]">
-                                      <div className="flex items-center justify-center gap-2">
-                                          <Button variant="outline" size="sm" className="h-8 px-2 whitespace-nowrap" onClick={() => handleResetPin(student.username)}>
-                                              <Undo className="mr-1 h-3.5 w-3.5" /> PIN 초기화
-                                          </Button>
-                                          <AlertDialogTrigger asChild>
-                                              <Button variant="destructive" size="sm" className="h-8 px-2 whitespace-nowrap" onClick={() => setStudentToDelete(student)}>
-                                                  <Trash2 className="mr-1 h-3.5 w-3.5" /> 삭제
-                                              </Button>
-                                          </AlertDialogTrigger>
+                                  <TableCell className="text-center w-[120px] px-2 py-1 align-middle">
+                                      <div className="flex items-center justify-center gap-1">
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setStudentToEdit(student)}>
+                                                        <Edit className="h-4 w-4" />
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent><p>학생 정보 수정</p></TooltipContent>
+                                            </Tooltip>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleResetPin(student.username)}>
+                                                        <Undo className="h-4 w-4" />
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent><p>PIN 초기화</p></TooltipContent>
+                                            </Tooltip>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <AlertDialogTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setStudentToDelete(student)}>
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </AlertDialogTrigger>
+                                                </TooltipTrigger>
+                                                <TooltipContent><p>학생 삭제</p></TooltipContent>
+                                            </Tooltip>
                                       </div>
                                   </TableCell>
                               </TableRow>
@@ -290,7 +324,9 @@ export default function AdminPage() {
       </AlertDialog>
 
       <AddStudentDialog open={isAddStudentDialogOpen} onOpenChange={setIsAddStudentDialogOpen} />
+      <EditStudentDialog open={!!studentToEdit} onOpenChange={(open) => !open && setStudentToEdit(null)} student={studentToEdit} />
       <BulkAddStudentsDialog open={isBulkAddDialogOpen} onOpenChange={setIsBulkAddDialogOpen} />
     </div>
+    </TooltipProvider>
   );
 }

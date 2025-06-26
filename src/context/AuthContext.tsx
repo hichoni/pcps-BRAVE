@@ -29,6 +29,7 @@ interface AuthContextType {
   resetPin: (username: string) => Promise<void>;
   deleteUser: (username:string) => Promise<void>;
   addUser: (studentData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>) => Promise<{ success: boolean; message: string }>;
+  updateUser: (userId: number, studentData: Partial<Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>>) => Promise<{ success: boolean; message: string }>;
   bulkAddUsers: (studentsData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>[]) => Promise<{ successCount: number; failCount: number; errors: string[] }>;
 }
 
@@ -288,6 +289,74 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [ensureUsersLoaded]);
 
+  const updateUser = useCallback(async (userId: number, studentData: Partial<Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>>): Promise<{ success: boolean; message: string }> => {
+    if (!db) return { success: false, message: "데이터베이스에 연결되지 않았습니다." };
+
+    const currentUsers = await ensureUsersLoaded();
+    const targetUser = currentUsers.find(u => u.id === userId);
+
+    if (!targetUser) {
+        return { success: false, message: "수정할 학생을 찾을 수 없습니다." };
+    }
+
+    const updatedUserData = { ...targetUser, ...studentData };
+    
+    if (studentData.grade || studentData.classNum || studentData.studentNum) {
+        const studentExists = currentUsers.some(u =>
+          u.id !== userId &&
+          u.role === 'student' &&
+          Number(u.grade) === Number(updatedUserData.grade) &&
+          Number(u.classNum) === Number(updatedUserData.classNum) &&
+          Number(u.studentNum) === Number(updatedUserData.studentNum)
+        );
+
+        if (studentExists) {
+          return { success: false, message: `${updatedUserData.grade}학년 ${updatedUserData.classNum}반 ${updatedUserData.studentNum}번 학생은 이미 존재합니다.` };
+        }
+    }
+    
+    const oldUsername = targetUser.username;
+    const newUsername = `s-${updatedUserData.grade}-${updatedUserData.classNum}-${updatedUserData.studentNum}`;
+    const usernameChanged = oldUsername !== newUsername;
+
+    const finalUserData = {
+        ...updatedUserData,
+        username: newUsername
+    };
+
+    try {
+        const batch = writeBatch(db);
+        const userDocRef = doc(db, "users", String(userId));
+        
+        if (usernameChanged) {
+            const oldAchievementRef = doc(db, 'achievements', oldUsername);
+            const oldAchievementSnap = await getDoc(oldAchievementRef);
+            
+            if (oldAchievementSnap.exists()) {
+                const newAchievementRef = doc(db, 'achievements', newUsername);
+                batch.set(newAchievementRef, oldAchievementSnap.data());
+                batch.delete(oldAchievementRef);
+            }
+        }
+        
+        const { id, ...dataToWrite } = finalUserData;
+        batch.update(userDocRef, dataToWrite);
+
+        await batch.commit();
+
+        setUsers(prev => prev.map(u => u.id === userId ? finalUserData : u));
+        if (user && user.id === userId) {
+            setUser(finalUserData);
+            sessionStorage.setItem('user', JSON.stringify(finalUserData));
+        }
+
+        return { success: true, message: "학생 정보가 성공적으로 수정되었습니다." };
+    } catch (e) {
+        console.error("Failed to update user", e);
+        return { success: false, message: "학생 정보 수정에 실패했습니다." };
+    }
+  }, [ensureUsersLoaded, user]);
+
   const bulkAddUsers = useCallback(async (studentsData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>[]): Promise<{ successCount: number; failCount: number; errors: string[] }> => {
     let successCount = 0;
     let failCount = 0;
@@ -353,7 +422,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   return (
-    <AuthContext.Provider value={{ user, users, loading, usersLoading, login, logout, updatePin, resetPin, deleteUser, addUser, bulkAddUsers }}>
+    <AuthContext.Provider value={{ user, users, loading, usersLoading, login, logout, updatePin, resetPin, deleteUser, addUser, updateUser, bulkAddUsers }}>
       {children}
     </AuthContext.Provider>
   );
