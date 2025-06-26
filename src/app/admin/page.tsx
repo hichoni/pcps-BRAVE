@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Badge } from '@/components/ui/badge';
+import { BulkDeleteStudentsDialog } from '@/components/BulkDeleteStudentsDialog';
 
 function PendingReviewsBadge() {
     const { user } = useAuth();
@@ -71,6 +72,7 @@ export default function AdminPage() {
   const [studentToDelete, setStudentToDelete] = useState<User | null>(null);
   const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
   const [isBulkAddDialogOpen, setIsBulkAddDialogOpen] = useState(false);
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
   
   const [gradeFilter, setGradeFilter] = useState<string>('all');
   const [classFilter, setClassFilter] = useState<string>('all');
@@ -201,6 +203,9 @@ export default function AdminPage() {
                             </Button>
                             <Button variant="outline" onClick={() => setIsBulkAddDialogOpen(true)}>
                                 <Upload className="mr-2"/> 일괄 등록
+                            </Button>
+                             <Button variant="destructive" onClick={() => setIsBulkDeleteDialogOpen(true)} className="bg-destructive hover:bg-destructive/90">
+                                <Trash2 className="mr-2"/> 일괄 삭제
                             </Button>
                         </div>
                     )}
@@ -378,6 +383,7 @@ export default function AdminPage() {
       <AddStudentDialog open={isAddStudentDialogOpen} onOpenChange={setIsAddStudentDialogOpen} />
       <EditStudentDialog open={!!studentToEdit} onOpenChange={(open) => !open && setStudentToEdit(null)} student={studentToEdit} />
       <BulkAddStudentsDialog open={isBulkAddDialogOpen} onOpenChange={setIsBulkAddDialogOpen} />
+      <BulkDeleteStudentsDialog open={isBulkDeleteDialogOpen} onOpenChange={setIsBulkDeleteDialogOpen} />
     </div>
     </TooltipProvider>
   );

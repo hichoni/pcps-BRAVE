@@ -31,6 +31,7 @@ interface AuthContextType {
   addUser: (studentData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>) => Promise<{ success: boolean; message: string }>;
   updateUser: (userId: number, studentData: Partial<Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>>) => Promise<{ success: boolean; message: string }>;
   bulkAddUsers: (studentsData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>[]) => Promise<{ successCount: number; failCount: number; errors: string[] }>;
+  bulkDeleteUsers: (options: { grade?: number }) => Promise<{ deletedCount: number }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -81,28 +82,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (db) {
             try {
-                // --- Definitive Cleanup: Remove all 6 initial mock students if they exist ---
-                const mockStudentUsernames = ['s-4-1-1', 's-4-1-2', 's-5-2-3', 's-5-2-4', 's-6-3-5', 's-6-3-6'];
-                const usersRef = collection(db, "users");
-                const q = query(usersRef, where("username", "in", mockStudentUsernames));
-                const querySnapshot = await getDocs(q);
-                
-                if (!querySnapshot.empty) {
-                    console.log("Found initial mock students in the database. Deleting them now...");
-                    const batch = writeBatch(db);
-                    querySnapshot.forEach((docToDelete) => {
-                        const userData = docToDelete.data() as User;
-                        console.log(`Deleting mock user: ${userData.name} (Username: ${userData.username})`);
-                        batch.delete(docToDelete.ref);
-
-                        // Also delete their achievements document
-                        const achievementDocRef = doc(db, 'achievements', userData.username);
-                        batch.delete(achievementDocRef);
-                    });
-                    await batch.commit();
-                    console.log("Initial mock students have been permanently deleted.");
-                }
-
                 // --- Robust Seeding Logic ---
                 // Seed initial data ONLY if the users collection is completely empty.
                 const usersQuery = query(collection(db, "users"), limit(1));
@@ -251,6 +230,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         const achievementDocRef = doc(db, 'achievements', username);
         batch.delete(achievementDocRef);
+
+        const submissionsQuery = query(collection(db, "challengeSubmissions"), where('userId', '==', username));
+        const submissionsSnapshot = await getDocs(submissionsQuery);
+        submissionsSnapshot.forEach(submissionDoc => {
+            batch.delete(submissionDoc.ref);
+        });
 
         await batch.commit();
 
@@ -445,9 +430,74 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { successCount, failCount, errors };
   }, [ensureUsersLoaded]);
 
+  const bulkDeleteUsers = useCallback(async (options: { grade?: number }): Promise<{ deletedCount: number }> => {
+    if (!db) {
+      throw new Error("데이터베이스에 연결되지 않았습니다.");
+    }
+    setUsersLoading(true);
+    const usersRef = collection(db, "users");
+    let q;
+    if (options.grade) {
+      q = query(usersRef, where('role', '==', 'student'), where('grade', '==', options.grade));
+    } else {
+      q = query(usersRef, where('role', '==', 'student'));
+    }
+
+    try {
+      const usersSnapshot = await getDocs(q);
+      const userIdsToDelete = usersSnapshot.docs.map(doc => doc.data().username as string);
+      
+      if (userIdsToDelete.length === 0) {
+        setUsersLoading(false);
+        return { deletedCount: 0 };
+      }
+
+      // Firestore allows querying for up to 30 items in a 'in' query.
+      // We process deletions in chunks to stay within limits and manage batch sizes.
+      const CHUNK_SIZE = 30; 
+      let deletedCount = 0;
+
+      for (let i = 0; i < userIdsToDelete.length; i += CHUNK_SIZE) {
+        const userIdChunk = userIdsToDelete.slice(i, i + CHUNK_SIZE);
+        const batch = writeBatch(db);
+
+        // Delete user docs
+        const userDocsQuery = query(collection(db, "users"), where('username', 'in', userIdChunk));
+        const userDocsSnapshot = await getDocs(userDocsQuery);
+        userDocsSnapshot.forEach(userDoc => {
+          batch.delete(userDoc.ref);
+          deletedCount++;
+        });
+
+        // Delete achievement docs
+        userIdChunk.forEach(username => {
+          batch.delete(doc(db, "achievements", username));
+        });
+
+        // Delete submission docs
+        const submissionsQuery = query(collection(db, "challengeSubmissions"), where('userId', 'in', userIdChunk));
+        const submissionsSnapshot = await getDocs(submissionsQuery);
+        submissionsSnapshot.forEach(submissionDoc => {
+          batch.delete(submissionDoc.ref);
+        });
+        
+        await batch.commit();
+      }
+      
+      await fetchUsers();
+      setUsersLoading(false);
+      return { deletedCount };
+
+    } catch (e) {
+      console.error("Bulk user deletion failed:", e);
+      setUsersLoading(false);
+      throw new Error("학생 일괄 삭제 중 오류가 발생했습니다.");
+    }
+  }, [fetchUsers]);
+
 
   return (
-    <AuthContext.Provider value={{ user, users, loading, usersLoading, login, logout, updatePin, resetPin, deleteUser, addUser, updateUser, bulkAddUsers }}>
+    <AuthContext.Provider value={{ user, users, loading, usersLoading, login, logout, updatePin, resetPin, deleteUser, addUser, updateUser, bulkAddUsers, bulkDeleteUsers }}>
       {children}
     </AuthContext.Provider>
   );
