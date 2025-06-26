@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,8 +18,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useAuth } from '@/context/AuthContext';
 import { AreaName } from '@/lib/config';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
-import { ListChecks, Send, Loader2, UploadCloud } from 'lucide-react';
+import { ListChecks, Send, Loader2, UploadCloud, ThumbsUp, ThumbsDown, BrainCircuit } from 'lucide-react';
 import { submitEvidence } from '@/ai/flows/submit-evidence';
+import { checkCertification } from '@/ai/flows/certification-checker';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Input } from './ui/input';
@@ -82,7 +83,7 @@ const resizeImage = (file: File, maxWidth: number, maxHeight: number, quality: n
 
           },
           'image/jpeg',
-          quality
+          0.8
         );
       };
       img.onerror = reject;
@@ -103,11 +104,15 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [isChecking, setIsChecking] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState<{ isSufficient: boolean; reasoning: string } | null>(null);
 
   const form = useForm<EvidenceFormValues>({
     resolver: zodResolver(evidenceSchema),
     defaultValues: { evidence: '' },
   });
+
+  const evidenceValue = form.watch('evidence');
 
   if (!user || !challengeConfig || !user.grade) return null;
   
@@ -117,6 +122,36 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   
   const { koreanName, challengeName } = areaConfig;
   const isMediaRequired = !!areaConfig.mediaRequired;
+
+  useEffect(() => {
+    if (evidenceValue.trim().length < 10) {
+      setAiFeedback(null);
+      return;
+    }
+
+    setIsChecking(true);
+    setAiFeedback(null);
+
+    const handler = setTimeout(async () => {
+      if (!areaConfig) return;
+      try {
+        const result = await checkCertification({
+          areaName: koreanName,
+          requirements: areaConfig.requirements,
+          evidence: evidenceValue,
+        });
+        setAiFeedback(result);
+      } catch (error) {
+        console.error("Real-time AI check failed:", error);
+      } finally {
+        setIsChecking(false);
+      }
+    }, 1500); // 1.5초 후에 AI 분석 시작
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [evidenceValue, areaName, koreanName, areaConfig]);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -223,6 +258,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
           form.reset();
           setMediaFile(null);
           setMediaPreview(null);
+          setAiFeedback(null);
       }
       setDialogOpen(isOpen);
   }
@@ -262,6 +298,26 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                         </FormItem>
                       )}
                     />
+
+                    <div className="min-h-[6rem] flex items-center">
+                        {isChecking && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse p-2">
+                                <BrainCircuit className="h-4 w-4" />
+                                <span>AI가 실시간으로 내용을 분석하고 있습니다...</span>
+                            </div>
+                        )}
+                        {!isChecking && aiFeedback && (
+                            <Alert variant={aiFeedback.isSufficient ? "default" : "destructive"} className="p-3 w-full">
+                                {aiFeedback.isSufficient ? <ThumbsUp className="h-4 w-4" /> : <ThumbsDown className="h-4 w-4" />}
+                                <AlertTitle className="text-sm font-semibold mb-1">
+                                    {aiFeedback.isSufficient ? "AI 피드백: 좋은 내용입니다!" : "AI 피드백: 기준에 조금 부족해요."}
+                                </AlertTitle>
+                                <AlertDescription className="text-xs">
+                                    {aiFeedback.reasoning}
+                                </AlertDescription>
+                            </Alert>
+                        )}
+                    </div>
                     
                     {isMediaRequired && (
                         <>
@@ -306,7 +362,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                         </>
                     )}
                     
-                    <Button type="submit" className="w-full" disabled={isSubmitting}>
+                    <Button type="submit" className="w-full" disabled={isSubmitting || isChecking}>
                         {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2"/>}
                         {isSubmitting && !mediaFile ? '제출 중...' : (isSubmitting && mediaFile ? '파일 처리 중...' : '갤러리에 제출하기')}
                     </Button>
