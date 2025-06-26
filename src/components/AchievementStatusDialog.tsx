@@ -14,7 +14,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from './ui/form';
 import { useAuth } from '@/context/AuthContext';
 import { AreaName } from '@/lib/config';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
@@ -121,7 +121,6 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   if (!areaConfig) return null;
   
   const { koreanName, challengeName } = areaConfig;
-  const isMediaRequired = !!areaConfig.mediaRequired;
 
   useEffect(() => {
     if (evidenceValue.trim().length < 10) {
@@ -202,7 +201,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const handleFormSubmit = async (data: EvidenceFormValues) => {
     if (!user || !user.name) return;
 
-    if (isMediaRequired && !mediaFile) {
+    if (areaConfig.mediaRequired && !mediaFile) {
         toast({
             variant: 'destructive',
             title: '파일 누락',
@@ -319,22 +318,17 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                         )}
                     </div>
                     
-                    {isMediaRequired && (
+                    {areaConfig.mediaRequired && (
                         <>
-                            <Alert>
-                                <UploadCloud className="h-4 w-4" />
-                                <AlertTitle>파일 업로드 안내</AlertTitle>
-                                <AlertDescription>
-                                    10MB 이하의 사진 또는 동영상 파일을 제출할 수 있습니다. 큰 사진은 자동으로 최적화됩니다.
-                                    {isMediaRequired && <p className="font-semibold text-primary mt-1">이 영역은 사진/영상 제출이 필수입니다.</p>}
-                                </AlertDescription>
-                            </Alert>
                             <FormField
                                 control={form.control}
-                                name="media" // Dummy name for react-hook-form
+                                name="media"
                                 render={() => (
                                 <FormItem>
-                                    <FormLabel>증명 파일 (사진/영상)</FormLabel>
+                                    <FormLabel>
+                                        증명 파일 (사진/영상)
+                                        {areaConfig.mediaRequired && <span className="text-destructive ml-1">*필수</span>}
+                                    </FormLabel>
                                     <FormControl>
                                     <Input 
                                         type="file" 
@@ -344,6 +338,9 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                                         disabled={isSubmitting}
                                     />
                                     </FormControl>
+                                    <FormDescription>
+                                        10MB 이하의 사진/동영상. 큰 사진은 자동으로 최적화됩니다.
+                                    </FormDescription>
                                     <FormMessage />
                                 </FormItem>
                                 )}

@@ -28,7 +28,7 @@ const prompt = ai.definePrompt({
   name: 'certificationCheckerPrompt',
   input: { schema: CertificationCheckInputSchema },
   output: { schema: CertificationCheckOutputSchema },
-  prompt: `You are an AI assistant for a teacher. Your task is to determine if a student's provided evidence is sufficient to meet the requirements for an achievement certificate.
+  prompt: `You are an AI assistant for a Korean teacher. Your task is to determine if a student's provided evidence is sufficient to meet the requirements for an achievement certificate.
 
   Achievement Area: {{{areaName}}}
   Certification Requirements: "{{{requirements}}}"
@@ -36,7 +36,9 @@ const prompt = ai.definePrompt({
   Student's Evidence:
   "{{{evidence}}}"
   
-  Based on the evidence, decide if it meets the requirements. Provide a clear "yes" or "no" (isSufficient) and a brief reasoning for your decision.`,
+  Based on the evidence, decide if it meets the requirements. Provide a clear "yes" or "no" (isSufficient) and a brief reasoning for your decision.
+  
+  IMPORTANT: Your entire response, especially the 'reasoning' field, MUST be in Korean.`,
 });
 
 const certificationCheckerFlow = ai.defineFlow(
