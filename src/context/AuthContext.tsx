@@ -79,26 +79,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const seedInitialData = async () => {
         if (!db) return;
         try {
-            const masterUserRef = doc(db, "users", "99"); // Master user ID is 99
-            const masterUserSnap = await getDoc(masterUserRef);
+            const batch = writeBatch(db);
+            let writesMade = false;
 
-            if (!masterUserSnap.exists()) {
-                console.log("Master user not found. Seeding database with initial mock users and config...");
-                const batch = writeBatch(db);
-                
-                // Seed users
-                MOCK_USERS.forEach(userToSeed => {
-                    const docRef = doc(db, "users", String(userToSeed.id));
+            // Upsert users from MOCK_USERS list
+            for (const userToSeed of MOCK_USERS) {
+                const docRef = doc(db, "users", String(userToSeed.id));
+                const docSnap = await getDoc(docRef);
+                if (!docSnap.exists()) {
                     batch.set(docRef, userToSeed);
-                });
-
-                // Seed challenge config
-                const configDocRef = doc(db, 'config/challengeConfig');
-                batch.set(configDocRef, DEFAULT_AREAS_CONFIG);
-                
-                await batch.commit();
-                console.log("Database seeded successfully.");
+                    writesMade = true;
+                }
             }
+
+            // Check and seed config if it doesn't exist
+            const configDocRef = doc(db, 'config/challengeConfig');
+            const configDocSnap = await getDoc(configDocRef);
+            if (!configDocSnap.exists()) {
+                batch.set(configDocRef, DEFAULT_AREAS_CONFIG);
+                writesMade = true;
+            }
+
+            if(writesMade) {
+                console.log("Adding missing initial data to Firestore...");
+                await batch.commit();
+                console.log("Database updated successfully.");
+            }
+
         } catch (error) {
             console.error("AuthContext: Failed to check/seed initial data. This might be a connection issue or Firestore is not enabled.", error);
         }
@@ -435,5 +442,7 @@ export const useAuth = () => {
   }
   return context;
 };
+
+    
 
     
