@@ -20,6 +20,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { ICONS, AreaName, StoredAreaConfig } from '@/lib/config';
 import { Checkbox } from './ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { cn } from '@/lib/utils';
 
 const formSchema = z.object({
   id: z.string().refine(val => /^[a-zA-Z0-9-_]+$/.test(val), {
@@ -96,6 +97,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
   });
 
   const goalType = form.watch('goalType');
+  const autoApproveEnabled = form.watch('autoApprove');
   const aiVisionEnabled = form.watch('aiVisionCheck');
   const isEditMode = !!area;
 
@@ -138,6 +140,12 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
       });
     }
   }, [area, form, open]);
+
+  useEffect(() => {
+    if (!autoApproveEnabled) {
+      form.setValue('aiVisionCheck', false);
+    }
+  }, [autoApproveEnabled, form]);
   
   const onSubmit = async (data: FormValues) => {
     setLoading(true);
@@ -286,8 +294,8 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="numeric">숫자 목표형 (학생 제출)</SelectItem>
-                            <SelectItem value="objective">객관식 선택형 (교사 입력)</SelectItem>
+                            <SelectItem value="numeric">학생 입력형 (숫자 목표)</SelectItem>
+                            <SelectItem value="objective">교사 입력형 (선택형)</SelectItem>
                           </SelectContent>
                         </Select>
                          <FormDescription className="text-xs">
@@ -417,6 +425,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
                           <FormLabel>
                             미디어(사진/영상) 제출 필수
                           </FormLabel>
+                          <FormDescription className="text-xs">학생이 활동 내용을 제출할 때 사진이나 영상 첨부를 필수로 만듭니다.</FormDescription>
                         </div>
                       </FormItem>
                     )}
@@ -450,18 +459,21 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
                           <Checkbox
                             checked={field.value}
                             onCheckedChange={field.onChange}
+                            disabled={!autoApproveEnabled}
                           />
                         </FormControl>
                         <div className="space-y-1 leading-none">
-                          <FormLabel>
+                          <FormLabel className={cn(!autoApproveEnabled && "text-muted-foreground")}>
                             AI Vision으로 사진/영상 분석
                           </FormLabel>
-                           <FormDescription className="text-xs">AI가 제출된 미디어를 직접 보고 내용을 판단합니다. (AI 자동 인증 활성화 필요)</FormDescription>
+                           <FormDescription className={cn("text-xs", !autoApproveEnabled && "text-muted-foreground/50")}>
+                            AI가 제출된 미디어를 직접 보고 내용을 판단합니다.
+                           </FormDescription>
                         </div>
                       </FormItem>
                     )}
                   />
-                  {aiVisionEnabled && (
+                  {aiVisionEnabled && autoApproveEnabled && (
                      <FormField
                         control={form.control}
                         name="aiVisionPrompt"
@@ -486,7 +498,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
                   </>
                   }
                   {goalType !== 'numeric' &&
-                    <p className="text-sm text-muted-foreground">객관식 선택형은 교사가 직접 관리하므로 추가 설정이 필요 없습니다.</p>
+                    <p className="text-sm text-muted-foreground">교사 입력형은 교사가 직접 관리하므로 추가 설정이 필요 없습니다.</p>
                   }
               </div>
                 
