@@ -136,9 +136,9 @@ export default function ChallengeConfigPage() {
   
   return (
     <div className="container mx-auto px-4 py-8">
-      <header className="flex justify-between items-center mb-8 pb-4 border-b">
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 pb-4 border-b">
         <h1 className="text-2xl sm:text-3xl font-bold font-headline text-primary flex items-center gap-2"><Settings/> 도전 영역 관리</h1>
-        <Button variant="outline" onClick={() => router.push('/admin')}>
+        <Button variant="outline" onClick={() => router.push('/admin')} className="self-end sm:self-auto">
             <ArrowLeft className="mr-2"/> 학생 관리로
         </Button>
       </header>

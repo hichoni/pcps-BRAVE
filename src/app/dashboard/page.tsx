@@ -61,7 +61,7 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
           <CertificateStatus />
-          <Card className="h-full flex flex-col justify-center p-6 text-center shadow-lg border bg-card">
+          <Card className="h-full flex flex-col justify-center p-4 sm:p-6 text-center shadow-lg border bg-card">
             <CardHeader className="p-2">
               <CardTitle className="font-headline text-xl sm:text-2xl">✨ 참여 안내 ✨</CardTitle>
             </CardHeader>
@@ -87,7 +87,7 @@ export default function Dashboard() {
           </Card>
           <Link href="/gallery" passHref>
              <Card className={cn(
-                "h-full flex flex-col items-center justify-center p-6 text-center shadow-lg border bg-card",
+                "h-full flex flex-col items-center justify-center p-4 sm:p-6 text-center shadow-lg border bg-card",
                 "hover:shadow-xl hover:border-primary/50 transition-all duration-300 cursor-pointer group"
              )}>
                 <GalleryThumbnails className="w-20 h-20 text-muted-foreground group-hover:text-primary transition-colors duration-300"/>
@@ -99,7 +99,7 @@ export default function Dashboard() {
         
         <div className="text-center mb-12">
             <h2 className="text-2xl sm:text-3xl font-bold font-headline text-primary">도전 영역 둘러보기</h2>
-            <p className="text-muted-foreground">아래 영역들을 눌러 현재 진행 상황을 확인하고, 실천 내용을 갤러리에 공유해보세요.</p>
+            <p className="text-muted-foreground text-sm sm:text-base">아래 영역들을 눌러 현재 진행 상황을 확인하고, 실천 내용을 갤러리에 공유해보세요.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">

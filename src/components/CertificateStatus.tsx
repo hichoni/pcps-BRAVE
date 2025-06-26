@@ -40,10 +40,10 @@ export function CertificateStatus() {
 
   return (
     <Card className="w-full h-full flex flex-col shadow-lg border">
-      <CardHeader className="text-center pb-2">
+      <CardHeader className="text-center p-4 sm:p-6 pb-2">
         <CardTitle className="font-headline text-xl sm:text-2xl">나의 도전 현황</CardTitle>
       </CardHeader>
-      <CardContent className="text-center flex-grow flex flex-col items-center justify-center">
+      <CardContent className="text-center flex-grow flex flex-col items-center justify-center p-4 sm:p-6 pt-0">
         <div className="flex flex-col items-center gap-2">
           <statusInfo.icon className={cn("w-20 h-20 transition-all duration-500", statusInfo.color)} />
           {currentStatus !== 'Unranked' && (
@@ -51,7 +51,7 @@ export function CertificateStatus() {
               {statusInfo.label}
             </p>
           )}
-          <p className="text-muted-foreground font-semibold">{getNextGoalMessage()}</p>
+          <p className="text-muted-foreground font-semibold text-sm sm:text-base">{getNextGoalMessage()}</p>
         </div>
       </CardContent>
     </Card>

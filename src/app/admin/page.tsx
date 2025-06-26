@@ -116,16 +116,20 @@ export default function AdminPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <header className="flex justify-between items-center mb-8 pb-4 border-b">
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 pb-4 border-b">
         <h1 className="text-2xl sm:text-3xl font-bold font-headline text-primary flex items-center gap-2"><Users/> 학생 성취 현황 관리</h1>
-        <div className="flex items-center gap-4">
-          <span className="font-semibold">{user.name} 선생님</span>
-           <Link href="/admin/challenges" passHref>
-              <Button variant="outline" aria-label="도전 영역 관리">
-                <Settings className="mr-2"/> 도전 영역 관리
-              </Button>
-           </Link>
-          <Button variant="outline" onClick={logout}><LogOut className="mr-2"/> 로그아웃</Button>
+        <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap justify-end">
+          <span className="font-semibold text-sm sm:text-base whitespace-nowrap">{user.name} 선생님</span>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/admin/challenges">
+                <Settings className="h-4 w-4 sm:mr-2"/>
+                <span className="hidden sm:inline">도전 영역 관리</span>
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" onClick={logout}>
+            <LogOut className="h-4 w-4 sm:mr-2"/>
+            <span className="hidden sm:inline">로그아웃</span>
+          </Button>
         </div>
       </header>
 
@@ -137,7 +141,7 @@ export default function AdminPage() {
                         <CardTitle>학생 명렬표</CardTitle>
                         <CardDescription>학생들의 성취 현황을 관리하고 검색, 필터링할 수 있습니다.</CardDescription>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                         <Button onClick={() => setIsAddStudentDialogOpen(true)}>
                             <PlusCircle className="mr-2"/> 학생 등록
                         </Button>
@@ -250,11 +254,11 @@ export default function AdminPage() {
                                   })}
                                   <TableCell className="text-center">
                                       <div className="flex items-center justify-center gap-2">
-                                          <Button variant="outline" size="sm" className="h-8 px-2" onClick={() => handleResetPin(student.username)}>
+                                          <Button variant="outline" size="sm" className="h-8 px-2 whitespace-nowrap" onClick={() => handleResetPin(student.username)}>
                                               <Undo className="mr-1 h-3.5 w-3.5" /> PIN 초기화
                                           </Button>
                                           <AlertDialogTrigger asChild>
-                                              <Button variant="destructive" size="sm" className="h-8 px-2" onClick={() => setStudentToDelete(student)}>
+                                              <Button variant="destructive" size="sm" className="h-8 px-2 whitespace-nowrap" onClick={() => setStudentToDelete(student)}>
                                                   <Trash2 className="mr-1 h-3.5 w-3.5" /> 삭제
                                               </Button>
                                           </AlertDialogTrigger>

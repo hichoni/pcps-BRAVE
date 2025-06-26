@@ -28,7 +28,7 @@ export function ExternalUrlDialog({ url, areaName }: ExternalUrlDialogProps) {
       </DialogTrigger>
       <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-2 sm:p-4">
         <DialogHeader className="p-4 pb-2 shrink-0">
-          <DialogTitle className="font-headline text-2xl">{areaName} 바로가기</DialogTitle>
+          <DialogTitle className="font-headline text-xl sm:text-2xl">{areaName} 바로가기</DialogTitle>
           <DialogDescription>
             아래 창이 보이지 않으면,{' '}
             <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">

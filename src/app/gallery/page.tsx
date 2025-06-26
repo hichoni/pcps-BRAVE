@@ -287,11 +287,11 @@ export default function GalleryPage() {
   
   return (
     <div className="container mx-auto px-4 py-8">
-      <header className="flex justify-between items-center mb-8 pb-4 border-b">
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 pb-4 border-b">
         <h1 className="text-2xl sm:text-3xl font-bold font-headline text-primary flex items-center gap-2">
             <GalleryThumbnails /> 도전 갤러리
         </h1>
-        <Button variant="outline" onClick={() => router.push('/dashboard')}>
+        <Button variant="outline" onClick={() => router.push('/dashboard')} className="self-end sm:self-auto">
             <ArrowLeft className="mr-2"/> 대시보드로
         </Button>
       </header>
