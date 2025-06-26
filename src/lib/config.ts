@@ -1,5 +1,5 @@
 
-import { BookOpen, HeartHandshake, Bike, Palette, Laptop, Award, Medal, Gem, ShieldOff, BrainCircuit, ExternalLink, UploadCloud, FileCheck, FileX, History } from 'lucide-react';
+import { BookOpen, HeartHandshake, Bike, Palette, Laptop, Award, Medal, Gem, ShieldOff, BrainCircuit, ExternalLink, UploadCloud, FileCheck, FileX, History, Keyboard } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export type AreaName = string;
@@ -83,6 +83,7 @@ export const ICONS: Record<string, LucideIcon> = {
     Bike,
     Palette,
     Laptop,
+    Keyboard, // New icon for typing
     BrainCircuit,
     Award,
     Medal,
@@ -143,15 +144,14 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
   },
   Information: {
     koreanName: '정보',
-    challengeName: '타자의 달인 •',
-    iconName: 'Laptop',
-    requirements: "교내 타자 대회에서 '달인' 등급을 달성해야 합니다.",
-    goalType: 'objective',
-    goal: {},
-    options: ['입문', '초보', '중수', '고수', '달인'],
-    unit: '레벨',
-    autoApprove: false, // Teacher must check official results
-    goalDescription: "'달인' 등급",
+    challengeName: 'AI 타자 연습 인증 ⌨️',
+    iconName: 'Keyboard',
+    requirements: "타자 연습 결과(200타 이상)를 스크린샷으로 제출하세요. AI가 자동으로 인식하여 1회 연습으로 인정해줍니다.",
+    goalType: 'numeric',
+    goal: { '4': 10, '5': 15, '6': 20 },
+    unit: '회',
+    mediaRequired: true,
+    autoApprove: true, // AI will auto-approve based on vision
   },
 };
 

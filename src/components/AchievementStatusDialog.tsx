@@ -43,7 +43,7 @@ interface Submission {
 }
 
 const evidenceSchema = z.object({
-  evidence: z.string().min(10, { message: '최소 10자 이상 자세하게 입력해주세요.' }).max(1000, { message: '1000자 이내로 입력해주세요.'}),
+  evidence: z.string().min(1, { message: '간단한 활동 내용을 입력해주세요.' }).max(1000, { message: '1000자 이내로 입력해주세요.'}),
   media: z.any().optional(),
 });
 
@@ -184,6 +184,12 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const { koreanName, challengeName } = areaConfig;
 
   useEffect(() => {
+    if (areaName === 'Information') {
+        setAiFeedback(null);
+        setIsChecking(false);
+        return;
+    }
+      
     if (evidenceValue.trim().length < 10) {
       setAiFeedback(null);
       return;
@@ -203,11 +209,6 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
         setAiFeedback(result);
       } catch (error) {
         console.error("Real-time AI check failed:", error);
-        toast({
-            variant: "destructive",
-            title: "AI 분석 실패",
-            description: "AI 피드백을 가져오는 데 실패했습니다. 네트워크 연결을 확인해주세요."
-        });
       } finally {
         setIsChecking(false);
       }
@@ -225,7 +226,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
             toast({
                 variant: 'destructive',
                 title: '파일 크기 초과',
-                description: `동영상 등 미디어 파일의 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`,
+                description: `미디어 파일의 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`,
             });
             event.target.value = '';
             return;
@@ -284,7 +285,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
         areaName: areaName,
         koreanName: areaConfig.koreanName,
         challengeName: areaConfig.challengeName,
-        evidence: data.evidence,
+        evidence: data.evidence || '타자 연습 결과 제출', // Add default evidence for typing test
         mediaDataUri: mediaPreview ?? undefined,
         mediaType: mediaFile?.type ?? undefined,
       });
@@ -391,9 +392,13 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                             <FormLabel className="sr-only">활동 내용</FormLabel>
                             <FormControl>
                                 <Textarea
-                                placeholder="여기에 나의 실천 내용을 자세히 적어주세요. (예: 어떤 책을 읽고 무엇을 느꼈는지, 봉사활동을 통해 무엇을 배우고 실천했는지 등)"
+                                placeholder={
+                                    areaName === 'Information'
+                                    ? "타자 연습 날짜나 간단한 메모를 남겨주세요."
+                                    : "여기에 나의 실천 내용을 자세히 적어주세요. (예: 어떤 책을 읽고 무엇을 느꼈는지, 봉사활동을 통해 무엇을 배우고 실천했는지 등)"
+                                }
                                 {...field}
-                                rows={3}
+                                rows={areaName === 'Information' ? 2 : 3}
                                 />
                             </FormControl>
                             <FormMessage />
@@ -401,25 +406,27 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                         )}
                         />
 
-                        <div className="flex items-center justify-center min-h-[4rem]">
-                            {isChecking && (
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse p-2">
-                                    <BrainCircuit className="h-4 w-4" />
-                                    <span>AI가 실시간으로 내용을 분석하고 있습니다...</span>
-                                </div>
-                            )}
-                            {!isChecking && aiFeedback && (
-                                <Alert variant={aiFeedback.isSufficient ? "default" : "destructive"} className="p-2 w-full">
-                                    {aiFeedback.isSufficient ? <ThumbsUp className="h-4 w-4" /> : <ThumbsDown className="h-4 w-4" />}
-                                    <AlertTitle className="text-xs font-semibold mb-0.5">
-                                        {aiFeedback.isSufficient ? "AI 피드백: 좋은 내용입니다!" : "AI 피드백: 기준에 조금 부족해요."}
-                                    </AlertTitle>
-                                    <AlertDescription className="text-xs">
-                                        {aiFeedback.reasoning}
-                                    </AlertDescription>
-                                </Alert>
-                            )}
-                        </div>
+                        {areaName !== 'Information' && (
+                            <div className="flex items-center justify-center min-h-[4rem]">
+                                {isChecking && (
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse p-2">
+                                        <BrainCircuit className="h-4 w-4" />
+                                        <span>AI가 실시간으로 내용을 분석하고 있습니다...</span>
+                                    </div>
+                                )}
+                                {!isChecking && aiFeedback && (
+                                    <Alert variant={aiFeedback.isSufficient ? "default" : "destructive"} className="p-2 w-full">
+                                        {aiFeedback.isSufficient ? <ThumbsUp className="h-4 w-4" /> : <ThumbsDown className="h-4 w-4" />}
+                                        <AlertTitle className="text-xs font-semibold mb-0.5">
+                                            {aiFeedback.isSufficient ? "AI 피드백: 좋은 내용입니다!" : "AI 피드백: 기준에 조금 부족해요."}
+                                        </AlertTitle>
+                                        <AlertDescription className="text-xs">
+                                            {aiFeedback.reasoning}
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+                            </div>
+                        )}
                         
                         <FormField
                             control={form.control}
@@ -427,20 +434,23 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                             render={() => (
                             <FormItem>
                                 <FormLabel className="text-xs">
-                                    증명 파일 (사진/영상)
+                                    {areaName === 'Information' ? '타자 연습 결과 스크린샷' : '증명 파일 (사진/영상)'}
                                     {areaConfig.mediaRequired && <span className="text-destructive ml-1">*필수</span>}
                                 </FormLabel>
                                 <FormControl>
                                 <Input 
                                     type="file" 
-                                    accept="image/*,video/*"
+                                    accept={areaName === 'Information' ? "image/*" : "image/*,video/*"}
                                     onChange={handleFileChange}
                                     className="file:text-primary file:font-semibold text-xs h-9"
                                     disabled={isSubmitting}
                                 />
                                 </FormControl>
                                 <FormDescription className="text-xs">
-                                    10MB 이하. 큰 사진은 자동으로 최적화됩니다.
+                                    {areaName === 'Information'
+                                        ? '200타 이상 결과 화면을 올려주세요. 10MB 이하.'
+                                        : '10MB 이하. 큰 사진은 자동으로 최적화됩니다.'
+                                    }
                                 </FormDescription>
                                 <FormMessage />
                             </FormItem>

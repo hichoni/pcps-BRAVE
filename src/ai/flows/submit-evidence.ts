@@ -1,7 +1,9 @@
+
 'use server';
 /**
  * @fileOverview A flow to submit student's challenge evidence to Firestore.
- * It now includes an AI check to automatically update progress if the evidence is sufficient.
+ * It now includes an AI check to automatically update progress if the evidence is sufficient,
+ * and uses AI vision for specific challenges like typing tests.
  */
 
 import { ai } from '@/ai/genkit';
@@ -11,6 +13,7 @@ import { adminStorage } from '@/lib/firebase-admin';
 import { collection, addDoc, serverTimestamp, doc, getDoc, runTransaction } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { checkCertification } from './certification-checker';
+import { analyzeTypingTest } from './analyze-typing-test';
 import { type SubmitEvidenceInput, type SubmitEvidenceOutput, SubmissionStatus } from '@/lib/config';
 
 export async function submitEvidence(input: SubmitEvidenceInput): Promise<SubmitEvidenceOutput> {
@@ -23,7 +26,7 @@ const SubmitEvidenceInputSchema = z.object({
   areaName: z.string().describe('The achievement area ID.'),
   koreanName: z.string().describe('The Korean name of the achievement area.'),
   challengeName: z.string().describe('The name of the challenge.'),
-  evidence: z.string().min(10, "Evidence must be at least 10 characters long.").max(1000, "Evidence cannot be more than 1000 characters long.").describe('The evidence provided by the student.'),
+  evidence: z.string().min(1, "Evidence must not be empty.").max(1000, "Evidence cannot be more than 1000 characters long.").describe('The evidence provided by the student.'),
   mediaDataUri: z.string().optional().describe("A media file (image or video) as a data URI."),
   mediaType: z.string().optional().describe("The MIME type of the media file."),
 });
@@ -115,14 +118,36 @@ const submitEvidenceFlow = ai.defineFlow(
           throw new Error(`'${input.koreanName}' 도전 영역의 설정을 찾을 수 없습니다.`);
       }
 
-      const aiCheckResult = await checkCertification({
-          areaName: input.koreanName,
-          requirements: areaConfig.requirements,
-          evidence: input.evidence,
-      });
+      let aiSufficient = false;
+      let aiReasoning = '';
+      let submissionStatus: SubmissionStatus;
 
-      const isAutoApproved = areaConfig.autoApprove && aiCheckResult.isSufficient;
-      const submissionStatus: SubmissionStatus = isAutoApproved ? 'approved' : 'pending_review';
+      if (input.areaName === 'Information' && areaConfig.autoApprove) {
+          if (!input.mediaDataUri) {
+              throw new Error('정보 영역은 타자 연습 결과 스크린샷이 필수입니다.');
+          }
+          const visionResult = await analyzeTypingTest({ photoDataUri: input.mediaDataUri });
+          aiSufficient = visionResult.isValid;
+          aiReasoning = visionResult.reasoning;
+          
+          if (!visionResult.isTypingTest) {
+              submissionStatus = 'pending_review'; // If not a typing test, let teacher decide
+          } else {
+              submissionStatus = aiSufficient ? 'approved' : 'rejected';
+          }
+      } else {
+          // Fallback to original text-based check
+          const textCheckResult = await checkCertification({
+              areaName: input.koreanName,
+              requirements: areaConfig.requirements,
+              evidence: input.evidence,
+          });
+          aiSufficient = textCheckResult.isSufficient;
+          aiReasoning = textCheckResult.reasoning;
+          submissionStatus = areaConfig.autoApprove && aiSufficient ? 'approved' : 'pending_review';
+      }
+
+      const isAutoApproved = submissionStatus === 'approved';
       let updateMessage = '';
 
       if (isAutoApproved) {
@@ -137,11 +162,16 @@ const submitEvidenceFlow = ai.defineFlow(
               updateMessage = `AI가 활동을 확인하고 바로 승인했어요! 진행도가 1만큼 증가했습니다. (현재: ${newProgress}${areaConfig.unit})`;
           });
         } else {
-            // Objective types are never auto-approved for progress, only teacher can set it.
             updateMessage = `AI가 활동을 확인했지만, 이 영역은 선생님의 최종 확인이 필요합니다.`;
         }
       } else {
-          updateMessage = '제출 완료! 선생님이 확인하신 후, 진행도에 반영될 거예요.';
+          if (submissionStatus === 'rejected') {
+              updateMessage = `AI 심사 결과, 반려되었습니다. 사유: ${aiReasoning}`;
+          } else if (submissionStatus === 'pending_review' && input.areaName === 'Information') {
+              updateMessage = `AI가 타자 연습 결과를 명확히 인식하지 못했습니다. 선생님이 직접 확인할 예정입니다.`;
+          } else {
+              updateMessage = '제출 완료! 선생님이 확인하신 후, 진행도에 반영될 거예요.';
+          }
       }
       
       const submissionsCollection = collection(db, 'challengeSubmissions');
@@ -169,7 +199,7 @@ const submitEvidenceFlow = ai.defineFlow(
           id: docRef.id,
           status: submissionStatus,
           updateMessage,
-          aiReasoning: aiCheckResult.reasoning
+          aiReasoning: aiReasoning
       };
     } catch (e: any) {
       console.error("Error in submitEvidenceFlow: ", e);
