@@ -65,8 +65,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUsers(usersList);
       return usersList;
     } catch(error) {
-        console.error("Error fetching users from Firestore:", error);
-        throw new Error("Failed to fetch users from database.");
+        console.error("AuthContext: Error fetching users from Firestore. This might be a connection issue or Firestore is not enabled.", error);
+        console.warn("AuthContext: Falling back to mock user data.");
+        setUsers(MOCK_USERS);
+        return MOCK_USERS;
     } finally {
       setUsersLoading(false);
     }
@@ -75,25 +77,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const seedInitialData = async () => {
         if (!db) return;
-        const masterUserRef = doc(db, "users", "99"); // Master user ID is 99
-        const masterUserSnap = await getDoc(masterUserRef);
+        try {
+            const masterUserRef = doc(db, "users", "99"); // Master user ID is 99
+            const masterUserSnap = await getDoc(masterUserRef);
 
-        if (!masterUserSnap.exists()) {
-            console.log("Master user not found. Seeding database with initial mock users and config...");
-            const batch = writeBatch(db);
-            
-            // Seed users
-            MOCK_USERS.forEach(userToSeed => {
-                const docRef = doc(db, "users", String(userToSeed.id));
-                batch.set(docRef, userToSeed);
-            });
+            if (!masterUserSnap.exists()) {
+                console.log("Master user not found. Seeding database with initial mock users and config...");
+                const batch = writeBatch(db);
+                
+                // Seed users
+                MOCK_USERS.forEach(userToSeed => {
+                    const docRef = doc(db, "users", String(userToSeed.id));
+                    batch.set(docRef, userToSeed);
+                });
 
-            // Seed challenge config
-            const configDocRef = doc(db, 'config/challengeConfig');
-            batch.set(configDocRef, DEFAULT_AREAS_CONFIG);
-            
-            await batch.commit();
-            console.log("Database seeded successfully.");
+                // Seed challenge config
+                const configDocRef = doc(db, 'config/challengeConfig');
+                batch.set(configDocRef, DEFAULT_AREAS_CONFIG);
+                
+                await batch.commit();
+                console.log("Database seeded successfully.");
+            }
+        } catch (error) {
+            console.error("AuthContext: Failed to check/seed initial data. This might be a connection issue or Firestore is not enabled.", error);
         }
     }
 
@@ -360,3 +366,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+    
