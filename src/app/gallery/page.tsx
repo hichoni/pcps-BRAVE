@@ -1,12 +1,13 @@
+
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth, User } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, orderBy, query, Timestamp, limit, startAfter, QueryDocumentSnapshot } from 'firebase/firestore';
-import { Loader2, ArrowLeft, User as UserIcon, Calendar as CalendarIcon, GalleryThumbnails, Trash2, Heart } from 'lucide-react';
+import { Loader2, ArrowLeft, User as UserIcon, Calendar as CalendarIcon, GalleryThumbnails, Trash2, Heart, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -18,6 +19,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { deleteSubmission } from '@/ai/flows/delete-submission';
 import { toggleLike } from '@/ai/flows/toggle-like';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+
 
 interface Submission {
   id: string;
@@ -178,15 +182,19 @@ function GalleryCard({ submission, user, onSubmissionDeleted }: { submission: Su
 
 
 export default function GalleryPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, users, loading: authLoading, usersLoading } = useAuth();
   const router = useRouter();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingInitial, setLoadingInitial] = useState(true);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const PAGE_SIZE = 9;
 
+  const [gradeFilter, setGradeFilter] = useState('all');
+  const [classFilter, setClassFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
@@ -195,11 +203,11 @@ export default function GalleryPage() {
 
   useEffect(() => {
     const fetchInitialSubmissions = async () => {
-      if (!db) {
-          setLoading(false);
+      if (!db || !user) {
+          setLoadingInitial(false);
           return;
       };
-      setLoading(true);
+      setLoadingInitial(true);
       try {
         const q = query(
             collection(db, "challengeSubmissions"), 
@@ -220,17 +228,12 @@ export default function GalleryPage() {
         
         const lastVisible = querySnapshot.docs[querySnapshot.docs.length - 1];
         setLastDoc(lastVisible);
-
-        if (querySnapshot.docs.length < PAGE_SIZE) {
-            setHasMore(false);
-        } else {
-            setHasMore(true);
-        }
+        setHasMore(querySnapshot.docs.length === PAGE_SIZE);
 
       } catch (error) {
         console.error("Error fetching submissions: ", error);
       } finally {
-        setLoading(false);
+        setLoadingInitial(false);
       }
     };
 
@@ -238,6 +241,12 @@ export default function GalleryPage() {
       fetchInitialSubmissions();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (gradeFilter !== 'all') {
+      setClassFilter('all');
+    }
+  }, [gradeFilter]);
   
   const fetchMoreSubmissions = async () => {
     if (!db || !lastDoc || !hasMore || loadingMore) return;
@@ -265,10 +274,7 @@ export default function GalleryPage() {
         
         const lastVisible = querySnapshot.docs[querySnapshot.docs.length - 1];
         setLastDoc(lastVisible);
-
-        if (querySnapshot.docs.length < PAGE_SIZE) {
-            setHasMore(false);
-        }
+        setHasMore(querySnapshot.docs.length === PAGE_SIZE);
 
     } catch (error) {
         console.error("Error fetching more submissions: ", error);
@@ -281,7 +287,34 @@ export default function GalleryPage() {
     setSubmissions(prev => prev.filter(s => s.id !== deletedId));
   }, []);
 
-  if (authLoading || !user) {
+  const allStudentUsers = users.filter(u => u.role === 'student');
+  const availableGrades = [...new Set(allStudentUsers.map(u => u.grade))].sort((a,b) => (a ?? 0) - (b ?? 0));
+  const studentsForClassList = allStudentUsers.filter(u => gradeFilter === 'all' || u.grade === parseInt(gradeFilter, 10));
+  const availableClasses = [...new Set(studentsForClassList.map(u => u.classNum))].sort((a,b) => (a ?? 0) - (b ?? 0));
+  
+  const userMap = useMemo(() => new Map(users.map(u => [u.username, u])), [users]);
+
+  const filteredSubmissions = useMemo(() => {
+    return submissions.filter(submission => {
+        const author = userMap.get(submission.userId);
+        if (!author) return false;
+
+        const gradeMatch = gradeFilter === 'all' || author.grade === parseInt(gradeFilter, 10);
+        const classMatch = classFilter === 'all' || author.classNum === parseInt(classFilter, 10);
+        
+        const searchLower = searchQuery.toLowerCase();
+        const searchMatch = !searchQuery ||
+            author.name.toLowerCase().includes(searchLower) ||
+            submission.koreanName.toLowerCase().includes(searchLower) ||
+            submission.challengeName.toLowerCase().includes(searchLower) ||
+            submission.evidence.toLowerCase().includes(searchLower);
+
+        return gradeMatch && classMatch && searchMatch;
+    });
+  }, [submissions, userMap, gradeFilter, classFilter, searchQuery]);
+
+
+  if (authLoading || usersLoading || !user) {
     return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
   
@@ -295,20 +328,68 @@ export default function GalleryPage() {
             <ArrowLeft className="mr-2"/> 대시보드로
         </Button>
       </header>
+
+      <Card className="mb-8 shadow-md border">
+        <CardContent className="p-4 flex flex-col md:flex-row items-stretch gap-2">
+            <div className="flex items-center gap-2">
+                <Select value={gradeFilter} onValueChange={setGradeFilter}>
+                    <SelectTrigger className="w-full md:w-[120px]">
+                        <SelectValue placeholder="학년" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">전체 학년</SelectItem>
+                        {availableGrades.map(grade => (
+                            grade != null && <SelectItem key={grade} value={String(grade)}>{grade}학년</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <Select value={classFilter} onValueChange={setClassFilter} disabled={availableClasses.length === 0 || gradeFilter === 'all'}>
+                    <SelectTrigger className="w-full md:w-[120px]">
+                        <SelectValue placeholder="반" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">전체 반</SelectItem>
+                        {availableClasses.map(classNum => (
+                            classNum != null && <SelectItem key={classNum} value={String(classNum)}>{classNum}반</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="relative w-full md:flex-grow">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="학생 이름 또는 내용으로 검색..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+            </div>
+        </CardContent>
+      </Card>
       
-      {loading ? (
+      {loadingInitial ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {Array.from({length: 3}).map((_, i) => <Card key={i} className="h-80 animate-pulse bg-muted"/>)}
+            {Array.from({length: 3}).map((_, i) => <Card key={i} className="h-80"><Skeleton className="w-full h-full" /></Card>)}
         </div>
       ) : submissions.length === 0 ? (
         <div className="text-center py-20">
           <p className="text-lg font-semibold text-muted-foreground">아직 제출된 도전이 없어요!</p>
           <p className="text-sm text-muted-foreground">가장 먼저 도전 내용을 제출하고 갤러리를 채워보세요.</p>
         </div>
+      ) : filteredSubmissions.length === 0 ? (
+        <div className="text-center py-20">
+            <p className="text-lg font-semibold text-muted-foreground">검색 결과가 없습니다.</p>
+            <p className="text-sm text-muted-foreground">다른 필터를 선택하거나 검색어를 변경해보세요.</p>
+            {hasMore && (
+                <Button onClick={fetchMoreSubmissions} disabled={loadingMore} variant="link" className="mt-4">
+                    혹은, 더 많은 게시물 불러오기
+                </Button>
+            )}
+        </div>
       ) : (
         <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {submissions.map(sub => <GalleryCard key={sub.id} submission={sub} user={user} onSubmissionDeleted={handleSubmissionDeleted} />)}
+              {filteredSubmissions.map(sub => <GalleryCard key={sub.id} submission={sub} user={user} onSubmissionDeleted={handleSubmissionDeleted} />)}
             </div>
             {hasMore && (
                 <div className="mt-12 text-center">
