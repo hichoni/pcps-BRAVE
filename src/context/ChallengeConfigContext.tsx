@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
@@ -23,10 +24,15 @@ const resolveConfigWithIcons = (storedConfig: Record<AreaName, StoredAreaConfig>
     Object.keys(storedConfig).forEach(area => {
         const config = storedConfig[area];
         if (config) {
+            // To be resilient to config changes, merge the stored config over the default.
+            // This ensures new properties added to the default config are present.
+            const defaultConfig = DEFAULT_AREAS_CONFIG[area] || {};
+            const mergedConfig = { ...defaultConfig, ...config };
+
             resolvedConfig[area] = {
-                ...config,
+                ...mergedConfig,
                 name: area,
-                icon: ICONS[config.iconName] || ShieldOff, // Fallback icon
+                icon: ICONS[mergedConfig.iconName] || ShieldOff, // Fallback icon
             };
         }
     });
@@ -51,7 +57,8 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
         const configDocSnap = await getDoc(configDocRef);
 
         if (configDocSnap.exists() && typeof configDocSnap.data() === 'object' && configDocSnap.data() !== null) {
-          configData = configDocSnap.data() as Record<AreaName, StoredAreaConfig>;
+           const fromDb = configDocSnap.data() as Record<AreaName, StoredAreaConfig>;
+           configData = fromDb;
         } else {
           configData = { ...DEFAULT_AREAS_CONFIG };
           await setDoc(configDocRef, configData);
@@ -71,7 +78,9 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
   }, [fetchConfig]);
 
   const updateArea = useCallback(async (areaId: AreaName, newConfig: StoredAreaConfig) => {
-    setChallengeConfig(prev => prev ? resolveConfigWithIcons({ ...prev, [areaId]: newConfig }) : null);
+    const currentConfig = challengeConfig || {};
+    const updatedConfig = resolveConfigWithIcons({ ...currentConfig, [areaId]: newConfig });
+    setChallengeConfig(updatedConfig);
 
     if (!db) return;
     try {
@@ -81,10 +90,12 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
       console.error("Failed to save challenge config to Firestore", error);
       fetchConfig(); // Revert on failure
     }
-  }, [fetchConfig]);
+  }, [challengeConfig, fetchConfig]);
 
   const addArea = useCallback(async (areaId: AreaName, newConfig: StoredAreaConfig) => {
-     setChallengeConfig(prev => prev ? resolveConfigWithIcons({ ...prev, [areaId]: newConfig }) : null);
+     const currentConfig = challengeConfig || {};
+     const updatedConfig = resolveConfigWithIcons({ ...currentConfig, [areaId]: newConfig });
+     setChallengeConfig(updatedConfig);
     
     if (!db) return;
     try {
@@ -94,7 +105,7 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
         console.error("Failed to add area", e);
         fetchConfig(); // Revert on failure
     }
-  }, [fetchConfig]);
+  }, [challengeConfig, fetchConfig]);
 
   const deleteArea = useCallback(async (areaId: AreaName) => {
     setChallengeConfig(prev => {
