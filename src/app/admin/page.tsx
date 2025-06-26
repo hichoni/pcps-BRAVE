@@ -203,7 +203,7 @@ export default function AdminPage() {
                           const studentAchievements = getAchievements(student.username);
                           return (
                               <TableRow key={student.id}>
-                                  <TableCell className="font-medium whitespace-nowrap sticky left-0 bg-card z-10">
+                                  <TableCell className="font-medium whitespace-nowrap sticky left-0 bg-card z-10 w-[220px]">
                                       {`${student.grade}학년 ${student.classNum}반 ${student.studentNum}번 ${student.name}`}
                                   </TableCell>
                                   {challengeAreaKeys.map(area => {
@@ -252,7 +252,7 @@ export default function AdminPage() {
                                           </TableCell>
                                       )
                                   })}
-                                  <TableCell className="text-center">
+                                  <TableCell className="text-center w-[220px]">
                                       <div className="flex items-center justify-center gap-2">
                                           <Button variant="outline" size="sm" className="h-8 px-2 whitespace-nowrap" onClick={() => handleResetPin(student.username)}>
                                               <Undo className="mr-1 h-3.5 w-3.5" /> PIN 초기화
