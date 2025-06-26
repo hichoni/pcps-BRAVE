@@ -39,6 +39,18 @@ const prompt = ai.definePrompt({
   Based on the evidence, decide if it meets the requirements. Provide a clear "yes" or "no" (isSufficient) and a brief reasoning for your decision.
   
   IMPORTANT: Your entire response, especially the 'reasoning' field, MUST be in Korean.`,
+  config: {
+    safetySettings: [
+      {
+        category: 'HARM_CATEGORY_HATE_SPEECH',
+        threshold: 'BLOCK_ONLY_HIGH',
+      },
+      {
+        category: 'HARM_CATEGORY_HARASSMENT',
+        threshold: 'BLOCK_ONLY_HIGH',
+      },
+    ],
+  },
 });
 
 const certificationCheckerFlow = ai.defineFlow(
