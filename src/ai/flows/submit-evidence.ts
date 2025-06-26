@@ -68,8 +68,11 @@ const submitEvidenceFlow = ai.defineFlow(
             const file = bucket.file(filePath);
 
             const buffer = Buffer.from(input.mediaDataUri.split(',')[1], 'base64');
+            
+            // This token is the key to creating a public, unguessable URL.
             const token = uuidv4();
 
+            // Save the file with the correct metadata for public access via token.
             await file.save(buffer, {
                 metadata: {
                     contentType: input.mediaType,
@@ -79,17 +82,24 @@ const submitEvidenceFlow = ai.defineFlow(
                 },
             });
 
+            // Construct the public URL
             mediaUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(filePath)}?alt=media&token=${token}`;
         
         } catch (error: any) {
             console.error("Firebase Admin Storage upload error:", error);
-            let detail = "자세한 내용은 서버 로그를 확인해주세요.";
-            if (error.code === 'storage/object-not-found' || (error.message && error.message.includes('not found'))) {
-                 detail = `Firebase Storage 버킷을 찾을 수 없습니다. 버킷 이름이 올바른지 확인해주세요: '${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || ''}'`;
-            } else if (error.code === 'storage/unauthorized' || (error.message && error.message.includes('permission'))) {
-                detail = "Firebase Storage에 파일을 업로드할 권한이 없습니다. 서비스 계정(service-account.json)의 IAM 권한을 확인해주세요.";
+            let detail = error.message || '알 수 없는 서버 오류가 발생했습니다. 서버 로그를 확인해주세요.';
+
+            if (typeof detail === 'string') {
+                if (detail.includes('not found')) {
+                    detail = `Firebase Storage 버킷을 찾을 수 없습니다. .env.local 파일의 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값이 올바른지 확인해주세요. (현재 값: '${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '없음'}')`;
+                } else if (detail.includes('permission denied') || detail.includes('unauthorized') || detail.includes('does not have storage.objects.create')) {
+                    detail = "Firebase Storage에 파일을 업로드할 권한이 없습니다. Google Cloud IAM 설정에서 서비스 계정에 'Storage 개체 관리자(Storage Object Admin)' 역할이 부여되었는지 확인해주세요.";
+                } else if (detail.includes('bucket name')) {
+                     detail = `버킷 이름이 잘못되었습니다. .env.local 파일의 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값을 확인해주세요.`;
+                }
             }
-            throw new Error(`파일 업로드 중 서버 오류가 발생했습니다. ${detail}`);
+            
+            throw new Error(`파일 업로드 실패: ${detail}`);
         }
     }
     
