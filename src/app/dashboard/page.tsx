@@ -59,8 +59,21 @@ export default function Dashboard() {
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-          <CertificateStatus />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+          <div className="space-y-8 flex flex-col">
+            <CertificateStatus />
+            <Link href="/gallery" passHref>
+              <Card className={cn(
+                  "flex-grow flex flex-col items-center justify-center p-4 sm:p-6 text-center shadow-lg border bg-card",
+                  "hover:shadow-xl hover:border-primary/50 transition-all duration-300 cursor-pointer group"
+              )}>
+                  <GalleryThumbnails className="w-16 h-16 text-muted-foreground group-hover:text-primary transition-colors duration-300"/>
+                  <p className="font-headline text-lg sm:text-xl mt-4 text-primary font-semibold">도전 갤러리 가기</p>
+                  <p className="text-muted-foreground text-sm">다른 친구들의 도전을 구경해보세요!</p>
+              </Card>
+            </Link>
+          </div>
+          
           <Card className="h-full flex flex-col justify-center p-4 sm:p-6 text-center shadow-lg border bg-card">
             <CardHeader className="p-2">
               <CardTitle className="font-headline text-xl sm:text-2xl">✨ 참여 안내 ✨</CardTitle>
@@ -85,16 +98,6 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
-          <Link href="/gallery" passHref>
-             <Card className={cn(
-                "h-full flex flex-col items-center justify-center p-4 sm:p-6 text-center shadow-lg border bg-card",
-                "hover:shadow-xl hover:border-primary/50 transition-all duration-300 cursor-pointer group"
-             )}>
-                <GalleryThumbnails className="w-20 h-20 text-muted-foreground group-hover:text-primary transition-colors duration-300"/>
-                <p className="font-headline text-xl sm:text-2xl mt-4 text-primary font-semibold">도전 갤러리 가기</p>
-                <p className="text-muted-foreground text-sm">다른 친구들의 도전을 구경해보세요!</p>
-             </Card>
-          </Link>
         </div>
         
         <div className="text-center mb-12">
