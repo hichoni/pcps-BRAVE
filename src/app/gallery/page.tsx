@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { useAuth, User } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, orderBy, query, Timestamp, limit, startAfter, QueryDocumentSnapshot } from 'firebase/firestore';
-import { Loader2, ArrowLeft, User as UserIcon, Calendar as CalendarIcon, GalleryThumbnails, Trash2, Heart, Search } from 'lucide-react';
+import { Loader2, ArrowLeft, User as UserIcon, Calendar as CalendarIcon, GalleryThumbnails, Trash2, Heart, Search, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EditSubmissionDialog } from '@/components/EditSubmissionDialog';
 
 
 interface Submission {
@@ -48,7 +49,7 @@ const maskName = (name: string) => {
   return name;
 };
 
-function GalleryCard({ submission, user, onSubmissionDeleted }: { submission: Submission; user: User | null, onSubmissionDeleted: (id: string) => void; }) {
+function GalleryCard({ submission, user, onSubmissionDeleted, onSubmissionUpdated }: { submission: Submission; user: User | null, onSubmissionDeleted: (id: string) => void, onSubmissionUpdated: (updatedSubmission: {id: string; evidence: string}) => void }) {
   const { challengeConfig } = useChallengeConfig();
   const { toast } = useToast();
   const AreaIcon = challengeConfig?.[submission.areaName]?.icon || UserIcon;
@@ -57,12 +58,13 @@ function GalleryCard({ submission, user, onSubmissionDeleted }: { submission: Su
   const [isLiking, setIsLiking] = useState(false);
   const [isLiked, setIsLiked] = useState(user ? submission.likes.includes(user.username) : false);
   const [likeCount, setLikeCount] = useState(submission.likes.length);
+  const [isEditing, setIsEditing] = useState(false);
 
   const handleDelete = async () => {
     if (!user) return;
     setIsDeleting(true);
     try {
-      await deleteSubmission({ submissionId: submission.id, userId: user.username });
+      await deleteSubmission({ submissionId: submission.id, userId: user.id.toString() }); // Pass teacher ID
       toast({ title: '삭제 완료', description: '게시글이 삭제되었습니다.' });
       onSubmissionDeleted(submission.id);
     } catch (error: any) {
@@ -96,6 +98,7 @@ function GalleryCard({ submission, user, onSubmissionDeleted }: { submission: Su
   };
 
   return (
+    <>
     <Card className="flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300 border">
       <CardHeader className="flex flex-row items-start gap-4 space-y-0 pb-3">
          <Avatar>
@@ -108,8 +111,14 @@ function GalleryCard({ submission, user, onSubmissionDeleted }: { submission: Su
                 {submission.createdAt ? formatDistanceToNow(submission.createdAt, { addSuffix: true, locale: ko }) : '방금 전'}
             </CardDescription>
          </div>
-         {user && user.username === submission.userId && (
-           <AlertDialog>
+         {user && (user.username === submission.userId || user.role === 'teacher') && (
+           <div className="flex items-center gap-1">
+            {user.role === 'teacher' && (
+                 <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => setIsEditing(true)}>
+                    <Edit className="h-4 w-4" />
+                </Button>
+            )}
+            <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" disabled={isDeleting}>
                   <Trash2 className="h-4 w-4" />
@@ -130,6 +139,7 @@ function GalleryCard({ submission, user, onSubmissionDeleted }: { submission: Su
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+           </div>
          )}
       </CardHeader>
       <CardContent className="flex-grow space-y-4">
@@ -178,6 +188,13 @@ function GalleryCard({ submission, user, onSubmissionDeleted }: { submission: Su
         </Button>
       </CardFooter>
     </Card>
+    <EditSubmissionDialog
+        open={isEditing}
+        onOpenChange={setIsEditing}
+        submission={submission}
+        onSubmissionUpdated={onSubmissionUpdated}
+    />
+    </>
   );
 }
 
@@ -288,6 +305,10 @@ export default function GalleryPage() {
   const handleSubmissionDeleted = useCallback((deletedId: string) => {
     setSubmissions(prev => prev.filter(s => s.id !== deletedId));
   }, []);
+  
+  const handleSubmissionUpdated = useCallback((updatedSubmission: {id: string; evidence: string}) => {
+    setSubmissions(prev => prev.map(s => s.id === updatedSubmission.id ? { ...s, evidence: updatedSubmission.evidence } : s));
+  }, []);
 
   const allStudentUsers = users.filter(u => u.role === 'student');
   const availableGrades = [...new Set(allStudentUsers.map(u => u.grade))].sort((a,b) => (a ?? 0) - (b ?? 0));
@@ -326,8 +347,8 @@ export default function GalleryPage() {
         <h1 className="text-2xl sm:text-3xl font-bold font-headline text-primary flex items-center gap-2">
             <GalleryThumbnails /> 도전 갤러리
         </h1>
-        <Button variant="outline" onClick={() => router.push('/dashboard')} className="self-end sm:self-auto">
-            <ArrowLeft className="mr-2"/> 대시보드로
+        <Button variant="outline" onClick={() => router.push(user?.role === 'teacher' ? '/admin' : '/dashboard')} className="self-end sm:self-auto">
+            <ArrowLeft className="mr-2"/> {user?.role === 'teacher' ? '관리자 페이지로' : '대시보드로'}
         </Button>
       </header>
 
@@ -391,7 +412,7 @@ export default function GalleryPage() {
       ) : (
         <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {filteredSubmissions.map(sub => <GalleryCard key={sub.id} submission={sub} user={user} onSubmissionDeleted={handleSubmissionDeleted} />)}
+              {filteredSubmissions.map(sub => <GalleryCard key={sub.id} submission={sub} user={user} onSubmissionDeleted={handleSubmissionDeleted} onSubmissionUpdated={handleSubmissionUpdated}/>)}
             </div>
             {hasMore && (
                 <div className="mt-12 text-center">

@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A flow to delete a student's challenge submission.
@@ -45,8 +46,17 @@ const deleteSubmissionFlow = ai.defineFlow(
 
     const submissionData = submissionSnap.data();
 
-    // Security check: Only the owner of the submission can delete it.
-    if (submissionData.userId !== userId) {
+    // Fetch requester's data to check their role
+    const requesterDocRef = doc(db, 'users', userId);
+    const requesterDocSnap = await getDoc(requesterDocRef);
+
+    if (!requesterDocSnap.exists()) {
+        throw new Error("오류: 요청자 정보를 찾을 수 없습니다.");
+    }
+    const requesterData = requesterDocSnap.data();
+
+    // Security check: Only the owner or a teacher can delete a submission.
+    if (submissionData.userId !== requesterData.username && requesterData.role !== 'teacher') {
       throw new Error("오류: 이 게시글을 삭제할 권한이 없습니다.");
     }
 
