@@ -21,6 +21,7 @@ import { toggleLike } from '@/ai/flows/toggle-like';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 interface Submission {
@@ -183,7 +184,7 @@ function GalleryCard({ submission, user, onSubmissionDeleted }: { submission: Su
 
 export default function GalleryPage() {
   const { user, users, loading: authLoading, usersLoading } = useAuth();
-  const { loading: configLoading } = useChallengeConfig();
+  const { challengeConfig, loading: configLoading } = useChallengeConfig();
   const router = useRouter();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
@@ -204,7 +205,7 @@ export default function GalleryPage() {
 
   useEffect(() => {
     const fetchInitialSubmissions = async () => {
-      if (!db || !user) {
+      if (!db || !user || !challengeConfig || configLoading) {
           setLoadingInitial(false);
           return;
       };
@@ -238,10 +239,10 @@ export default function GalleryPage() {
       }
     };
 
-    if (user) {
+    if (user && !configLoading) {
       fetchInitialSubmissions();
     }
-  }, [user]);
+  }, [user, configLoading, challengeConfig]);
 
   useEffect(() => {
     if (gradeFilter !== 'all') {
