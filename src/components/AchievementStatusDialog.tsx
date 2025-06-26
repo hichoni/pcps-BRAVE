@@ -279,7 +279,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
         
         <div className="py-2">
             <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
+                <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-3">
                    <FormField
                       control={form.control}
                       name="evidence"
@@ -298,7 +298,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                       )}
                     />
 
-                    <div className="min-h-[6rem] flex items-center">
+                    <div className="flex items-center justify-center min-h-[5rem]">
                         {isChecking && (
                             <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse p-2">
                                 <BrainCircuit className="h-4 w-4" />
@@ -347,12 +347,12 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                             />
 
                             {mediaPreview && mediaFile && (
-                                <div className="mt-4">
+                                <div className="mt-2">
                                     <p className="text-sm font-medium mb-2">미리보기:</p>
                                     {mediaFile.type.startsWith('image/') ? (
-                                        <img src={mediaPreview} alt="미리보기" className="rounded-md max-h-60 w-auto mx-auto border" />
+                                        <img src={mediaPreview} alt="미리보기" className="rounded-md max-h-48 w-auto mx-auto border" />
                                     ) : (
-                                        <video src={mediaPreview} controls className="rounded-md max-h-60 w-auto mx-auto border" />
+                                        <video src={mediaPreview} controls className="rounded-md max-h-48 w-auto mx-auto border" />
                                     )}
                                 </div>
                             )}
