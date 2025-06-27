@@ -33,19 +33,26 @@ function PendingReviewsBadge() {
     useEffect(() => {
         if (!db || !user) return;
 
+        const statusesToFetch = ['pending_review', 'pending_deletion'];
         let q;
         if (user.areaName) {
             q = query(
                 collection(db, "challengeSubmissions"), 
-                where("status", "==", "pending_review"),
+                where("status", "in", statusesToFetch),
                 where("areaName", "==", user.areaName)
             );
         } else {
-             q = query(collection(db, "challengeSubmissions"), where("status", "==", "pending_review"));
+             q = query(
+                collection(db, "challengeSubmissions"), 
+                where("status", "in", statusesToFetch)
+            );
         }
         
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setCount(snapshot.size);
+        }, (error) => {
+            console.error("Error fetching pending review count:", error);
+            setCount(0);
         });
 
         return () => unsubscribe();
@@ -428,3 +435,5 @@ export default function AdminPage() {
     </TooltipProvider>
   );
 }
+
+    
