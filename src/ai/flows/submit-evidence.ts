@@ -145,9 +145,15 @@ const submitEvidenceFlow = ai.defineFlow(
 
                 mediaUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(filePath)}?alt=media&token=${token}`;
             
-            } catch (error: any) {
+            } catch (error: unknown) {
                 console.error("Firebase Admin Storage upload error:", error);
-                let detail = error.message || '알 수 없는 서버 오류가 발생했습니다. 서버 로그를 확인해주세요.';
+                
+                let detail = "알 수 없는 서버 오류가 발생했습니다. 서버 로그를 확인해주세요.";
+                if (error instanceof Error) {
+                    detail = error.message;
+                } else if (typeof error === 'string') {
+                    detail = error;
+                }
 
                 if (typeof detail === 'string') {
                     if (detail.includes('not found')) {
@@ -269,8 +275,14 @@ const submitEvidenceFlow = ai.defineFlow(
       };
     } catch (e: unknown) {
       console.error("Error in submitEvidenceFlow: ", e);
-      // Simplify error handling to be more robust and avoid causing secondary errors.
-      const errorMessage = (e instanceof Error && e.message) ? e.message : "AI 심사 중 알 수 없는 오류가 발생했습니다.";
+      let errorMessage = "AI 심사 중 알 수 없는 오류가 발생했습니다.";
+      if (e instanceof Error) {
+        errorMessage = e.message;
+      } else if (typeof e === 'string') {
+        errorMessage = e;
+      } else if (e && typeof e === 'object' && 'message' in e && typeof e.message === 'string') {
+        errorMessage = e.message;
+      }
       throw new Error(errorMessage);
     }
   }
