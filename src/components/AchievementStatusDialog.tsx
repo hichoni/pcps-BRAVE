@@ -180,7 +180,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   }, [dialogOpen, user, areaName, toast]);
 
 
-  if (!user || !challengeConfig || !user.grade) return null;
+  if (!user || !challengeConfig || user.grade === undefined) return null;
   
   const areaConfig = challengeConfig[areaName];
 
