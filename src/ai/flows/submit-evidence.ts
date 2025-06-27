@@ -175,34 +175,32 @@ const submitEvidenceFlow = ai.defineFlow(
       let submissionStatus: SubmissionStatus;
 
       if (areaConfig.autoApprove) {
-          let aiResult: CertificationCheckOutput | null = null;
-          
           if (areaConfig.aiVisionCheck && input.mediaDataUri && areaConfig.aiVisionPrompt) {
-              aiResult = await analyzeMediaEvidence({
+              const visionResult = await analyzeMediaEvidence({
                   photoDataUri: input.mediaDataUri,
                   prompt: areaConfig.aiVisionPrompt,
               });
-              if (!aiResult) {
+              if (visionResult) {
+                  aiSufficient = visionResult.isSufficient;
+                  aiReasoning = visionResult.reasoning;
+              } else {
+                  aiSufficient = false;
                   aiReasoning = 'AI가 이미지를 분석하지 못했습니다. 기준에 맞지 않거나 손상된 파일일 수 있습니다.';
               }
           } else {
-              aiResult = await checkCertification({
+              const textResult = await checkCertification({
                   areaName: input.koreanName,
                   requirements: areaConfig.requirements,
                   evidence: input.evidence,
               });
-              if (!aiResult) {
+              if (textResult) {
+                  aiSufficient = textResult.isSufficient;
+                  aiReasoning = textResult.reasoning;
+              } else {
+                  aiSufficient = false;
                   aiReasoning = 'AI가 제출 내용을 분석하지 못했습니다. 내용을 확인 후 다시 시도해주세요.';
               }
           }
-
-          if (aiResult) {
-              aiSufficient = aiResult.isSufficient;
-              aiReasoning = aiResult.reasoning;
-          } else {
-              aiSufficient = false;
-          }
-          
           submissionStatus = aiSufficient ? 'approved' : 'rejected';
       } else {
           submissionStatus = 'pending_review';
@@ -306,5 +304,3 @@ const submitEvidenceFlow = ai.defineFlow(
     }
   }
 );
-
-    
