@@ -174,40 +174,42 @@ const submitEvidenceFlow = ai.defineFlow(
             }
         }
         
-      let aiSufficient = false;
-      let aiReasoning = '';
+      let aiSufficient: boolean;
+      let aiReasoning: string;
       let submissionStatus: SubmissionStatus;
 
       if (areaConfig.autoApprove) {
+          let aiResult: CertificationCheckOutput | null = null;
           if (areaConfig.aiVisionCheck && input.mediaDataUri && areaConfig.aiVisionPrompt) {
-              const visionResult = await analyzeMediaEvidence({
+              aiResult = await analyzeMediaEvidence({
                   photoDataUri: input.mediaDataUri,
                   prompt: areaConfig.aiVisionPrompt,
               });
-              if (visionResult) {
-                  aiSufficient = visionResult.isSufficient;
-                  aiReasoning = visionResult.reasoning;
-              } else {
-                  aiSufficient = false;
-                  aiReasoning = 'AI가 이미지를 분석하지 못했습니다. 기준에 맞지 않거나 손상된 파일일 수 있습니다.';
+              if (!aiResult) {
+                aiSufficient = false;
+                aiReasoning = 'AI가 이미지를 분석하지 못했습니다. 기준에 맞지 않거나 손상된 파일일 수 있습니다.';
               }
           } else {
-              const textResult = await checkCertification({
+              aiResult = await checkCertification({
                   areaName: input.koreanName,
                   requirements: areaConfig.requirements,
                   evidence: input.evidence,
               });
-              if (textResult) {
-                  aiSufficient = textResult.isSufficient;
-                  aiReasoning = textResult.reasoning;
-              } else {
-                  aiSufficient = false;
-                  aiReasoning = 'AI가 제출 내용을 분석하지 못했습니다. 내용을 확인 후 다시 시도해주세요.';
+              if (!aiResult) {
+                 aiSufficient = false;
+                 aiReasoning = 'AI가 제출 내용을 분석하지 못했습니다. 내용을 확인 후 다시 시도해주세요.';
               }
           }
+          
+          if(aiResult) {
+            aiSufficient = aiResult.isSufficient;
+            aiReasoning = aiResult.reasoning;
+          }
+
           submissionStatus = aiSufficient ? 'approved' : 'rejected';
       } else {
           submissionStatus = 'pending_review';
+          aiSufficient = false; // Not applicable, but set for clarity
           aiReasoning = 'AI 자동 인증이 비활성화된 영역입니다. 선생님의 확인이 필요합니다.';
       }
 
@@ -235,36 +237,38 @@ const submitEvidenceFlow = ai.defineFlow(
       }
       
       const transactionResult = await runTransaction(db, async (transaction) => {
-        // This transaction is now "pure": it only reads and writes to Firestore,
-        // and returns a value. It doesn't modify outer-scope variables.
-        
-        transaction.set(newSubmissionRef, docData);
-
-        if (!isAutoApproved || areaConfig.goalType !== 'numeric') {
-            return null; // No progress update needed
-        }
-
+        // --- READ PHASE ---
+        let achievementDocSnap;
         const achievementDocRef = doc(db, 'achievements', input.userId);
-        const achievementDocSnap = await transaction.get(achievementDocRef);
-
-        const achievements = achievementDocSnap.exists() ? achievementDocSnap.data() : {};
-        if (typeof achievements !== 'object' || achievements === null) {
-          throw new Error('성취도 데이터 형식이 올바르지 않습니다.');
+        if (isAutoApproved && areaConfig.goalType === 'numeric') {
+            achievementDocSnap = await transaction.get(achievementDocRef);
         }
 
-        const areaState: any = achievements[input.areaName] || {};
-        const newProgress = (Number(areaState.progress) || 0) + 1;
-        
-        const gradeKey = studentUser.grade === 0 ? '6' : String(studentUser.grade ?? '4');
-        const goal = areaConfig.goal?.[gradeKey] ?? 0;
-        const isNowCertified = goal > 0 && newProgress >= goal;
+        // --- CALCULATION & WRITE PHASE ---
+        let newProgress: number | null = null;
+        if (isAutoApproved && areaConfig.goalType === 'numeric') {
+            const achievements = achievementDocSnap?.exists() ? achievementDocSnap.data() : {};
+            if (typeof achievements !== 'object' || achievements === null) {
+              throw new Error('성취도 데이터 형식이 올바르지 않습니다.');
+            }
 
-        const newData = {
-          progress: newProgress,
-          isCertified: !!areaState.isCertified || isNowCertified,
-        };
-        
-        transaction.set(achievementDocRef, { [input.areaName]: newData }, { merge: true });
+            const areaState: any = achievements[input.areaName] || {};
+            newProgress = (Number(areaState.progress) || 0) + 1;
+            
+            const gradeKey = studentUser.grade === 0 ? '6' : String(studentUser.grade ?? '4');
+            const goal = areaConfig.goal?.[gradeKey] ?? 0;
+            const isNowCertified = goal > 0 && newProgress >= goal;
+
+            const newData = {
+              progress: newProgress,
+              isCertified: !!areaState.isCertified || isNowCertified,
+            };
+            
+            transaction.set(achievementDocRef, { [input.areaName]: newData }, { merge: true });
+        }
+
+        // This must be a write operation.
+        transaction.set(newSubmissionRef, docData);
 
         return newProgress; // Return the calculated new progress
       });
@@ -293,12 +297,6 @@ const submitEvidenceFlow = ai.defineFlow(
         errorMessage = e.message;
       } else if (typeof e === 'string' && e) {
         errorMessage = e;
-      } else if (e && typeof e === 'object' && 'message' in e && typeof (e as any).message === 'string') {
-        errorMessage = (e as {message: string}).message;
-      }
-      
-      if (!errorMessage.trim()) {
-        errorMessage = "An unexpected error occurred with no message.";
       }
       
       throw new Error(errorMessage);

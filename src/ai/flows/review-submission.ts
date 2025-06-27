@@ -66,26 +66,29 @@ const reviewSubmissionFlow = ai.defineFlow(
       const challengeConfig = configDocSnap.data();
 
       await runTransaction(db, async (transaction) => {
+        // --- READ PHASE ---
         const submissionSnap = await transaction.get(submissionRef);
         if (!submissionSnap.exists()) {
           throw new Error("검토할 제출물을 찾을 수 없습니다.");
         }
-
+        
+        let achievementDocSnap;
         const submissionData = submissionSnap.data();
-        const newStatus = isApproved ? 'approved' : 'rejected';
+        const areaConfig = challengeConfig[submissionData.areaName];
+        const achievementDocRef = doc(db, 'achievements', submissionData.userId);
 
-        // Update submission status
+        // Only read achievement data if we need to update it
+        if (isApproved && areaConfig && areaConfig.goalType === 'numeric') {
+            achievementDocSnap = await transaction.get(achievementDocRef);
+        }
+
+        // --- WRITE PHASE ---
+        const newStatus = isApproved ? 'approved' : 'rejected';
         transaction.update(submissionRef, { status: newStatus });
 
         // If approved, and it's a numeric goal, update the student's progress
-        if (isApproved) {
-          const areaConfig = challengeConfig[submissionData.areaName];
-          
-          if (areaConfig && areaConfig.goalType === 'numeric') {
-            const achievementDocRef = doc(db, 'achievements', submissionData.userId);
-            const achievementDocSnap = await transaction.get(achievementDocRef);
-            
-            const achievements = achievementDocSnap.exists() ? achievementDocSnap.data() : {};
+        if (isApproved && areaConfig && areaConfig.goalType === 'numeric') {
+            const achievements = achievementDocSnap?.exists() ? achievementDocSnap.data() : {};
             const areaState = achievements[submissionData.areaName] || { progress: 0, isCertified: false };
             const newProgress = (Number(areaState.progress) || 0) + 1;
             
@@ -101,7 +104,6 @@ const reviewSubmissionFlow = ai.defineFlow(
             transaction.set(achievementDocRef, { 
                 [submissionData.areaName]: newData
             }, { merge: true });
-          }
         }
       });
 
