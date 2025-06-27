@@ -269,11 +269,15 @@ const submitEvidenceFlow = ai.defineFlow(
       };
     } catch (e: any) {
       console.error("Error in submitEvidenceFlow: ", e);
-      // Ensure that we always throw an Error object for consistent handling upstream
+      let errorMessage = "데이터베이스에 제출 정보를 저장하거나 AI 검사를 하는 데 실패했습니다.";
       if (e instanceof Error) {
-        throw e;
+        errorMessage = e.message;
+      } else if (typeof e === 'string') {
+        errorMessage = e;
+      } else if (e && typeof e === 'object' && 'message' in e && typeof e.message === 'string') {
+        errorMessage = e.message;
       }
-      throw new Error(e.message || "데이터베이스에 제출 정보를 저장하거나 AI 검사를 하는 데 실패했습니다.");
+      throw new Error(errorMessage);
     }
   }
 );
