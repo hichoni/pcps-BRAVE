@@ -212,7 +212,6 @@ const submitEvidenceFlow = ai.defineFlow(
       }
 
       const isAutoApproved = submissionStatus === 'approved';
-      let updateMessage = '';
 
       const submissionsCollection = collection(db, 'challengeSubmissions');
       const newSubmissionRef = doc(submissionsCollection);
@@ -235,47 +234,48 @@ const submitEvidenceFlow = ai.defineFlow(
           docData.mediaType = input.mediaType;
       }
       
-      await runTransaction(db, async (transaction) => {
-        let achievementDocRef;
-        let achievementDocSnap;
-
-        if (isAutoApproved && areaConfig.goalType === 'numeric') {
-          achievementDocRef = doc(db, 'achievements', input.userId);
-          achievementDocSnap = await transaction.get(achievementDocRef);
-        }
-
+      const transactionResult = await runTransaction(db, async (transaction) => {
+        // This transaction is now "pure": it only reads and writes to Firestore,
+        // and returns a value. It doesn't modify outer-scope variables.
+        
         transaction.set(newSubmissionRef, docData);
 
-        if (isAutoApproved && areaConfig.goalType === 'numeric' && achievementDocRef && achievementDocSnap) {
-          const achievements = achievementDocSnap.exists() ? achievementDocSnap.data() : {};
-          if (typeof achievements !== 'object' || achievements === null) {
-            throw new Error('성취도 데이터 형식이 올바르지 않습니다.');
-          }
-
-          const areaState: any = achievements[input.areaName] || {};
-          const newProgress = (Number(areaState.progress) || 0) + 1;
-          
-          const gradeKey = studentUser.grade === 0 ? '6' : String(studentUser.grade ?? '4');
-          const goal = areaConfig.goal?.[gradeKey] ?? 0;
-          const isNowCertified = goal > 0 && newProgress >= goal;
-
-          const newData = {
-            progress: newProgress,
-            isCertified: !!areaState.isCertified || isNowCertified,
-          };
-          
-          transaction.set(achievementDocRef, { [input.areaName]: newData }, { merge: true });
-          updateMessage = `AI가 활동을 확인하고 바로 승인했어요! 진행도가 1만큼 증가했습니다. (현재: ${newProgress}${areaConfig.unit})`;
+        if (!isAutoApproved || areaConfig.goalType !== 'numeric') {
+            return null; // No progress update needed
         }
+
+        const achievementDocRef = doc(db, 'achievements', input.userId);
+        const achievementDocSnap = await transaction.get(achievementDocRef);
+
+        const achievements = achievementDocSnap.exists() ? achievementDocSnap.data() : {};
+        if (typeof achievements !== 'object' || achievements === null) {
+          throw new Error('성취도 데이터 형식이 올바르지 않습니다.');
+        }
+
+        const areaState: any = achievements[input.areaName] || {};
+        const newProgress = (Number(areaState.progress) || 0) + 1;
+        
+        const gradeKey = studentUser.grade === 0 ? '6' : String(studentUser.grade ?? '4');
+        const goal = areaConfig.goal?.[gradeKey] ?? 0;
+        const isNowCertified = goal > 0 && newProgress >= goal;
+
+        const newData = {
+          progress: newProgress,
+          isCertified: !!areaState.isCertified || isNowCertified,
+        };
+        
+        transaction.set(achievementDocRef, { [input.areaName]: newData }, { merge: true });
+
+        return newProgress; // Return the calculated new progress
       });
 
-
-      if (!isAutoApproved) {
-          if (submissionStatus === 'rejected') {
-              updateMessage = `AI 심사 결과, 반려되었습니다. 사유: ${aiReasoning}`;
-          } else {
-              updateMessage = '제출 완료! 선생님이 확인하신 후, 진행도에 반영될 거예요.';
-          }
+      let updateMessage = '';
+      if (transactionResult !== null) {
+          updateMessage = `AI가 활동을 확인하고 바로 승인했어요! 진행도가 1만큼 증가했습니다. (현재: ${transactionResult}${areaConfig.unit})`;
+      } else if (submissionStatus === 'rejected') {
+          updateMessage = `AI 심사 결과, 반려되었습니다. 사유: ${aiReasoning}`;
+      } else {
+          updateMessage = '제출 완료! 선생님이 확인하신 후, 진행도에 반영될 거예요.';
       }
 
       return { 
