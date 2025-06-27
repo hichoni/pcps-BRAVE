@@ -47,122 +47,122 @@ const submitEvidenceFlow = ai.defineFlow(
     outputSchema: SubmitEvidenceOutputSchema,
   },
   async (input) => {
-    if (!db) {
-      console.error("Firestore is not initialized.");
-      throw new Error("데이터베이스 연결 실패: Firestore가 초기화되지 않았습니다.");
-    }
-    
-    const configDocRef = doc(db, 'config', 'challengeConfig');
-    const configDocSnap = await getDoc(configDocRef);
-    if (!configDocSnap.exists()) {
-        throw new Error("도전 영역 설정을 찾을 수 없습니다. 관리자에게 문의해주세요.");
-    }
-    const challengeConfig = configDocSnap.data();
-    const areaConfig = challengeConfig[input.areaName];
-    if (!areaConfig) {
-        throw new Error(`'${input.koreanName}' 도전 영역의 설정을 찾을 수 없습니다.`);
-    }
-
-    const userQuery = query(collection(db, 'users'), where('username', '==', input.userId), limit(1));
-    const userSnapshot = await getDocs(userQuery);
-    if (userSnapshot.empty) {
-        throw new Error(`사용자 정보(${input.userId})를 찾을 수 없습니다.`);
-    }
-    const studentUser = userSnapshot.docs[0].data() as User;
-
-    // Submission interval check
-    if (areaConfig.submissionIntervalMinutes && areaConfig.submissionIntervalMinutes > 0) {
-        const submissionsCollection = collection(db, 'challengeSubmissions');
-        const q = query(
-            submissionsCollection,
-            where("userId", "==", input.userId),
-            where("areaName", "==", input.areaName)
-        );
-
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-            const submissions = querySnapshot.docs.map(doc => doc.data());
-            
-            // Filter out rejected submissions before checking the interval.
-            const nonRejectedSubmissions = submissions.filter(s => s.status !== 'rejected');
-
-            if (nonRejectedSubmissions.length > 0) {
-                // Sort to find the most recent non-rejected submission
-                nonRejectedSubmissions.sort((a, b) => 
-                    (b.createdAt as Timestamp)?.toMillis() - (a.createdAt as Timestamp)?.toMillis()
-                );
-                
-                const lastValidSubmission = nonRejectedSubmissions[0];
-
-                if (lastValidSubmission && lastValidSubmission.createdAt) {
-                    const lastSubmissionTime = (lastValidSubmission.createdAt as Timestamp).toDate();
-                    const now = new Date();
-                    const minutesSinceLastSubmission = (now.getTime() - lastSubmissionTime.getTime()) / (1000 * 60);
-        
-                    if (minutesSinceLastSubmission < areaConfig.submissionIntervalMinutes) {
-                        const minutesToWait = Math.ceil(areaConfig.submissionIntervalMinutes - minutesSinceLastSubmission);
-                        throw new Error(`제출 간격 제한: 다음 제출까지 ${minutesToWait}분 남았습니다.`);
-                    }
-                }
-            }
-        }
-    }
-
-    let mediaUrl: string | undefined = undefined;
-
-    if (input.mediaDataUri && input.mediaType) {
-        if (!adminStorage) {
-            throw new Error("서버 설정 오류: Firebase Admin SDK가 초기화되지 않았습니다. service-account.json 파일이 올바른지, 혹은 서버 로그에 다른 오류가 있는지 확인해주세요.");
-        }
-        try {
-            const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
-            if (!bucketName) {
-                throw new Error("서버 설정 오류: .env.local 파일에 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값이 설정되지 않았습니다.");
-            }
-            if (bucketName.startsWith('gs://')) {
-                throw new Error("서버 설정 오류: .env.local 파일의 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값에 'gs://'를 포함해서는 안 됩니다. 'gs://'를 제외하고 입력해주세요.");
-            }
-
-            const bucket = adminStorage.bucket(bucketName);
-
-            const fileExtension = input.mediaType.split('/')[1] || 'jpeg';
-            const filePath = `evidence/${input.userId}/${Date.now()}.${fileExtension}`;
-            const file = bucket.file(filePath);
-
-            const buffer = Buffer.from(input.mediaDataUri.split(',')[1], 'base64');
-            
-            const token = uuidv4();
-
-            await file.save(buffer, {
-                metadata: {
-                    contentType: input.mediaType,
-                    metadata: {
-                        firebaseStorageDownloadTokens: token,
-                    }
-                },
-            });
-
-            mediaUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(filePath)}?alt=media&token=${token}`;
-        
-        } catch (error: any) {
-            console.error("Firebase Admin Storage upload error:", error);
-            let detail = error.message || '알 수 없는 서버 오류가 발생했습니다. 서버 로그를 확인해주세요.';
-
-            if (typeof detail === 'string') {
-                if (detail.includes('not found')) {
-                    detail = `Firebase Storage 버킷을 찾을 수 없습니다. .env.local 파일의 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값이 올바른지 확인해주세요. (현재 값: '${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '없음'}')`;
-                } else if (detail.includes('permission denied') || detail.includes('unauthorized') || detail.includes('does not have storage.objects.create')) {
-                    detail = "Firebase Storage에 파일을 업로드할 권한이 없습니다. Google Cloud IAM 설정에서 서비스 계정에 'Storage 개체 관리자(Storage Object Admin)' 역할이 부여되었는지 확인해주세요.";
-                } else if (detail.includes('bucket name')) {
-                     detail = `버킷 이름이 잘못되었습니다. .env.local 파일의 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값을 확인해주세요.`;
-                }
-            }
-            
-            throw new Error(`파일 업로드 실패: ${detail}`);
-        }
-    }
-    
     try {
+        if (!db) {
+            console.error("Firestore is not initialized.");
+            throw new Error("데이터베이스 연결 실패: Firestore가 초기화되지 않았습니다.");
+        }
+        
+        const configDocRef = doc(db, 'config', 'challengeConfig');
+        const configDocSnap = await getDoc(configDocRef);
+        if (!configDocSnap.exists()) {
+            throw new Error("도전 영역 설정을 찾을 수 없습니다. 관리자에게 문의해주세요.");
+        }
+        const challengeConfig = configDocSnap.data();
+        const areaConfig = challengeConfig[input.areaName];
+        if (!areaConfig) {
+            throw new Error(`'${input.koreanName}' 도전 영역의 설정을 찾을 수 없습니다.`);
+        }
+
+        const userQuery = query(collection(db, 'users'), where('username', '==', input.userId), limit(1));
+        const userSnapshot = await getDocs(userQuery);
+        if (userSnapshot.empty) {
+            throw new Error(`사용자 정보(${input.userId})를 찾을 수 없습니다.`);
+        }
+        const studentUser = userSnapshot.docs[0].data() as User;
+
+        // Submission interval check
+        if (areaConfig.submissionIntervalMinutes && areaConfig.submissionIntervalMinutes > 0) {
+            const submissionsCollection = collection(db, 'challengeSubmissions');
+            const q = query(
+                submissionsCollection,
+                where("userId", "==", input.userId),
+                where("areaName", "==", input.areaName)
+            );
+
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+                const submissions = querySnapshot.docs.map(doc => doc.data());
+                
+                // Filter out rejected submissions before checking the interval.
+                const nonRejectedSubmissions = submissions.filter(s => s.status !== 'rejected');
+
+                if (nonRejectedSubmissions.length > 0) {
+                    // Sort to find the most recent non-rejected submission
+                    nonRejectedSubmissions.sort((a, b) => 
+                        (b.createdAt as Timestamp)?.toMillis() - (a.createdAt as Timestamp)?.toMillis()
+                    );
+                    
+                    const lastValidSubmission = nonRejectedSubmissions[0];
+
+                    if (lastValidSubmission && lastValidSubmission.createdAt) {
+                        const lastSubmissionTime = (lastValidSubmission.createdAt as Timestamp).toDate();
+                        const now = new Date();
+                        const minutesSinceLastSubmission = (now.getTime() - lastSubmissionTime.getTime()) / (1000 * 60);
+            
+                        if (minutesSinceLastSubmission < areaConfig.submissionIntervalMinutes) {
+                            const minutesToWait = Math.ceil(areaConfig.submissionIntervalMinutes - minutesSinceLastSubmission);
+                            throw new Error(`제출 간격 제한: 다음 제출까지 ${minutesToWait}분 남았습니다.`);
+                        }
+                    }
+                }
+            }
+        }
+
+        let mediaUrl: string | undefined = undefined;
+
+        if (input.mediaDataUri && input.mediaType) {
+            if (!adminStorage) {
+                throw new Error("서버 설정 오류: Firebase Admin SDK가 초기화되지 않았습니다. service-account.json 파일이 올바른지, 혹은 서버 로그에 다른 오류가 있는지 확인해주세요.");
+            }
+            try {
+                const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+                if (!bucketName) {
+                    throw new Error("서버 설정 오류: .env.local 파일에 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값이 설정되지 않았습니다.");
+                }
+                if (bucketName.startsWith('gs://')) {
+                    throw new Error("서버 설정 오류: .env.local 파일의 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값에 'gs://'를 포함해서는 안 됩니다. 'gs://'를 제외하고 입력해주세요.");
+                }
+
+                const bucket = adminStorage.bucket(bucketName);
+
+                const fileExtension = input.mediaType.split('/')[1] || 'jpeg';
+                const filePath = `evidence/${input.userId}/${Date.now()}.${fileExtension}`;
+                const file = bucket.file(filePath);
+
+                const buffer = Buffer.from(input.mediaDataUri.split(',')[1], 'base64');
+                
+                const token = uuidv4();
+
+                await file.save(buffer, {
+                    metadata: {
+                        contentType: input.mediaType,
+                        metadata: {
+                            firebaseStorageDownloadTokens: token,
+                        }
+                    },
+                });
+
+                mediaUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(filePath)}?alt=media&token=${token}`;
+            
+            } catch (error: any) {
+                console.error("Firebase Admin Storage upload error:", error);
+                let detail = error.message || '알 수 없는 서버 오류가 발생했습니다. 서버 로그를 확인해주세요.';
+
+                if (typeof detail === 'string') {
+                    if (detail.includes('not found')) {
+                        detail = `Firebase Storage 버킷을 찾을 수 없습니다. .env.local 파일의 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값이 올바른지 확인해주세요. (현재 값: '${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '없음'}')`;
+                    } else if (detail.includes('permission denied') || detail.includes('unauthorized') || detail.includes('does not have storage.objects.create')) {
+                        detail = "Firebase Storage에 파일을 업로드할 권한이 없습니다. Google Cloud IAM 설정에서 서비스 계정에 'Storage 개체 관리자(Storage Object Admin)' 역할이 부여되었는지 확인해주세요.";
+                    } else if (detail.includes('bucket name')) {
+                        detail = `버킷 이름이 잘못되었습니다. .env.local 파일의 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값을 확인해주세요.`;
+                    }
+                }
+                
+                throw new Error(`파일 업로드 실패: ${detail}`);
+            }
+        }
+        
       let aiSufficient = false;
       let aiReasoning = '';
       let submissionStatus: SubmissionStatus;
@@ -267,16 +267,10 @@ const submitEvidenceFlow = ai.defineFlow(
           updateMessage,
           aiReasoning: aiReasoning
       };
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Error in submitEvidenceFlow: ", e);
-      let errorMessage = "데이터베이스에 제출 정보를 저장하거나 AI 검사를 하는 데 실패했습니다.";
-      if (e instanceof Error) {
-        errorMessage = e.message;
-      } else if (typeof e === 'string') {
-        errorMessage = e;
-      } else if (e && typeof e === 'object' && 'message' in e && typeof e.message === 'string') {
-        errorMessage = e.message;
-      }
+      // Simplify error handling to be more robust and avoid causing secondary errors.
+      const errorMessage = (e instanceof Error && e.message) ? e.message : "AI 심사 중 알 수 없는 오류가 발생했습니다.";
       throw new Error(errorMessage);
     }
   }
