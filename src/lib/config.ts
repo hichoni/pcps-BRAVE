@@ -71,6 +71,7 @@ export type AreaConfig = {
   aiVisionCheck?: boolean;
   aiVisionPrompt?: string;
   submissionIntervalMinutes?: number;
+  autoCertifyOn?: string[];
 };
 
 export type StoredAreaConfig = Omit<AreaConfig, 'icon' | 'name'> & { 
@@ -83,6 +84,7 @@ export type StoredAreaConfig = Omit<AreaConfig, 'icon' | 'name'> & {
   aiVisionCheck?: boolean;
   aiVisionPrompt?: string;
   submissionIntervalMinutes?: number;
+  autoCertifyOn?: string[];
 };
 
 export const ICONS: Record<string, LucideIcon> = {
@@ -143,6 +145,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goal: {},
     options: ['1등급', '2등급', '3등급', '4등급', '5등급'],
     unit: '등급',
+    autoCertifyOn: ['1등급', '2등급', '3등급'],
     autoApprove: false, // Teacher must check official results
     goalDescription: 'PAPS 기준 충족',
     showInGallery: false,

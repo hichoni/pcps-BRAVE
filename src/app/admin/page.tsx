@@ -339,14 +339,26 @@ export default function AdminPage() {
                                                         </SelectContent>
                                                       </Select>
                                                   )}
-                                                  <Button
-                                                    variant={isCertified ? 'default' : 'outline'}
-                                                    size="icon"
-                                                    className="h-8 w-8"
-                                                    onClick={() => handleToggleCertification(student.username, area)}
-                                                  >
-                                                      <Check className="h-5 w-5" />
-                                                  </Button>
+                                                  <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                      <div>
+                                                        <Button
+                                                          variant={isCertified ? 'default' : 'outline'}
+                                                          size="icon"
+                                                          className="h-8 w-8"
+                                                          onClick={() => handleToggleCertification(student.username, area)}
+                                                          disabled={!!areaConfig.autoCertifyOn}
+                                                        >
+                                                          <Check className="h-5 w-5" />
+                                                        </Button>
+                                                      </div>
+                                                    </TooltipTrigger>
+                                                    {!!areaConfig.autoCertifyOn && (
+                                                      <TooltipContent>
+                                                        <p>자동 인증 영역입니다.</p>
+                                                      </TooltipContent>
+                                                    )}
+                                                  </Tooltip>
                                               </div>
                                           </TableCell>
                                       )

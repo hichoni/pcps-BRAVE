@@ -14,7 +14,7 @@ import { collection, addDoc, serverTimestamp, doc, getDoc, runTransaction, query
 import { v4 as uuidv4 } from 'uuid';
 import { checkCertification } from './certification-checker';
 import { analyzeMediaEvidence } from './analyze-typing-test'; // Now a generic media analyzer
-import { type SubmitEvidenceInput, type SubmitEvidenceOutput, SubmissionStatus } from '@/lib/config';
+import { type SubmitEvidenceInput, type SubmitEvidenceOutput, SubmissionStatus, type User } from '@/lib/config';
 
 export async function submitEvidence(input: SubmitEvidenceInput): Promise<SubmitEvidenceOutput> {
   return submitEvidenceFlow(input);
@@ -62,6 +62,13 @@ const submitEvidenceFlow = ai.defineFlow(
     if (!areaConfig) {
         throw new Error(`'${input.koreanName}' 도전 영역의 설정을 찾을 수 없습니다.`);
     }
+
+    const userQuery = query(collection(db, 'users'), where('username', '==', input.userId), limit(1));
+    const userSnapshot = await getDocs(userQuery);
+    if (userSnapshot.empty) {
+        throw new Error(`사용자 정보(${input.userId})를 찾을 수 없습니다.`);
+    }
+    const studentUser = userSnapshot.docs[0].data() as User;
 
     // Submission interval check
     if (areaConfig.submissionIntervalMinutes && areaConfig.submissionIntervalMinutes > 0) {
@@ -183,9 +190,19 @@ const submitEvidenceFlow = ai.defineFlow(
           await runTransaction(db, async (transaction) => {
               const achievementDocSnap = await transaction.get(achievementDocRef);
               const achievements = achievementDocSnap.exists() ? achievementDocSnap.data() : {};
-              const areaState = achievements[input.areaName] || { progress: 0 };
+              const areaState = achievements[input.areaName] || { progress: 0, isCertified: false };
               const newProgress = (Number(areaState.progress) || 0) + 1;
-              transaction.set(achievementDocRef, { [input.areaName]: { ...areaState, progress: newProgress } }, { merge: true });
+              
+              const gradeKey = studentUser.grade === 0 ? '6' : String(studentUser.grade ?? '4');
+              const goal = areaConfig.goal[gradeKey] ?? 0;
+              const isNowCertified = goal > 0 && newProgress >= goal;
+
+              const newData = {
+                progress: newProgress,
+                isCertified: areaState.isCertified || isNowCertified
+              };
+
+              transaction.set(achievementDocRef, { [input.areaName]: newData }, { merge: true });
               updateMessage = `AI가 활동을 확인하고 바로 승인했어요! 진행도가 1만큼 증가했습니다. (현재: ${newProgress}${areaConfig.unit})`;
           });
         }

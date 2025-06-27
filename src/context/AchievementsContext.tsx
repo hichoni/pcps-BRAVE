@@ -50,7 +50,7 @@ const generateInitialStateForUser = (challengeConfig: any): AchievementsState =>
 export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
   const [allAchievements, setAllAchievements] = useState<AllAchievementsState | null>(null);
   const [loading, setLoading] = useState(true);
-  const { user, loading: authLoading } = useAuth();
+  const { user, users, loading: authLoading } = useAuth();
   const { challengeConfig, loading: configLoading } = useChallengeConfig();
 
   useEffect(() => {
@@ -136,16 +136,46 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
   }, [allAchievements, challengeConfig]);
 
   const setProgress = useCallback(async (username: string, area: AreaName, progress: number | string) => {
-    // This function is now mainly for manual teacher overrides.
-    if (!db) return;
+    if (!db || !challengeConfig || !users) return;
+
     try {
         const achievementDocRef = doc(db, 'achievements', username);
-        await setDoc(achievementDocRef, { [area]: { progress } }, { merge: true });
+        const areaConfig = challengeConfig[area];
+        const student = users.find(u => u.username === username);
+
+        const docSnap = await getDoc(achievementDocRef);
+        const currentData = docSnap.exists() && docSnap.data()[area] ? docSnap.data()[area] : {};
+        
+        let newIsCertified;
+
+        // For objective types with auto-certify rules, the status is directly tied to the value.
+        if (areaConfig?.goalType === 'objective' && areaConfig.autoCertifyOn && typeof progress === 'string') {
+            newIsCertified = areaConfig.autoCertifyOn.includes(progress);
+        } 
+        // For numeric types, certify if goal is met (and don't un-certify).
+        else if (areaConfig?.goalType === 'numeric' && typeof progress === 'number' && student?.grade !== undefined) {
+            const gradeKey = student.grade === 0 ? '6' : String(student.grade);
+            const goal = areaConfig.goal[gradeKey] ?? 0;
+            const meetsGoal = goal > 0 && progress >= goal;
+            newIsCertified = (currentData.isCertified ?? false) || meetsGoal;
+        } else {
+            // For objective types without auto-certify rules, or other cases, don't change certification status.
+            newIsCertified = currentData.isCertified ?? false;
+        }
+        
+        const newData = {
+            ...currentData,
+            progress: progress,
+            isCertified: newIsCertified,
+        };
+
+        await setDoc(achievementDocRef, { [area]: newData }, { merge: true });
+
     } catch(e) {
         console.warn("Failed to update progress in Firestore", e);
-        // Revert UI change if Firestore fails? The real-time listener should handle this automatically.
+        throw e;
     }
-  }, []);
+  }, [challengeConfig, users]);
 
   const toggleCertification = useCallback(async (username: string, area: AreaName) => {
     if (!db) return;

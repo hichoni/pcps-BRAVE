@@ -6,8 +6,8 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, runTransaction, collection } from 'firebase/firestore';
-import { type ReviewSubmissionInput, type ReviewSubmissionOutput } from '@/lib/config';
+import { doc, getDoc, runTransaction, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { type ReviewSubmissionInput, type ReviewSubmissionOutput, type User } from '@/lib/config';
 
 const ReviewSubmissionInputSchema = z.object({
   submissionId: z.string().describe("The ID of the submission document to review."),
@@ -45,6 +45,25 @@ const reviewSubmissionFlow = ai.defineFlow(
     const submissionRef = doc(db, 'challengeSubmissions', submissionId);
 
     try {
+      const submissionSnapForUser = await getDoc(submissionRef);
+      if (!submissionSnapForUser.exists()) {
+        throw new Error("검토할 제출물을 찾을 수 없습니다.");
+      }
+      const studentUsername = submissionSnapForUser.data().userId;
+      const userQuery = query(collection(db, 'users'), where("username", "==", studentUsername), limit(1));
+      const userSnapshot = await getDocs(userQuery);
+      if (userSnapshot.empty) {
+          throw new Error(`사용자 정보(${studentUsername})를 찾을 수 없습니다.`);
+      }
+      const studentUser = userSnapshot.docs[0].data() as User;
+
+      const configDocRef = doc(db, 'config', 'challengeConfig');
+      const configDocSnap = await getDoc(configDocRef);
+      if (!configDocSnap.exists()) {
+          throw new Error("도전 영역 설정을 찾을 수 없습니다.");
+      }
+      const challengeConfig = configDocSnap.data();
+
       await runTransaction(db, async (transaction) => {
         const submissionSnap = await transaction.get(submissionRef);
         if (!submissionSnap.exists()) {
@@ -59,12 +78,6 @@ const reviewSubmissionFlow = ai.defineFlow(
 
         // If approved, and it's a numeric goal, update the student's progress
         if (isApproved) {
-          const configDocRef = doc(db, 'config', 'challengeConfig');
-          const configDocSnap = await getDoc(configDocRef); // Use getDoc inside transaction for read
-          if (!configDocSnap.exists()) {
-              throw new Error("도전 영역 설정을 찾을 수 없습니다.");
-          }
-          const challengeConfig = configDocSnap.data();
           const areaConfig = challengeConfig[submissionData.areaName];
           
           if (areaConfig && areaConfig.goalType === 'numeric') {
@@ -72,11 +85,20 @@ const reviewSubmissionFlow = ai.defineFlow(
             const achievementDocSnap = await transaction.get(achievementDocRef);
             
             const achievements = achievementDocSnap.exists() ? achievementDocSnap.data() : {};
-            const areaState = achievements[submissionData.areaName] || { progress: 0 };
+            const areaState = achievements[submissionData.areaName] || { progress: 0, isCertified: false };
             const newProgress = (Number(areaState.progress) || 0) + 1;
             
+            const gradeKey = studentUser.grade === 0 ? '6' : String(studentUser.grade ?? '4');
+            const goal = areaConfig.goal[gradeKey] ?? 0;
+            const isNowCertified = goal > 0 && newProgress >= goal;
+            
+            const newData = {
+              progress: newProgress,
+              isCertified: areaState.isCertified || isNowCertified,
+            };
+            
             transaction.set(achievementDocRef, { 
-                [submissionData.areaName]: { ...areaState, progress: newProgress } 
+                [submissionData.areaName]: newData
             }, { merge: true });
           }
         }
