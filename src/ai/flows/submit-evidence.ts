@@ -242,10 +242,9 @@ const submitEvidenceFlow = ai.defineFlow(
         // --- CALCULATION & WRITE PHASE ---
         let newProgress: number | null = null;
         if (isAutoApproved && areaConfig.goalType === 'numeric') {
-            const achievements = achievementDocSnap?.exists() ? achievementDocSnap.data() : {};
-            if (typeof achievements !== 'object' || achievements === null) {
-              throw new Error('성취도 데이터 형식이 올바르지 않습니다.');
-            }
+            const rawAchievements = achievementDocSnap?.exists() ? achievementDocSnap.data() : {};
+            // Robustness check: Ensure achievements is a valid object.
+            const achievements = (typeof rawAchievements === 'object' && rawAchievements !== null) ? rawAchievements : {};
 
             const areaState: any = achievements[input.areaName] || {};
             newProgress = (Number(areaState.progress) || 0) + 1;

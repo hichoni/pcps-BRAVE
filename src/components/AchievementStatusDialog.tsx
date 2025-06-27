@@ -329,7 +329,15 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
       setMediaPreview(null);
     } catch (error: unknown) {
       console.error('Evidence Submission Error:', error);
-      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+      let errorMessage = '알 수 없는 오류가 발생했습니다.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string') {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
       toast({
         variant: 'destructive',
         title: '제출 오류',
