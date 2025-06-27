@@ -59,7 +59,7 @@ const submitEvidenceFlow = ai.defineFlow(
             throw new Error("도전 영역 설정을 찾을 수 없습니다. 관리자에게 문의해주세요.");
         }
         const challengeConfig = configDocSnap.data();
-        if (!challengeConfig) {
+        if (!challengeConfig || typeof challengeConfig !== 'object' || Object.keys(challengeConfig).length === 0) {
              throw new Error("도전 영역 설정 데이터가 올바르지 않습니다.");
         }
 
@@ -136,8 +136,12 @@ const submitEvidenceFlow = ai.defineFlow(
                 const fileExtension = input.mediaType.split('/')[1] || 'jpeg';
                 const filePath = `evidence/${input.userId}/${Date.now()}.${fileExtension}`;
                 const file = bucket.file(filePath);
-
-                const buffer = Buffer.from(input.mediaDataUri.split(',')[1], 'base64');
+                
+                const dataUriParts = input.mediaDataUri.split(',');
+                if (dataUriParts.length !== 2 || !dataUriParts[1]) {
+                    throw new Error('올바르지 않은 미디어 데이터 형식입니다. 파일이 손상되었을 수 있습니다.');
+                }
+                const buffer = Buffer.from(dataUriParts[1], 'base64');
                 
                 const token = uuidv4();
 
@@ -301,5 +305,3 @@ const submitEvidenceFlow = ai.defineFlow(
     }
   }
 );
-
-    
