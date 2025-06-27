@@ -209,7 +209,7 @@ export default function LoginPage() {
               <Form {...studentForm}>
                 <form onSubmit={studentForm.handleSubmit(onStudentSubmit)}>
                   <CardContent className="space-y-4 pt-4">
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-2">
                       <FormField
                           control={studentForm.control}
                           name="grade"
