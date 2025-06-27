@@ -296,14 +296,23 @@ const submitEvidenceFlow = ai.defineFlow(
     } catch (e: unknown) {
       console.error("Submit Evidence Flow Error:", e);
 
-      let errorMessage = "An unexpected error occurred. Please try again later.";
+      let errorMessage = "알 수 없는 오류가 발생했습니다. 나중에 다시 시도해주세요.";
 
       if (e instanceof Error) {
         errorMessage = e.message;
-      } else if (typeof e === 'object' && e !== null && 'message' in e) {
-        errorMessage = String((e as { message: unknown }).message);
+      } else if (typeof e === 'string' && e.length > 0) {
+        errorMessage = e;
       } else if (e) {
-        errorMessage = String(e);
+        try {
+          const maybeError = JSON.parse(JSON.stringify(e));
+          if(maybeError && typeof maybeError === 'object' && 'message' in maybeError) {
+             errorMessage = String(maybeError.message);
+          } else {
+            errorMessage = String(e);
+          }
+        } catch {
+          errorMessage = String(e);
+        }
       }
       
       throw new Error(errorMessage);
