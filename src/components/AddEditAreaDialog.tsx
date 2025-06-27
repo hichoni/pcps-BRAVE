@@ -303,6 +303,22 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
                       </FormItem>
                   )}
               />
+              <FormField
+                control={form.control}
+                name="goalDescription"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>목표 설명 (선택)</FormLabel>
+                        <FormControl>
+                            <Input placeholder="예: 3등급 이상 달성 / 영어책 10권 읽기" {...field} value={field.value ?? ''} />
+                        </FormControl>
+                        <FormDescription className="text-xs">
+                          학생들의 '도전 영역 둘러보기' 카드에 표시될 목표입니다. 비워두면 자동으로 생성됩니다. (예: 5권)
+                        </FormDescription>
+                        <FormMessage />
+                    </FormItem>
+                )}
+              />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -369,22 +385,6 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
 
               {goalType === 'objective' && (
                 <div className="space-y-4 p-4 border rounded-md">
-                    <FormField
-                      control={form.control}
-                      name="goalDescription"
-                      render={({ field }) => (
-                          <FormItem>
-                              <FormLabel>목표 설명</FormLabel>
-                              <FormControl>
-                                  <Input placeholder="예: 3등급 이상 달성" {...field} value={field.value ?? ''} />
-                              </FormControl>
-                              <FormDescription className="text-xs">
-                                학생들의 '도전 영역 둘러보기' 카드에 표시될 목표입니다. (예: 3등급 달성, 금상 수상)
-                              </FormDescription>
-                              <FormMessage />
-                          </FormItem>
-                      )}
-                    />
                     <div className="space-y-2">
                       <div className="flex justify-between items-center mb-2">
                           <Label>선택지 목록</Label>

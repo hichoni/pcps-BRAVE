@@ -46,15 +46,18 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
   const isTeacherInput = areaConfig.goalType === 'objective';
 
   const renderProgress = () => {
+    const goalText = areaConfig.goalDescription;
+
     if (areaConfig.goalType === 'numeric') {
         const gradeKey = user.grade === 0 ? '6' : String(user.grade ?? '4');
         const goal = areaConfig.goal[gradeKey] ?? 0;
         const currentProgress = (progress as number) || 0;
         const unit = areaConfig.unit;
+        const defaultGoalText = `목표: ${goal}${unit}`;
 
         return (
             <div className="text-center">
-                <p className="text-xs sm:text-sm text-muted-foreground">목표: {goal}{unit}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">{goalText || defaultGoalText}</p>
                 <p className="font-bold text-base sm:text-lg text-primary h-7">
                     현재: {currentProgress}{unit}
                 </p>
@@ -63,9 +66,11 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
     }
     if (areaConfig.goalType === 'objective') {
         const hasProgress = !!progress;
+        const defaultGoalText = '교사 확인';
+
         return (
             <div className="text-center">
-                 <p className="text-xs sm:text-sm text-muted-foreground">목표: {areaConfig.goalDescription || '교사 확인'}</p>
+                 <p className="text-xs sm:text-sm text-muted-foreground">{goalText || defaultGoalText}</p>
                  <div className="font-bold text-base sm:text-lg text-primary flex items-center justify-center gap-2 h-7">
                     {hasProgress ? (
                         <>
