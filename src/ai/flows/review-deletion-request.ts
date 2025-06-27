@@ -65,7 +65,7 @@ const reviewDeletionRequestFlow = ai.defineFlow(
             const submissionData = submissionSnap.data();
             submissionDataForStorage = submissionData;
 
-            // FIX: Check 'previousStatus' because the current status is 'pending_deletion'.
+            // Check 'previousStatus' because the current status is 'pending_deletion'.
             // Only decrement progress if the submission was 'approved' before the deletion request.
             if (submissionData.previousStatus === 'approved' && challengeConfig) {
               const areaConfig = challengeConfig[submissionData.areaName];
@@ -75,11 +75,18 @@ const reviewDeletionRequestFlow = ai.defineFlow(
                 const achievementDocSnap = await transaction.get(achievementDocRef);
                 
                 const achievements = achievementDocSnap.exists() ? achievementDocSnap.data() : {};
-                const areaState = achievements[submissionData.areaName] || { progress: 0 };
-                const newProgress = Math.max(0, (Number(areaState.progress) || 0) - 1);
+                // Ensure areaState is an object, even if it doesn't exist in the DB yet.
+                const currentAreaState = achievements[submissionData.areaName] || {};
+                const newProgress = Math.max(0, (Number(currentAreaState.progress) || 0) - 1);
+                
+                // Construct the new state safely, preserving any other properties like isCertified.
+                const newAreaState = {
+                    ...currentAreaState,
+                    progress: newProgress,
+                };
                 
                 transaction.set(achievementDocRef, { 
-                    [submissionData.areaName]: { ...areaState, progress: newProgress } 
+                    [submissionData.areaName]: newAreaState
                 }, { merge: true });
               }
             }

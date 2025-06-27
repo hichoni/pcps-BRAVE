@@ -101,11 +101,18 @@ const deleteSubmissionFlow = ai.defineFlow(
                     const achievementDocSnap = await transaction.get(achievementDocRef);
                     
                     const achievements = achievementDocSnap.exists() ? achievementDocSnap.data() : {};
-                    const areaState = achievements[submissionData.areaName] || { progress: 0 };
-                    const newProgress = Math.max(0, (Number(areaState.progress) || 0) - 1);
+                    // Ensure areaState is an object, even if it doesn't exist in the DB yet.
+                    const currentAreaState = achievements[submissionData.areaName] || {};
+                    const newProgress = Math.max(0, (Number(currentAreaState.progress) || 0) - 1);
+                    
+                    // Construct the new state safely, preserving any other properties like isCertified.
+                    const newAreaState = {
+                        ...currentAreaState,
+                        progress: newProgress,
+                    };
                     
                     transaction.set(achievementDocRef, { 
-                        [submissionData.areaName]: { ...areaState, progress: newProgress } 
+                        [submissionData.areaName]: newAreaState
                     }, { merge: true });
                   }
                 }
