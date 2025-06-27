@@ -14,7 +14,7 @@ import { collection, addDoc, serverTimestamp, doc, getDoc, runTransaction, query
 import { v4 as uuidv4 } from 'uuid';
 import { checkCertification } from './certification-checker';
 import { analyzeMediaEvidence } from './analyze-typing-test'; // Now a generic media analyzer
-import { type SubmitEvidenceInput, type SubmitEvidenceOutput, SubmissionStatus, type User } from '@/lib/config';
+import { type SubmitEvidenceInput, type SubmitEvidenceOutput, SubmissionStatus, type User, type CertificationCheckOutput } from '@/lib/config';
 
 export async function submitEvidence(input: SubmitEvidenceInput): Promise<SubmitEvidenceOutput> {
   return submitEvidenceFlow(input);
@@ -154,13 +154,8 @@ const submitEvidenceFlow = ai.defineFlow(
             
             } catch (error: unknown) {
                 let detail = "알 수 없는 서버 오류가 발생했습니다. 서버 로그를 확인해주세요.";
-                
                 if (error instanceof Error) {
                     detail = error.message;
-                } else if (typeof error === 'string') {
-                    detail = error;
-                } else if (typeof error === 'object' && error !== null && 'message' in error && typeof (error as any).message === 'string') {
-                    detail = (error as { message: string }).message;
                 }
                 
                 if (detail.includes('not found')) {
@@ -180,35 +175,34 @@ const submitEvidenceFlow = ai.defineFlow(
       let submissionStatus: SubmissionStatus;
 
       if (areaConfig.autoApprove) {
+          let aiResult: CertificationCheckOutput | null = null;
+          
           if (areaConfig.aiVisionCheck && input.mediaDataUri && areaConfig.aiVisionPrompt) {
-              const visionResult = await analyzeMediaEvidence({
+              aiResult = await analyzeMediaEvidence({
                   photoDataUri: input.mediaDataUri,
                   prompt: areaConfig.aiVisionPrompt,
               });
-
-              if (visionResult) {
-                  aiSufficient = visionResult.isSufficient;
-                  aiReasoning = visionResult.reasoning;
-              } else {
-                  // If visionResult is null (AI failed to respond), mark as insufficient.
-                  aiSufficient = false;
+              if (!aiResult) {
                   aiReasoning = 'AI가 이미지를 분석하지 못했습니다. 기준에 맞지 않거나 손상된 파일일 수 있습니다.';
               }
           } else {
-              // Fallback to text-based check only if vision check is not applicable
-              const textCheckResult = await checkCertification({
+              aiResult = await checkCertification({
                   areaName: input.koreanName,
                   requirements: areaConfig.requirements,
                   evidence: input.evidence,
               });
-              if (textCheckResult) {
-                  aiSufficient = textCheckResult.isSufficient;
-                  aiReasoning = textCheckResult.reasoning;
-              } else {
-                  aiSufficient = false;
+              if (!aiResult) {
                   aiReasoning = 'AI가 제출 내용을 분석하지 못했습니다. 내용을 확인 후 다시 시도해주세요.';
               }
           }
+
+          if (aiResult) {
+              aiSufficient = aiResult.isSufficient;
+              aiReasoning = aiResult.reasoning;
+          } else {
+              aiSufficient = false;
+          }
+          
           submissionStatus = aiSufficient ? 'approved' : 'rejected';
       } else {
           submissionStatus = 'pending_review';
@@ -296,18 +290,15 @@ const submitEvidenceFlow = ai.defineFlow(
 
       if (e instanceof Error) {
         errorMessage = e.message;
+      } else if (e && typeof e === 'object' && 'message' in e && typeof (e as any).message === 'string') {
+        errorMessage = (e as { message: string }).message;
       } else if (typeof e === 'string' && e.length > 0) {
         errorMessage = e;
       } else if (e) {
         try {
-          const maybeError = JSON.parse(JSON.stringify(e));
-          if(maybeError && typeof maybeError === 'object' && maybeError !== null && 'message' in maybeError) {
-             errorMessage = String(maybeError.message);
-          } else {
-            errorMessage = String(e);
-          }
+          errorMessage = JSON.stringify(e);
         } catch {
-          errorMessage = String(e);
+          errorMessage = 'An un-serializable error object was thrown.';
         }
       }
       
@@ -315,3 +306,5 @@ const submitEvidenceFlow = ai.defineFlow(
     }
   }
 );
+
+    
