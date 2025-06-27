@@ -199,19 +199,19 @@ const submitEvidenceFlow = ai.defineFlow(
           const achievementDocRef = doc(db, 'achievements', input.userId);
           await runTransaction(db, async (transaction) => {
               const achievementDocSnap = await transaction.get(achievementDocRef);
-              const achievements = achievementDocSnap.exists() ? achievementDocSnap.data() : {};
-              const areaState = achievements[input.areaName] || { progress: 0, isCertified: false };
+              const achievements = achievementDocSnap.data() || {};
+              const areaState: any = achievements[input.areaName] || {};
               const newProgress = (Number(areaState.progress) || 0) + 1;
               
               const gradeKey = studentUser.grade === 0 ? '6' : String(studentUser.grade ?? '4');
-              const goal = areaConfig.goal[gradeKey] ?? 0;
+              const goal = (areaConfig.goal || {})[gradeKey] ?? 0;
               const isNowCertified = goal > 0 && newProgress >= goal;
 
               const newData = {
                 progress: newProgress,
-                isCertified: areaState.isCertified || isNowCertified
+                isCertified: !!areaState.isCertified || isNowCertified,
               };
-
+              
               transaction.set(achievementDocRef, { [input.areaName]: newData }, { merge: true });
               updateMessage = `AI가 활동을 확인하고 바로 승인했어요! 진행도가 1만큼 증가했습니다. (현재: ${newProgress}${areaConfig.unit})`;
           });
