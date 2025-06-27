@@ -128,7 +128,7 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
 
     for (const area in defaultState) {
         if (userAchievements[area]) {
-            finalState[area] = userAchievements[area];
+            finalState[area] = { ...defaultState[area], ...userAchievements[area] };
         }
     }
     return finalState;

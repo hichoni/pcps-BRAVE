@@ -243,19 +243,19 @@ const submitEvidenceFlow = ai.defineFlow(
         let newProgress: number | null = null;
         if (isAutoApproved && areaConfig.goalType === 'numeric') {
             const rawAchievements = achievementDocSnap?.exists() ? achievementDocSnap.data() : {};
-            // Robustness check: Ensure achievements is a valid object.
             const achievements = (typeof rawAchievements === 'object' && rawAchievements !== null) ? rawAchievements : {};
 
-            const areaState: any = achievements[input.areaName] || {};
-            newProgress = (Number(areaState.progress) || 0) + 1;
+            const currentAreaState = (typeof achievements[input.areaName] === 'object' && achievements[input.areaName] !== null) ? achievements[input.areaName] : {};
+
+            newProgress = (Number(currentAreaState.progress) || 0) + 1;
             
             const gradeKey = studentUser.grade === 0 ? '6' : String(studentUser.grade ?? '4');
-            const goal = areaConfig.goal?.[gradeKey] ?? 0;
+            const goal = (areaConfig.goal && typeof areaConfig.goal === 'object' && areaConfig.goal[gradeKey]) ? Number(areaConfig.goal[gradeKey]) : 0;
             const isNowCertified = goal > 0 && newProgress >= goal;
 
             const newData = {
               progress: newProgress,
-              isCertified: !!areaState.isCertified || isNowCertified,
+              isCertified: !!currentAreaState.isCertified || isNowCertified,
             };
             
             transaction.set(achievementDocRef, { [input.areaName]: newData }, { merge: true });
@@ -290,6 +290,8 @@ const submitEvidenceFlow = ai.defineFlow(
         errorMessage = e.message;
       } else if (typeof e === 'string' && e) {
         errorMessage = e;
+      } else if (typeof e === 'object' && e !== null) {
+        errorMessage = JSON.stringify(e);
       }
       
       throw new Error(errorMessage);
