@@ -278,7 +278,7 @@ export default function AdminPage() {
                   <TableHeader className="sticky top-0 bg-card z-10">
                       <TableRow>
                           <TableHead className="w-[200px] sticky left-0 bg-card z-20">학생 정보</TableHead>
-                          <TableHead className="w-[120px] sticky left-[200px] bg-card z-20 text-center">인증 등급</TableHead>
+                          <TableHead className="w-[130px] sticky left-[200px] bg-card z-20 text-center">인증 등급</TableHead>
                           {challengeAreaKeys.map(area => (
                               <TableHead key={area} className="text-center min-w-[130px]">{challengeConfig[area].koreanName}</TableHead>
                           ))}
@@ -297,7 +297,7 @@ export default function AdminPage() {
                                   <TableCell className="font-medium whitespace-nowrap sticky left-0 bg-card w-[200px] px-2 py-1 align-middle">
                                       {`${student.grade}학년 ${student.classNum}반 ${student.studentNum}번 ${student.name}`}
                                   </TableCell>
-                                  <TableCell className="sticky left-[200px] bg-card w-[120px] px-2 py-1 align-middle">
+                                  <TableCell className="sticky left-[200px] bg-card w-[130px] px-2 py-1 align-middle">
                                     <div className="flex items-center justify-center gap-1.5 font-semibold">
                                         <statusInfo.icon className={cn("h-4 w-4", statusInfo.color)} />
                                         <span className={cn(statusInfo.color)}>{statusInfo.label}</span>
