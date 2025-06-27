@@ -204,7 +204,7 @@ const submitEvidenceFlow = ai.defineFlow(
               const newProgress = (Number(areaState.progress) || 0) + 1;
               
               const gradeKey = studentUser.grade === 0 ? '6' : String(studentUser.grade ?? '4');
-              const goal = (areaConfig.goal || {})[gradeKey] ?? 0;
+              const goal = areaConfig.goal?.[gradeKey] ?? 0;
               const isNowCertified = goal > 0 && newProgress >= goal;
 
               const newData = {
