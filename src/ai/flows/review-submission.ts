@@ -97,7 +97,9 @@ const reviewSubmissionFlow = ai.defineFlow(
         transaction.update(submissionRef, { status: newStatus });
 
         if (isApproved && areaConfig && areaConfig.goalType === 'numeric') {
-            const achievements = achievementDocSnap?.exists() ? achievementDocSnap.data() : {};
+            const rawAchievements = achievementDocSnap?.exists() ? achievementDocSnap.data() : {};
+            const achievements = (typeof rawAchievements === 'object' && rawAchievements !== null) ? rawAchievements : {};
+
             const areaState = (typeof achievements[submissionData.areaName] === 'object' && achievements[submissionData.areaName] !== null) 
               ? achievements[submissionData.areaName] 
               : { progress: 0, isCertified: false };
@@ -105,7 +107,7 @@ const reviewSubmissionFlow = ai.defineFlow(
             const newProgress = (Number(areaState.progress) || 0) + 1;
             
             const gradeKey = studentUser.grade === 0 ? '6' : String(studentUser.grade ?? '4');
-            const goal = areaConfig.goal?.[gradeKey] ?? 0;
+            const goal = (areaConfig.goal && typeof areaConfig.goal === 'object' && areaConfig.goal[gradeKey] !== undefined) ? Number(areaConfig.goal[gradeKey]) : 0;
             const isNowCertified = goal > 0 && newProgress >= goal;
             
             const newData = {
