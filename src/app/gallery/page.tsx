@@ -373,7 +373,7 @@ export default function GalleryPage() {
         </Button>
       </header>
 
-      <Card className="mb-8 shadow-md border">
+      <Card className="mb-8 shadow-md border sticky top-0 z-10 bg-background/95 backdrop-blur-sm">
         <CardContent className="p-4 flex flex-col md:flex-row items-stretch gap-2">
             <div className="flex items-center gap-2">
                 <Select value={gradeFilter} onValueChange={setGradeFilter}>
@@ -448,4 +448,5 @@ export default function GalleryPage() {
     </div>
   );
 }
+
 
