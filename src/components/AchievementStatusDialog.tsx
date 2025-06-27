@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -417,6 +416,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                             <div className="space-y-2">
                                 {submissions.map(sub => {
                                     const status = StatusInfo[sub.status];
+                                    if (!status) return null;
                                     const Icon = status.icon;
                                     const isPending = sub.status === 'pending_review' || sub.status === 'pending_deletion';
                                     return (
@@ -572,5 +572,3 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     </Dialog>
   );
 }
-
-    
