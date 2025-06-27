@@ -73,24 +73,34 @@ const submitEvidenceFlow = ai.defineFlow(
     // Submission interval check
     if (areaConfig.submissionIntervalMinutes && areaConfig.submissionIntervalMinutes > 0) {
         const submissionsCollection = collection(db, 'challengeSubmissions');
+        // The previous query required a composite index.
+        // This revised query uses two simple 'where' clauses and sorts the results in memory,
+        // avoiding the need for a special Firestore index.
         const q = query(
             submissionsCollection,
             where("userId", "==", input.userId),
-            where("areaName", "==", input.areaName),
-            orderBy("createdAt", "desc"),
-            limit(1)
+            where("areaName", "==", input.areaName)
         );
 
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
-            const lastSubmission = querySnapshot.docs[0].data();
-            const lastSubmissionTime = (lastSubmission.createdAt as Timestamp).toDate();
-            const now = new Date();
-            const minutesSinceLastSubmission = (now.getTime() - lastSubmissionTime.getTime()) / (1000 * 60);
+            const submissions = querySnapshot.docs.map(doc => doc.data());
+            // Sort to find the most recent submission
+            submissions.sort((a, b) => 
+                (b.createdAt as Timestamp)?.toMillis() - (a.createdAt as Timestamp)?.toMillis()
+            );
+            
+            const lastSubmission = submissions[0];
 
-            if (minutesSinceLastSubmission < areaConfig.submissionIntervalMinutes) {
-                const minutesToWait = Math.ceil(areaConfig.submissionIntervalMinutes - minutesSinceLastSubmission);
-                throw new Error(`제출 간격 제한: 다음 제출까지 ${minutesToWait}분 남았습니다.`);
+            if (lastSubmission && lastSubmission.createdAt) {
+                const lastSubmissionTime = (lastSubmission.createdAt as Timestamp).toDate();
+                const now = new Date();
+                const minutesSinceLastSubmission = (now.getTime() - lastSubmissionTime.getTime()) / (1000 * 60);
+    
+                if (minutesSinceLastSubmission < areaConfig.submissionIntervalMinutes) {
+                    const minutesToWait = Math.ceil(areaConfig.submissionIntervalMinutes - minutesSinceLastSubmission);
+                    throw new Error(`제출 간격 제한: 다음 제출까지 ${minutesToWait}분 남았습니다.`);
+                }
             }
         }
     }
