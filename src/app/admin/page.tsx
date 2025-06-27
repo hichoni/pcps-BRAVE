@@ -78,6 +78,7 @@ export default function AdminPage() {
   const [classFilter, setClassFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isClient, setIsClient] = useState(false);
+  const [editingProgress, setEditingProgress] = useState<{ [key: string]: string }>({});
 
   useEffect(() => {
     setIsClient(true);
@@ -94,6 +95,25 @@ export default function AdminPage() {
       setClassFilter('all');
     }
   }, [gradeFilter, isClient]);
+  
+  const handleProgressChange = (key: string, value: string) => {
+    setEditingProgress(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleProgressBlur = (username: string, area: AreaName, value: string | undefined) => {
+    const key = `${username}-${area}`;
+    if (value !== undefined) {
+        const numericValue = parseInt(value, 10);
+        if (!isNaN(numericValue)) {
+            setProgress(username, area, numericValue);
+        }
+    }
+    setEditingProgress(prev => {
+        const newState = { ...prev };
+        delete newState[key];
+        return newState;
+    });
+  };
 
   const handleProgressUpdate = async (username: string, area: AreaName, value: number | string) => {
     try {
@@ -260,7 +280,7 @@ export default function AdminPage() {
                           <TableHead className="w-[200px] sticky left-0 bg-card z-20">학생 정보</TableHead>
                           <TableHead className="w-[120px] sticky left-[200px] bg-card z-20 text-center">인증 등급</TableHead>
                           {challengeAreaKeys.map(area => (
-                              <TableHead key={area} className="text-center min-w-[170px]">{challengeConfig[area].koreanName}</TableHead>
+                              <TableHead key={area} className="text-center min-w-[130px]">{challengeConfig[area].koreanName}</TableHead>
                           ))}
                           {!user.areaName && (
                             <TableHead className="text-center w-[120px] sticky right-0 bg-card z-20">관리</TableHead>
@@ -288,19 +308,21 @@ export default function AdminPage() {
                                       if (!areaConfig) return null;
                                       const progress = studentAchievements[area]?.progress ?? (areaConfig.goalType === 'numeric' ? 0 : '');
                                       const isCertified = studentAchievements[area]?.isCertified ?? false;
+                                      const progressKey = `${student.username}-${area}`;
+                                      const isEditing = editingProgress[progressKey] !== undefined;
+
                                       return (
                                           <TableCell key={area} className="px-2 py-1 align-middle">
-                                              <div className="flex items-center justify-center gap-1">
+                                              <div className="flex items-center justify-center gap-2">
                                                   {areaConfig.goalType === 'numeric' ? (
-                                                      <>
-                                                          <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => handleProgressUpdate(student.username, area, Math.max(0, (progress as number || 0) - 1))}>
-                                                              <Minus className="h-3 w-3"/>
-                                                          </Button>
-                                                          <span className="font-mono w-8 text-center text-base">{progress as number || 0}</span>
-                                                          <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => handleProgressUpdate(student.username, area, (progress as number || 0) + 1)}>
-                                                              <Plus className="h-3 w-3"/>
-                                                          </Button>
-                                                      </>
+                                                      <Input
+                                                          type="number"
+                                                          className="h-8 w-[60px] text-center px-1"
+                                                          value={isEditing ? editingProgress[progressKey] : (progress as number || 0)}
+                                                          onChange={(e) => handleProgressChange(progressKey, e.target.value)}
+                                                          onBlur={() => handleProgressBlur(student.username, area, editingProgress[progressKey])}
+                                                          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                                                      />
                                                   ) : (
                                                       <Select
                                                         value={progress as string || ''}
@@ -320,10 +342,10 @@ export default function AdminPage() {
                                                   <Button
                                                     variant={isCertified ? 'default' : 'outline'}
                                                     size="icon"
-                                                    className="h-6 w-6 ml-2"
+                                                    className="h-8 w-8"
                                                     onClick={() => handleToggleCertification(student.username, area)}
                                                   >
-                                                      <Check className="h-4 w-4" />
+                                                      <Check className="h-5 w-5" />
                                                   </Button>
                                               </div>
                                           </TableCell>
@@ -394,4 +416,3 @@ export default function AdminPage() {
     </TooltipProvider>
   );
 }
-
