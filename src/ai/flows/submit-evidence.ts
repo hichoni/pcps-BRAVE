@@ -59,6 +59,10 @@ const submitEvidenceFlow = ai.defineFlow(
             throw new Error("도전 영역 설정을 찾을 수 없습니다. 관리자에게 문의해주세요.");
         }
         const challengeConfig = configDocSnap.data();
+        if (!challengeConfig) {
+             throw new Error("도전 영역 설정 데이터가 올바르지 않습니다.");
+        }
+
         const areaConfig = challengeConfig[input.areaName];
         if (!areaConfig) {
             throw new Error(`'${input.koreanName}' 도전 영역의 설정을 찾을 수 없습니다.`);
@@ -70,6 +74,9 @@ const submitEvidenceFlow = ai.defineFlow(
             throw new Error(`사용자 정보(${input.userId})를 찾을 수 없습니다.`);
         }
         const studentUser = userSnapshot.docs[0].data() as User;
+        if (!studentUser) {
+            throw new Error(`사용자 정보(${input.userId}) 데이터가 올바르지 않습니다.`);
+        }
 
         // Submission interval check
         if (areaConfig.submissionIntervalMinutes && areaConfig.submissionIntervalMinutes > 0) {
@@ -248,7 +255,11 @@ const submitEvidenceFlow = ai.defineFlow(
         transaction.set(newSubmissionRef, docData);
 
         if (isAutoApproved && areaConfig.goalType === 'numeric' && achievementDocRef && achievementDocSnap) {
-          const achievements = achievementDocSnap.data() || {};
+          const achievements = achievementDocSnap.exists() ? achievementDocSnap.data() : {};
+          if (typeof achievements !== 'object' || achievements === null) {
+            throw new Error('성취도 데이터 형식이 올바르지 않습니다.');
+          }
+
           const areaState: any = achievements[input.areaName] || {};
           const newProgress = (Number(areaState.progress) || 0) + 1;
           
@@ -283,17 +294,18 @@ const submitEvidenceFlow = ai.defineFlow(
           aiReasoning: aiReasoning
       };
     } catch (e: unknown) {
-      // This is now a very robust error handler.
-      let errorMessage = "An unexpected error occurred. Please try again.";
+      console.error("Submit Evidence Flow Error:", e);
+
+      let errorMessage = "An unexpected error occurred. Please try again later.";
+
       if (e instanceof Error) {
         errorMessage = e.message;
-      } else if (typeof e === 'string') {
-        errorMessage = e;
-      } else if (e && typeof e === 'object' && 'message' in e && typeof (e as any).message === 'string') {
-        errorMessage = (e as { message: string }).message;
+      } else if (typeof e === 'object' && e !== null && 'message' in e) {
+        errorMessage = String((e as { message: unknown }).message);
+      } else if (e) {
+        errorMessage = String(e);
       }
       
-      console.error("Error in submitEvidenceFlow: ", e);
       throw new Error(errorMessage);
     }
   }
