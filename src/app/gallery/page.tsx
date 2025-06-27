@@ -74,9 +74,6 @@ function GalleryCard({ submission, user, onSubmissionDeleted, onSubmissionUpdate
     try {
       const result = await deleteSubmission({ submissionId: submission.id, userId: String(user.id) });
       toast({ title: '처리 완료', description: result.message });
-      // If a teacher deletes, it's gone immediately. If a student requests, it stays but status changes.
-      // The parent component will get the status update via real-time listener.
-      // We only need to remove it from view if the actor was a teacher.
       if (user.role === 'teacher') {
         onSubmissionDeleted(submission.id);
       }
@@ -114,14 +111,16 @@ function GalleryCard({ submission, user, onSubmissionDeleted, onSubmissionUpdate
   return (
     <>
     <Card className="flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300 border relative">
-      <div className="absolute top-2 right-2 flex flex-col items-end gap-1 text-xs z-10 bg-background/80 p-1 rounded-bl-md">
-          <Badge variant={submission.status === 'approved' ? 'default' : 'destructive'} className="capitalize">
-            {submission.status.replace('_', ' ')}
-          </Badge>
-          <Badge variant={submission.showInGallery ? 'secondary' : 'outline'}>
-              {submission.showInGallery ? '갤러리 표시' : '숨김'}
-          </Badge>
-      </div>
+      {user?.role === 'teacher' && (
+          <div className="absolute top-2 right-2 flex flex-col items-end gap-1 text-xs z-10 bg-background/80 p-1 rounded-bl-md">
+              <Badge variant={submission.status === 'approved' ? 'default' : 'destructive'} className="capitalize">
+                {submission.status.replace('_', ' ')}
+              </Badge>
+              <Badge variant={submission.showInGallery ? 'secondary' : 'outline'}>
+                  {submission.showInGallery ? '갤러리 표시' : '숨김'}
+              </Badge>
+          </div>
+      )}
       <CardHeader className="flex flex-row items-start gap-4 space-y-0 pb-3">
          <Avatar>
             <AvatarFallback>{submission.userName.charAt(0)}</AvatarFallback>
@@ -247,8 +246,7 @@ export default function GalleryPage() {
     }
   }, [user, authLoading, router]);
 
-  useEffect(() => {
-    const fetchInitialSubmissions = async () => {
+  const fetchInitialSubmissions = useCallback(async () => {
       if (!db || !user || !challengeConfig || configLoading) {
           setLoadingInitial(false);
           return;
@@ -282,12 +280,13 @@ export default function GalleryPage() {
       } finally {
         setLoadingInitial(false);
       }
-    };
+    }, [user, configLoading, challengeConfig]);
 
+  useEffect(() => {
     if (user && !configLoading) {
       fetchInitialSubmissions();
     }
-  }, [user, configLoading, challengeConfig]);
+  }, [user, configLoading, fetchInitialSubmissions]);
 
   useEffect(() => {
     if (gradeFilter !== 'all') {
@@ -348,9 +347,15 @@ export default function GalleryPage() {
 
   const filteredSubmissions = useMemo(() => {
     return submissions.filter(submission => {
+        // Role-based filtering: students only see approved & gallery-enabled posts.
+        if (user?.role === 'student') {
+            if (submission.status !== 'approved' || submission.showInGallery !== true) {
+                return false;
+            }
+        }
+
         const author = userMap.get(submission.userId);
 
-        // Filter by grade and class if author information is available
         if (author) {
             const gradeMatch = gradeFilter === 'all' || author.grade === parseInt(gradeFilter, 10);
             if (!gradeMatch) return false;
@@ -358,14 +363,11 @@ export default function GalleryPage() {
             const classMatch = classFilter === 'all' || author.classNum === parseInt(classFilter, 10);
             if (!classMatch) return false;
         } else {
-            // If author info is missing, we can't apply grade/class filters.
-            // So, if a filter is active, we must hide this submission.
             if (gradeFilter !== 'all' || classFilter !== 'all') {
                 return false;
             }
         }
         
-        // Always apply search query filter
         const searchLower = searchQuery.toLowerCase();
         const searchMatch = !searchQuery ||
             submission.userName.toLowerCase().includes(searchLower) ||
@@ -376,7 +378,7 @@ export default function GalleryPage() {
 
         return searchMatch;
     });
-  }, [submissions, userMap, gradeFilter, classFilter, searchQuery]);
+  }, [submissions, user, userMap, gradeFilter, classFilter, searchQuery]);
 
 
   if (authLoading || usersLoading || configLoading || !user) {
