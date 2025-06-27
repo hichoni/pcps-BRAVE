@@ -191,7 +191,7 @@ Your task is to determine if the image is a typing test result and if the typing
 };
 
 // --- Types for Server Actions ---
-export type SubmissionStatus = 'approved' | 'rejected' | 'pending_review';
+export type SubmissionStatus = 'approved' | 'rejected' | 'pending_review' | 'pending_deletion';
 
 // For submit-evidence.ts
 export interface SubmitEvidenceInput {
@@ -244,6 +244,18 @@ export interface ReviewSubmissionInput {
 }
 
 export interface ReviewSubmissionOutput {
+    success: boolean;
+    message: string;
+}
+
+// For review-deletion-request.ts
+export interface ReviewDeletionRequestInput {
+  submissionId: string;
+  isApproved: boolean; // approve the deletion
+  teacherId: string;
+}
+
+export interface ReviewDeletionRequestOutput {
     success: boolean;
     message: string;
 }

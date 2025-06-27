@@ -116,7 +116,8 @@ const resizeImage = (file: File, maxWidth: number, maxHeight: number, quality: n
 const StatusInfo = {
     approved: { icon: FileCheck, text: '승인됨', color: 'text-green-600' },
     pending_review: { icon: History, text: '검토 중', color: 'text-yellow-600' },
-    rejected: { icon: FileX, text: '반려됨', color: 'text-red-600' }
+    rejected: { icon: FileX, text: '반려됨', color: 'text-red-600' },
+    pending_deletion: { icon: Trash2, text: '삭제 요청 중', color: 'text-orange-500' },
 }
 
 export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
@@ -332,7 +333,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
       setDialogOpen(isOpen);
   }
 
-  const handleDeleteSubmission = async () => {
+  const handleDeleteRequest = async () => {
     if (!submissionToDelete || !user) return;
 
     setIsDeleting(true);
@@ -342,25 +343,21 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
             userId: String(user.id),
         });
 
-        if (result.success) {
-            toast({
-                title: "삭제 완료",
-                description: result.message
-            });
-        } else {
-             throw new Error(result.message);
-        }
+        toast({
+            title: "요청 완료",
+            description: result.message
+        });
         setSubmissionToDelete(null); // This will close the alert dialog
     } catch (error: any) {
         toast({
             variant: "destructive",
-            title: "삭제 오류",
-            description: error.message || '활동 기록 삭제에 실패했습니다.'
+            title: "삭제 요청 오류",
+            description: error.message || '삭제 요청에 실패했습니다.'
         });
     } finally {
         setIsDeleting(false);
     }
-};
+  };
 
   return (
     <Dialog open={dialogOpen} onOpenChange={onDialogClose}>
@@ -395,6 +392,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                                 {submissions.map(sub => {
                                     const status = StatusInfo[sub.status];
                                     const Icon = status.icon;
+                                    const isPending = sub.status === 'pending_review' || sub.status === 'pending_deletion';
                                     return (
                                         <div key={sub.id} className="text-sm p-2 bg-secondary/50 rounded-md flex justify-between items-center group">
                                             <div className="flex-grow">
@@ -408,7 +406,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                                                 <p className="text-xs text-muted-foreground/70 mt-1">{format(sub.createdAt, "yyyy.MM.dd HH:mm", { locale: ko })}</p>
                                             </div>
                                             <AlertDialogTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2" onClick={() => setSubmissionToDelete(sub)}>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2" onClick={() => setSubmissionToDelete(sub)} disabled={isPending}>
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </AlertDialogTrigger>
@@ -528,15 +526,15 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
 
             <AlertDialogContent>
                 <AlertDialogHeader>
-                    <AlertDialogTitle>정말로 삭제하시겠습니까?</AlertDialogTitle>
+                    <AlertDialogTitle>정말로 삭제를 요청하시겠습니까?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        이 활동 기록을 삭제하면 되돌릴 수 없습니다. 만약 '승인됨' 상태의 활동이었다면, 관련 진행도도 함께 차감됩니다.
+                        이 활동 기록의 삭제를 요청합니다. 요청이 선생님의 승인을 받으면, 이 기록과 관련 진행도는 영구적으로 삭제되며 되돌릴 수 없습니다.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel disabled={isDeleting}>취소</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDeleteSubmission} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                        {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : '삭제'}
+                    <AlertDialogAction onClick={handleDeleteRequest} disabled={isDeleting}>
+                        {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : '삭제 요청'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
@@ -545,4 +543,3 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     </Dialog>
   );
 }
-

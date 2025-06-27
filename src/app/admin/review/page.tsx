@@ -7,14 +7,16 @@ import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, orderBy, Timestamp, Query } from 'firebase/firestore';
-import { Loader2, ArrowLeft, User as UserIcon, Calendar as CalendarIcon, MailCheck, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Loader2, ArrowLeft, User as UserIcon, Calendar as CalendarIcon, MailCheck, ThumbsUp, ThumbsDown, Trash2, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { reviewSubmission } from '@/ai/flows/review-submission';
+import { reviewDeletionRequest } from '@/ai/flows/review-deletion-request';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
+import { SubmissionStatus } from '@/lib/config';
 
 interface PendingSubmission {
   id: string;
@@ -25,6 +27,7 @@ interface PendingSubmission {
   challengeName: string;
   evidence: string;
   createdAt: Date;
+  status: SubmissionStatus;
   mediaUrl?: string;
   mediaType?: string;
 }
@@ -36,7 +39,9 @@ function ReviewCard({ submission, onReviewed }: { submission: PendingSubmission;
     const [isProcessing, setIsProcessing] = useState(false);
     const AreaIcon = challengeConfig?.[submission.areaName]?.icon || UserIcon;
 
-    const handleReview = async (isApproved: boolean) => {
+    const isDeletionRequest = submission.status === 'pending_deletion';
+
+    const handleStandardReview = async (isApproved: boolean) => {
         if (!user) return;
         setIsProcessing(true);
         try {
@@ -45,12 +50,32 @@ function ReviewCard({ submission, onReviewed }: { submission: PendingSubmission;
             onReviewed(submission.id);
         } catch (error: any) {
             toast({ variant: 'destructive', title: '처리 오류', description: error.message });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+    
+    const handleDeletionReview = async (isApproved: boolean) => {
+        if (!user) return;
+        setIsProcessing(true);
+        try {
+            await reviewDeletionRequest({ submissionId: submission.id, isApproved, teacherId: String(user.id) });
+            toast({ title: '처리 완료', description: `삭제 요청이 ${isApproved ? '승인' : '반려'}되었습니다.` });
+            onReviewed(submission.id);
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: '처리 오류', description: error.message });
+        } finally {
             setIsProcessing(false);
         }
     };
     
     return (
         <Card className="flex flex-col h-full shadow-md border">
+            {isDeletionRequest && (
+                <div className="p-3 bg-destructive/10 text-destructive text-sm font-bold text-center rounded-t-lg flex items-center justify-center gap-2">
+                    <Trash2 className="w-4 h-4"/> 삭제 요청 검토
+                </div>
+            )}
             <CardHeader className="flex flex-row items-start gap-4 space-y-0 pb-3">
                 <div className="flex-grow">
                     <CardTitle className="text-base font-bold">{submission.userName} 학생</CardTitle>
@@ -92,12 +117,25 @@ function ReviewCard({ submission, onReviewed }: { submission: PendingSubmission;
                 </p>
             </CardContent>
             <CardFooter className="flex justify-end items-center p-4 pt-0 gap-2">
-                <Button variant="destructive" onClick={() => handleReview(false)} disabled={isProcessing}>
-                    <ThumbsDown className="mr-2"/> 반려
-                </Button>
-                <Button onClick={() => handleReview(true)} disabled={isProcessing}>
-                    {isProcessing ? <Loader2 className="animate-spin"/> : <><ThumbsUp className="mr-2"/> 승인</>}
-                </Button>
+                {isDeletionRequest ? (
+                    <>
+                        <Button variant="outline" onClick={() => handleDeletionReview(false)} disabled={isProcessing}>
+                            <Undo2 className="mr-2"/> 요청 반려
+                        </Button>
+                        <Button variant="destructive" onClick={() => handleDeletionReview(true)} disabled={isProcessing}>
+                            {isProcessing ? <Loader2 className="animate-spin"/> : <><Trash2 className="mr-2"/> 삭제 승인</>}
+                        </Button>
+                    </>
+                ) : (
+                     <>
+                        <Button variant="destructive" onClick={() => handleStandardReview(false)} disabled={isProcessing}>
+                            <ThumbsDown className="mr-2"/> 반려
+                        </Button>
+                        <Button onClick={() => handleStandardReview(true)} disabled={isProcessing}>
+                            {isProcessing ? <Loader2 className="animate-spin"/> : <><ThumbsUp className="mr-2"/> 승인</>}
+                        </Button>
+                    </>
+                )}
             </CardFooter>
         </Card>
     )
@@ -122,17 +160,19 @@ export default function ReviewPage() {
         setIsLoading(true);
 
         let q: Query;
+        const statusesToFetch = ['pending_review', 'pending_deletion'];
+
         if (user.areaName) {
              q = query(
                 collection(db, "challengeSubmissions"),
-                where("status", "==", "pending_review"),
+                where("status", "in", statusesToFetch),
                 where("areaName", "==", user.areaName),
                 orderBy("createdAt", "asc")
             );
         } else {
              q = query(
                 collection(db, "challengeSubmissions"),
-                where("status", "==", "pending_review"),
+                where("status", "in", statusesToFetch),
                 orderBy("createdAt", "asc")
             );
         }

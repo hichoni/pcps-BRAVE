@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EditSubmissionDialog } from '@/components/EditSubmissionDialog';
+import { SubmissionStatus } from '@/lib/config';
 
 
 interface Submission {
@@ -34,6 +35,7 @@ interface Submission {
   challengeName: string;
   evidence: string;
   createdAt: Date;
+  status: SubmissionStatus;
   mediaUrl?: string;
   mediaType?: string;
   likes: string[];
@@ -59,17 +61,27 @@ function GalleryCard({ submission, user, onSubmissionDeleted, onSubmissionUpdate
   const [isLiked, setIsLiked] = useState(user ? submission.likes.includes(user.username) : false);
   const [likeCount, setLikeCount] = useState(submission.likes.length);
   const [isEditing, setIsEditing] = useState(false);
+  
+  const isOwner = user?.username === submission.userId;
+  const canManage = user && (isOwner || user.role === 'teacher');
+  const isPending = submission.status === 'pending_deletion' || submission.status === 'pending_review';
 
   const handleDelete = async () => {
     if (!user) return;
     setIsDeleting(true);
     try {
-      await deleteSubmission({ submissionId: submission.id, userId: user.id.toString() }); // Pass teacher ID
-      toast({ title: '삭제 완료', description: '게시글이 삭제되었습니다.' });
-      onSubmissionDeleted(submission.id);
+      const result = await deleteSubmission({ submissionId: submission.id, userId: String(user.id) });
+      toast({ title: '처리 완료', description: result.message });
+      // If a teacher deletes, it's gone immediately. If a student requests, it stays but status changes.
+      // The parent component will get the status update via real-time listener.
+      // We only need to remove it from view if the actor was a teacher.
+      if (user.role === 'teacher') {
+        onSubmissionDeleted(submission.id);
+      }
     } catch (error: any) {
-      toast({ variant: 'destructive', title: '삭제 오류', description: error.message || '게시글 삭제 중 오류가 발생했습니다.' });
-      setIsDeleting(false);
+      toast({ variant: 'destructive', title: '처리 오류', description: error.message || '게시글 삭제/요청 중 오류가 발생했습니다.' });
+    } finally {
+        setIsDeleting(false);
     }
   };
 
@@ -111,7 +123,7 @@ function GalleryCard({ submission, user, onSubmissionDeleted, onSubmissionUpdate
                 {submission.createdAt ? formatDistanceToNow(submission.createdAt, { addSuffix: true, locale: ko }) : '방금 전'}
             </CardDescription>
          </div>
-         {user && (user.username === submission.userId || user.role === 'teacher') && (
+         {canManage && (
            <div className="flex items-center gap-1">
             {user.role === 'teacher' && (
                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => setIsEditing(true)}>
@@ -120,21 +132,26 @@ function GalleryCard({ submission, user, onSubmissionDeleted, onSubmissionUpdate
             )}
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" disabled={isDeleting}>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" disabled={isDeleting || isPending}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>정말로 삭제하시겠습니까?</AlertDialogTitle>
+                  <AlertDialogTitle>
+                    {user.role === 'teacher' ? "정말로 삭제하시겠습니까?" : "정말로 삭제를 요청하시겠습니까?"}
+                  </AlertDialogTitle>
                   <AlertDialogDescription>
-                    이 게시글을 삭제하면 되돌릴 수 없습니다. 갤러리에서 영구적으로 사라집니다.
+                    {user.role === 'teacher' 
+                        ? "이 게시글을 삭제하면 되돌릴 수 없습니다. 갤러리에서 영구적으로 사라집니다." 
+                        : "이 게시물의 삭제를 요청합니다. 요청이 승인되면, 게시물과 관련 진행도가 영구적으로 삭제되며 되돌릴 수 없습니다."
+                    }
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel disabled={isDeleting}>취소</AlertDialogCancel>
                   <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : '삭제'}
+                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : (user.role === 'teacher' ? '삭제' : '삭제 요청')}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
