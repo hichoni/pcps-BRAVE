@@ -61,10 +61,10 @@ const certificationCheckerFlow = ai.defineFlow(
     outputSchema: CertificationCheckOutputSchema,
   },
   async (input) => {
-    const { output } = await prompt(input);
-    if (!output) {
+    const result = await prompt(input);
+    if (!result || !result.output) {
       throw new Error("AI 모델이 유효한 응답을 생성하지 못했습니다. 제출 내용을 확인 후 다시 시도해주세요.");
     }
-    return output;
+    return result.output;
   }
 );
