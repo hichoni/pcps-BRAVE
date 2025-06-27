@@ -248,6 +248,7 @@ export default function GalleryPage() {
         const q = query(
             collection(db, "challengeSubmissions"), 
             where("status", "==", "approved"),
+            where("showInGallery", "==", true),
             orderBy("createdAt", "desc"),
             limit(PAGE_SIZE)
         );
@@ -293,6 +294,7 @@ export default function GalleryPage() {
         const q = query(
             collection(db, "challengeSubmissions"),
             where("status", "==", "approved"),
+            where("showInGallery", "==", true),
             orderBy("createdAt", "desc"),
             startAfter(lastDoc),
             limit(PAGE_SIZE)
@@ -339,19 +341,32 @@ export default function GalleryPage() {
   const filteredSubmissions = useMemo(() => {
     return submissions.filter(submission => {
         const author = userMap.get(submission.userId);
-        if (!author) return false;
 
-        const gradeMatch = gradeFilter === 'all' || author.grade === parseInt(gradeFilter, 10);
-        const classMatch = classFilter === 'all' || author.classNum === parseInt(classFilter, 10);
+        // Filter by grade and class if author information is available
+        if (author) {
+            const gradeMatch = gradeFilter === 'all' || author.grade === parseInt(gradeFilter, 10);
+            if (!gradeMatch) return false;
+
+            const classMatch = classFilter === 'all' || author.classNum === parseInt(classFilter, 10);
+            if (!classMatch) return false;
+        } else {
+            // If author info is missing, we can't apply grade/class filters.
+            // So, if a filter is active, we must hide this submission.
+            if (gradeFilter !== 'all' || classFilter !== 'all') {
+                return false;
+            }
+        }
         
+        // Always apply search query filter
         const searchLower = searchQuery.toLowerCase();
         const searchMatch = !searchQuery ||
-            author.name.toLowerCase().includes(searchLower) ||
+            submission.userName.toLowerCase().includes(searchLower) ||
             submission.koreanName.toLowerCase().includes(searchLower) ||
             submission.challengeName.toLowerCase().includes(searchLower) ||
-            submission.evidence.toLowerCase().includes(searchLower);
+            submission.evidence.toLowerCase().includes(searchLower) ||
+            (author && author.name.toLowerCase().includes(searchLower));
 
-        return gradeMatch && classMatch && searchMatch;
+        return searchMatch;
     });
   }, [submissions, userMap, gradeFilter, classFilter, searchQuery]);
 
@@ -449,3 +464,6 @@ export default function GalleryPage() {
 
 
 
+
+
+    
