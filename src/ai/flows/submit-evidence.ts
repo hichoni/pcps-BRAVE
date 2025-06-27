@@ -233,11 +233,9 @@ const submitEvidenceFlow = ai.defineFlow(
       
       const transactionResult = await runTransaction(db, async (transaction) => {
         // --- READ PHASE ---
-        let achievementDocSnap;
+        // Per Firestore transaction rules, all reads must come before all writes.
         const achievementDocRef = doc(db, 'achievements', input.userId);
-        if (isAutoApproved && areaConfig.goalType === 'numeric') {
-            achievementDocSnap = await transaction.get(achievementDocRef);
-        }
+        const achievementDocSnap = await transaction.get(achievementDocRef);
 
         // --- CALCULATION & WRITE PHASE ---
         let newProgress: number | null = null;
@@ -245,7 +243,7 @@ const submitEvidenceFlow = ai.defineFlow(
             const rawAchievements = achievementDocSnap?.exists() ? achievementDocSnap.data() : {};
             const achievements = (typeof rawAchievements === 'object' && rawAchievements !== null) ? rawAchievements : {};
 
-            const currentAreaState = (typeof achievements[input.areaName] === 'object' && achievements[input.areaName] !== null) ? achievements[input.areaName] : {};
+            const currentAreaState = (typeof achievements[input.areaName] === 'object' && achievements[input.areaName] !== null) ? achievements[input.areaName] : { progress: 0, isCertified: false };
 
             newProgress = (Number(currentAreaState.progress) || 0) + 1;
             
@@ -288,10 +286,8 @@ const submitEvidenceFlow = ai.defineFlow(
 
       if (e instanceof Error) {
         errorMessage = e.message;
-      } else if (typeof e === 'string' && e) {
-        errorMessage = e;
-      } else if (typeof e === 'object' && e !== null) {
-        errorMessage = JSON.stringify(e);
+      } else if (e) {
+        errorMessage = String(e);
       }
       
       throw new Error(errorMessage);

@@ -46,7 +46,7 @@ const reviewSubmissionFlow = ai.defineFlow(
     const submissionRef = doc(db, 'challengeSubmissions', submissionId);
 
     try {
-      // Fetch all necessary data BEFORE the transaction
+      // Fetch all necessary data BEFORE the transaction to avoid complex logic inside.
       const submissionSnapForUser = await getDoc(submissionRef);
       if (!submissionSnapForUser.exists()) {
         throw new Error("검토할 제출물을 찾을 수 없습니다.");
@@ -74,27 +74,34 @@ const reviewSubmissionFlow = ai.defineFlow(
 
       await runTransaction(db, async (transaction) => {
         // --- READ PHASE (INSIDE TRANSACTION) ---
+        // Per Firestore rules, all reads must come before all writes.
         const submissionSnap = await transaction.get(submissionRef);
+        const achievementDocRef = doc(db, 'achievements', studentUsername);
+        const achievementDocSnap = await transaction.get(achievementDocRef);
+
+        // --- VALIDATION (After Reads, Before Writes) ---
         if (!submissionSnap.exists()) {
           throw new Error("검토할 제출물을 찾을 수 없습니다.");
         }
         
-        let achievementDocSnap;
         const submissionData = submissionSnap.data();
         const areaConfig = challengeConfig[submissionData.areaName];
-        const achievementDocRef = doc(db, 'achievements', submissionData.userId);
-
-        if (isApproved && areaConfig && areaConfig.goalType === 'numeric') {
-            achievementDocSnap = await transaction.get(achievementDocRef);
+        if (!areaConfig) {
+          // This case is unlikely but safe to handle. It means a submission exists for a now-deleted challenge.
+          // We can just approve/reject without changing achievements.
+          console.warn(`Attempted to review submission for a non-existent challenge area: ${submissionData.areaName}`);
         }
-
+        
         // --- WRITE PHASE (INSIDE TRANSACTION) ---
         const newStatus = isApproved ? 'approved' : 'rejected';
         transaction.update(submissionRef, { status: newStatus });
 
         if (isApproved && areaConfig && areaConfig.goalType === 'numeric') {
             const achievements = achievementDocSnap?.exists() ? achievementDocSnap.data() : {};
-            const areaState = achievements[submissionData.areaName] || { progress: 0, isCertified: false };
+            const areaState = (typeof achievements[submissionData.areaName] === 'object' && achievements[submissionData.areaName] !== null) 
+              ? achievements[submissionData.areaName] 
+              : { progress: 0, isCertified: false };
+            
             const newProgress = (Number(areaState.progress) || 0) + 1;
             
             const gradeKey = studentUser.grade === 0 ? '6' : String(studentUser.grade ?? '4');
