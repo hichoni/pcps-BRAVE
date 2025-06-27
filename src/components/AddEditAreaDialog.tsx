@@ -31,6 +31,7 @@ const formSchema = z.object({
   iconName: z.string().min(1, '아이콘을 선택해주세요.'),
   requirements: z.string().min(1, '인증 기준 설명은 필수입니다.'),
   goalType: z.enum(['numeric', 'objective']),
+  goalDescription: z.string().optional(),
   unit: z.string().min(1, '단위는 필수입니다.'),
   goal: z.object({
     '4': z.coerce.number().optional(),
@@ -93,6 +94,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
       aiVisionCheck: false,
       aiVisionPrompt: '',
       submissionIntervalMinutes: 0,
+      goalDescription: '',
     },
   });
 
@@ -129,6 +131,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
           aiVisionCheck: area.config.aiVisionCheck ?? false,
           aiVisionPrompt: area.config.aiVisionPrompt ?? '',
           submissionIntervalMinutes: area.config.submissionIntervalMinutes ?? 0,
+          goalDescription: area.config.goalDescription || '',
         });
       } else {
         form.reset({
@@ -148,6 +151,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
           aiVisionCheck: false,
           aiVisionPrompt: '',
           submissionIntervalMinutes: 0,
+          goalDescription: '',
         });
       }
     }
@@ -190,6 +194,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
       aiVisionCheck: data.aiVisionCheck,
       aiVisionPrompt: data.aiVisionPrompt,
       submissionIntervalMinutes: data.submissionIntervalMinutes,
+      goalDescription: data.goalDescription || undefined,
     };
     
     try {
@@ -363,50 +368,68 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
               )}
 
               {goalType === 'objective' && (
-                <div className="space-y-2 p-4 border rounded-md">
-                    <div className="flex justify-between items-center mb-2">
-                        <Label>선택지 목록</Label>
-                        <FormDescription>자동 인증: 체크 시 해당 항목을 받으면 자동 인증됩니다.</FormDescription>
-                    </div>
-                    {fields.map((field, index) => (
-                        <div key={field.id} className="flex items-start gap-2">
-                           <FormField
-                                control={form.control}
-                                name={`options.${index}.value`}
-                                render={({ field }) => (
-                                    <FormItem className="flex-grow">
-                                        <FormControl>
-                                            <Input placeholder={`옵션 ${index + 1}`} {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                <div className="space-y-4 p-4 border rounded-md">
+                    <FormField
+                      control={form.control}
+                      name="goalDescription"
+                      render={({ field }) => (
+                          <FormItem>
+                              <FormLabel>목표 설명</FormLabel>
+                              <FormControl>
+                                  <Input placeholder="예: 3등급 이상 달성" {...field} value={field.value ?? ''} />
+                              </FormControl>
+                              <FormDescription className="text-xs">
+                                학생들의 '도전 영역 둘러보기' 카드에 표시될 목표입니다. (예: 3등급 달성, 금상 수상)
+                              </FormDescription>
+                              <FormMessage />
+                          </FormItem>
+                      )}
+                    />
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center mb-2">
+                          <Label>선택지 목록</Label>
+                          <FormDescription>자동 인증: 체크 시 해당 항목을 받으면 자동 인증됩니다.</FormDescription>
+                      </div>
+                      {fields.map((field, index) => (
+                          <div key={field.id} className="flex items-start gap-2">
                              <FormField
-                                control={form.control}
-                                name={`options.${index}.isCertifying`}
-                                render={({ field }) => (
-                                  <FormItem className="flex flex-row items-center space-x-2 pt-2">
-                                      <FormControl>
-                                      <Checkbox
-                                          checked={field.value}
-                                          onCheckedChange={field.onChange}
-                                      />
-                                      </FormControl>
-                                      <FormLabel className="text-sm font-normal cursor-pointer">
-                                        자동 인증
-                                      </FormLabel>
-                                  </FormItem>
-                                )}
+                                  control={form.control}
+                                  name={`options.${index}.value`}
+                                  render={({ field }) => (
+                                      <FormItem className="flex-grow">
+                                          <FormControl>
+                                              <Input placeholder={`옵션 ${index + 1}`} {...field} />
+                                          </FormControl>
+                                          <FormMessage />
+                                      </FormItem>
+                                  )}
                               />
-                            <Button type="button" variant="destructive" size="icon" className="h-9 w-9 mt-0.5" onClick={() => remove(index)}>
-                                <Trash2 className="h-4 w-4"/>
-                            </Button>
-                        </div>
-                    ))}
-                    <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '', isCertifying: false })}>
-                        <PlusCircle className="mr-2"/> 옵션 추가
-                    </Button>
+                               <FormField
+                                  control={form.control}
+                                  name={`options.${index}.isCertifying`}
+                                  render={({ field }) => (
+                                    <FormItem className="flex flex-row items-center space-x-2 pt-2">
+                                        <FormControl>
+                                        <Checkbox
+                                            checked={field.value}
+                                            onCheckedChange={field.onChange}
+                                        />
+                                        </FormControl>
+                                        <FormLabel className="text-sm font-normal cursor-pointer">
+                                          자동 인증
+                                        </FormLabel>
+                                    </FormItem>
+                                  )}
+                                />
+                              <Button type="button" variant="destructive" size="icon" className="h-9 w-9 mt-0.5" onClick={() => remove(index)}>
+                                  <Trash2 className="h-4 w-4"/>
+                              </Button>
+                          </div>
+                      ))}
+                      <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '', isCertifying: false })}>
+                          <PlusCircle className="mr-2"/> 옵션 추가
+                      </Button>
+                    </div>
                 </div>
               )}
 
