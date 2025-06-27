@@ -22,10 +22,12 @@ const AchievementsContext = createContext<AchievementsContextType | undefined>(u
 
 const generateInitialStateForUser = (challengeConfig: any): AchievementsState => {
     const studentAchievements = {} as AchievementsState;
-    if (!challengeConfig) return studentAchievements;
+    if (!challengeConfig || typeof challengeConfig !== 'object') return studentAchievements;
     
     Object.keys(challengeConfig).forEach(area => {
         const config = challengeConfig[area as AreaName];
+        if (!config || typeof config !== 'object') return;
+
         let initialProgress: string | number = '';
         if (config.goalType === 'numeric') {
             initialProgress = 0;
@@ -72,14 +74,10 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
             const fetchedAchievements: AllAchievementsState = {};
             querySnapshot.forEach(doc => {
                 const data = doc.data();
-                const achievements = generateInitialStateForUser(challengeConfig);
-                Object.keys(achievements).forEach(key => {
-                    const area = key as AreaName;
-                    if (data[area]) {
-                        achievements[area] = { ...achievements[area], ...data[area] };
-                    }
-                });
-                fetchedAchievements[doc.id] = achievements;
+                // Ensure data is an object before processing
+                if(data && typeof data === 'object') {
+                    fetchedAchievements[doc.id] = data as AchievementsState;
+                }
             });
             setAllAchievements(fetchedAchievements);
             setLoading(false);
@@ -94,16 +92,10 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
             const fetchedAchievements: AllAchievementsState = {};
              if (docSnap.exists()) {
                   const data = docSnap.data();
-                  const achievements = generateInitialStateForUser(challengeConfig);
-                  Object.keys(achievements).forEach(key => {
-                      const area = key as AreaName;
-                      if (data[area]) {
-                          achievements[area] = { ...achievements[area], ...data[area] };
-                      }
-                  });
-                  fetchedAchievements[user.username] = achievements;
-              } else {
-                  fetchedAchievements[user.username] = generateInitialStateForUser(challengeConfig);
+                  // Ensure data is an object before processing
+                  if(data && typeof data === 'object') {
+                      fetchedAchievements[user.username] = data as AchievementsState;
+                  }
               }
               setAllAchievements(fetchedAchievements);
               setLoading(false);
@@ -120,19 +112,30 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
 
 
   const getAchievements = useCallback((username: string): AchievementsState => {
-    if (!allAchievements || !challengeConfig) return generateInitialStateForUser(challengeConfig);
+    const baseDefaultState = generateInitialStateForUser(challengeConfig);
+    if (!allAchievements || !challengeConfig || !allAchievements[username]) {
+        return baseDefaultState;
+    }
     
-    const userAchievements = allAchievements[username] || {};
-    const defaultState = generateInitialStateForUser(challengeConfig);
-    const finalState: AchievementsState = { ...defaultState };
+    const userAchievements = allAchievements[username];
+    const finalState = {} as AchievementsState;
 
-    for (const area in defaultState) {
-        if (userAchievements[area]) {
-            finalState[area] = { ...defaultState[area], ...userAchievements[area] };
-        }
+    for (const area of Object.keys(baseDefaultState)) {
+        const defaultAreaState = baseDefaultState[area];
+        const userAreaState = userAchievements ? userAchievements[area] : undefined;
+        
+        // Defensively ensure both are valid objects before spreading.
+        const safeDefault = (typeof defaultAreaState === 'object' && defaultAreaState !== null) 
+            ? defaultAreaState 
+            : { progress: 0, isCertified: false };
+
+        const safeUser = (typeof userAreaState === 'object' && userAreaState !== null) 
+            ? userAreaState 
+            : {};
+
+        finalState[area] = { ...safeDefault, ...safeUser };
     }
     return finalState;
-
   }, [allAchievements, challengeConfig]);
 
   const setProgress = useCallback(async (username: string, area: AreaName, progress: number | string) => {
@@ -144,7 +147,7 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
         const student = users.find(u => u.username === username);
 
         const docSnap = await getDoc(achievementDocRef);
-        const currentData = docSnap.exists() && docSnap.data()[area] ? docSnap.data()[area] : {};
+        const currentData = docSnap.exists() && docSnap.data()?.[area] ? docSnap.data()?.[area] : {};
         
         let newIsCertified;
 
@@ -155,7 +158,7 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
         // For numeric types, certify if goal is met (and don't un-certify).
         else if (areaConfig?.goalType === 'numeric' && typeof progress === 'number' && student?.grade !== undefined) {
             const gradeKey = student.grade === 0 ? '6' : String(student.grade);
-            const goal = areaConfig.goal[gradeKey] ?? 0;
+            const goal = areaConfig.goal?.[gradeKey] ?? 0;
             const meetsGoal = goal > 0 && progress >= goal;
             newIsCertified = (currentData.isCertified ?? false) || meetsGoal;
         } else {
@@ -164,7 +167,6 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
         }
         
         const newData = {
-            ...currentData,
             progress: progress,
             isCertified: newIsCertified,
         };
@@ -182,7 +184,7 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
     try {
         const achievementDocRef = doc(db, 'achievements', username);
         const docSnap = await getDoc(achievementDocRef);
-        const currentIsCertified = docSnap.exists() ? (docSnap.data()[area]?.isCertified ?? false) : false;
+        const currentIsCertified = docSnap.exists() ? (docSnap.data()?.[area]?.isCertified ?? false) : false;
         const newIsCertified = !currentIsCertified;
         
         await setDoc(achievementDocRef, { [area]: { isCertified: newIsCertified } }, { merge: true });
@@ -192,16 +194,14 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
   }, []);
   
   const certificateStatus = useCallback((username: string): CertificateStatus => {
-    if (!allAchievements || !allAchievements[username]) return 'Unranked';
-    
     const userAchievements = getAchievements(username);
-    const certifiedCount = Object.values(userAchievements).filter(a => a.isCertified).length;
+    const certifiedCount = Object.values(userAchievements).filter(a => a && a.isCertified).length;
     
     if (certifiedCount >= CERTIFICATE_THRESHOLDS.GOLD) return 'Gold';
     if (certifiedCount >= CERTIFICATE_THRESHOLDS.SILVER) return 'Silver';
     if (certifiedCount >= CERTIFICATE_THRESHOLDS.BRONZE) return 'Bronze';
     return 'Unranked';
-  }, [allAchievements, getAchievements]);
+  }, [getAchievements]);
 
   return (
     <AchievementsContext.Provider value={{ getAchievements, setProgress, toggleCertification, certificateStatus, loading }}>
