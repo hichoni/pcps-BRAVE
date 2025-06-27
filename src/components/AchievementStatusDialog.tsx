@@ -54,10 +54,33 @@ type EvidenceFormValues = z.infer<typeof evidenceSchema>;
 const MAX_FILE_SIZE_MB = 10;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
+const dataURItoBlob = (dataURI: string): Blob | null => {
+  try {
+    const parts = dataURI.split(',');
+    if (parts.length < 2) return null;
+
+    const byteString = atob(parts[1]);
+    const mimeString = parts[0].split(':')[1].split(';')[0];
+    
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    return new Blob([ab], { type: mimeString });
+  } catch (e) {
+    console.error("Error converting data URI to blob", e);
+    return null;
+  }
+}
+
 const resizeImage = (file: File, maxWidth: number, maxHeight: number, quality: number): Promise<{ dataUri: string; file: File }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (event) => {
+      if (!event.target?.result) {
+        return reject(new Error("FileReader did not return a result."));
+      }
       const img = new Image();
       img.onload = () => {
         let width = img.width;
@@ -83,35 +106,29 @@ const resizeImage = (file: File, maxWidth: number, maxHeight: number, quality: n
           return reject(new Error('Could not get canvas context'));
         }
         ctx.drawImage(img, 0, 0, width, height);
+        
+        const dataUri = canvas.toDataURL('image/jpeg', quality);
+        const blob = dataURItoBlob(dataUri);
 
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              return reject(new Error('Canvas to Blob conversion failed'));
-            }
-            const resizedFile = new File([blob], file.name, {
-              type: 'image/jpeg',
-              lastModified: Date.now(),
-            });
-            
-            const resizedReader = new FileReader();
-            resizedReader.onloadend = () => {
-                resolve({ dataUri: resizedReader.result as string, file: resizedFile });
-            };
-            resizedReader.readAsDataURL(blob);
+        if (!blob) {
+            return reject(new Error("Failed to convert resized canvas to blob."));
+        }
 
-          },
-          'image/jpeg',
-          0.8
-        );
+        const resizedFile = new File([blob], file.name, {
+            type: 'image/jpeg',
+            lastModified: Date.now(),
+        });
+        
+        resolve({ dataUri, file: resizedFile });
       };
-      img.onerror = reject;
-      img.src = event.target?.result as string;
+      img.onerror = (err) => reject(new Error('Image failed to load. The file might be corrupted.'));
+      img.src = event.target.result as string;
     };
-    reader.onerror = reject;
+    reader.onerror = (err) => reject(new Error('FileReader failed to read the file.'));
     reader.readAsDataURL(file);
   });
 };
+
 
 const StatusInfo = {
     approved: { icon: FileCheck, text: '승인됨', color: 'text-green-600' },
@@ -128,6 +145,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [submissionsLoading, setSubmissionsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
@@ -247,7 +265,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
             return;
         }
 
-        setIsSubmitting(true);
+        setIsProcessingImage(true);
         try {
             const { dataUri, file: resizedFile } = await resizeImage(file, 1280, 720, 0.8);
             setMediaFile(resizedFile);
@@ -262,7 +280,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
             setMediaFile(null);
             setMediaPreview(null);
         } finally {
-            setIsSubmitting(false);
+            setIsProcessingImage(false);
         }
     } else {
         setMediaFile(null);
@@ -486,7 +504,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                                         accept={areaName === 'Information' ? "image/*" : "image/*,video/*"}
                                         onChange={handleFileChange}
                                         className="file:text-primary file:font-semibold text-xs h-9"
-                                        disabled={isSubmitting}
+                                        disabled={isSubmitting || isProcessingImage}
                                     />
                                     </FormControl>
                                     <FormDescription className="text-xs">
@@ -511,9 +529,9 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                                 </div>
                             )}
                             
-                            <Button type="submit" className="w-full" disabled={isSubmitting || isChecking}>
-                                {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2"/>}
-                                {isSubmitting && !mediaFile ? '제출 중...' : (isSubmitting && mediaFile ? '파일 처리 중...' : '갤러리에 제출하기')}
+                            <Button type="submit" className="w-full" disabled={isSubmitting || isChecking || isProcessingImage}>
+                                {isProcessingImage ? <Loader2 className="animate-spin" /> : (isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2"/>)}
+                                {isProcessingImage ? '이미지 처리 중...' : (isSubmitting ? '제출 중...' : '갤러리에 제출하기')}
                             </Button>
                         </form>
                     </Form>
@@ -546,3 +564,5 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     </Dialog>
   );
 }
+
+    
