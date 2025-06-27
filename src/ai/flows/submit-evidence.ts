@@ -73,9 +73,6 @@ const submitEvidenceFlow = ai.defineFlow(
     // Submission interval check
     if (areaConfig.submissionIntervalMinutes && areaConfig.submissionIntervalMinutes > 0) {
         const submissionsCollection = collection(db, 'challengeSubmissions');
-        // The previous query required a composite index.
-        // This revised query uses two simple 'where' clauses and sorts the results in memory,
-        // avoiding the need for a special Firestore index.
         const q = query(
             submissionsCollection,
             where("userId", "==", input.userId),
@@ -85,21 +82,27 @@ const submitEvidenceFlow = ai.defineFlow(
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
             const submissions = querySnapshot.docs.map(doc => doc.data());
-            // Sort to find the most recent submission
-            submissions.sort((a, b) => 
-                (b.createdAt as Timestamp)?.toMillis() - (a.createdAt as Timestamp)?.toMillis()
-            );
             
-            const lastSubmission = submissions[0];
+            // Filter out rejected submissions before checking the interval.
+            const nonRejectedSubmissions = submissions.filter(s => s.status !== 'rejected');
 
-            if (lastSubmission && lastSubmission.createdAt) {
-                const lastSubmissionTime = (lastSubmission.createdAt as Timestamp).toDate();
-                const now = new Date();
-                const minutesSinceLastSubmission = (now.getTime() - lastSubmissionTime.getTime()) / (1000 * 60);
-    
-                if (minutesSinceLastSubmission < areaConfig.submissionIntervalMinutes) {
-                    const minutesToWait = Math.ceil(areaConfig.submissionIntervalMinutes - minutesSinceLastSubmission);
-                    throw new Error(`제출 간격 제한: 다음 제출까지 ${minutesToWait}분 남았습니다.`);
+            if (nonRejectedSubmissions.length > 0) {
+                // Sort to find the most recent non-rejected submission
+                nonRejectedSubmissions.sort((a, b) => 
+                    (b.createdAt as Timestamp)?.toMillis() - (a.createdAt as Timestamp)?.toMillis()
+                );
+                
+                const lastValidSubmission = nonRejectedSubmissions[0];
+
+                if (lastValidSubmission && lastValidSubmission.createdAt) {
+                    const lastSubmissionTime = (lastValidSubmission.createdAt as Timestamp).toDate();
+                    const now = new Date();
+                    const minutesSinceLastSubmission = (now.getTime() - lastSubmissionTime.getTime()) / (1000 * 60);
+        
+                    if (minutesSinceLastSubmission < areaConfig.submissionIntervalMinutes) {
+                        const minutesToWait = Math.ceil(areaConfig.submissionIntervalMinutes - minutesSinceLastSubmission);
+                        throw new Error(`제출 간격 제한: 다음 제출까지 ${minutesToWait}분 남았습니다.`);
+                    }
                 }
             }
         }
@@ -266,6 +269,10 @@ const submitEvidenceFlow = ai.defineFlow(
       };
     } catch (e: any) {
       console.error("Error in submitEvidenceFlow: ", e);
+      // Ensure that we always throw an Error object for consistent handling upstream
+      if (e instanceof Error) {
+        throw e;
+      }
       throw new Error(e.message || "데이터베이스에 제출 정보를 저장하거나 AI 검사를 하는 데 실패했습니다.");
     }
   }
