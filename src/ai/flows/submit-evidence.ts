@@ -194,37 +194,9 @@ const submitEvidenceFlow = ai.defineFlow(
       const isAutoApproved = submissionStatus === 'approved';
       let updateMessage = '';
 
-      if (isAutoApproved) {
-        if (areaConfig.goalType === 'numeric') {
-          const achievementDocRef = doc(db, 'achievements', input.userId);
-          await runTransaction(db, async (transaction) => {
-              const achievementDocSnap = await transaction.get(achievementDocRef);
-              const achievements = achievementDocSnap.data() || {};
-              const areaState: any = achievements[input.areaName] || {};
-              const newProgress = (Number(areaState.progress) || 0) + 1;
-              
-              const gradeKey = studentUser.grade === 0 ? '6' : String(studentUser.grade ?? '4');
-              const goal = areaConfig.goal?.[gradeKey] ?? 0;
-              const isNowCertified = goal > 0 && newProgress >= goal;
-
-              const newData = {
-                progress: newProgress,
-                isCertified: !!areaState.isCertified || isNowCertified,
-              };
-              
-              transaction.set(achievementDocRef, { [input.areaName]: newData }, { merge: true });
-              updateMessage = `AI가 활동을 확인하고 바로 승인했어요! 진행도가 1만큼 증가했습니다. (현재: ${newProgress}${areaConfig.unit})`;
-          });
-        }
-      } else {
-          if (submissionStatus === 'rejected') {
-              updateMessage = `AI 심사 결과, 반려되었습니다. 사유: ${aiReasoning}`;
-          } else {
-              updateMessage = '제출 완료! 선생님이 확인하신 후, 진행도에 반영될 거예요.';
-          }
-      }
-      
       const submissionsCollection = collection(db, 'challengeSubmissions');
+      const newSubmissionRef = doc(submissionsCollection); // Create a new doc reference with a unique ID
+
       const docData: any = {
         userId: input.userId,
         userName: input.userName,
@@ -242,12 +214,47 @@ const submitEvidenceFlow = ai.defineFlow(
           docData.mediaUrl = mediaUrl;
           docData.mediaType = input.mediaType;
       }
+      
+      // Use a transaction to ensure both submission and progress are updated together
+      await runTransaction(db, async (transaction) => {
+        // 1. Write the new submission document
+        transaction.set(newSubmissionRef, docData);
 
-      const docRef = await addDoc(submissionsCollection, docData);
+        // 2. If it was auto-approved, update progress
+        if (isAutoApproved && areaConfig.goalType === 'numeric') {
+          const achievementDocRef = doc(db, 'achievements', input.userId);
+          const achievementDocSnap = await transaction.get(achievementDocRef);
+          
+          const achievements = achievementDocSnap.data() || {};
+          const areaState: any = achievements[input.areaName] || {};
+          const newProgress = (Number(areaState.progress) || 0) + 1;
+          
+          const gradeKey = studentUser.grade === 0 ? '6' : String(studentUser.grade ?? '4');
+          const goal = areaConfig.goal?.[gradeKey] ?? 0;
+          const isNowCertified = goal > 0 && newProgress >= goal;
+
+          const newData = {
+            progress: newProgress,
+            isCertified: !!areaState.isCertified || isNowCertified,
+          };
+          
+          transaction.set(achievementDocRef, { [input.areaName]: newData }, { merge: true });
+          updateMessage = `AI가 활동을 확인하고 바로 승인했어요! 진행도가 1만큼 증가했습니다. (현재: ${newProgress}${areaConfig.unit})`;
+        }
+      });
+
+
+      if (!isAutoApproved) {
+          if (submissionStatus === 'rejected') {
+              updateMessage = `AI 심사 결과, 반려되었습니다. 사유: ${aiReasoning}`;
+          } else {
+              updateMessage = '제출 완료! 선생님이 확인하신 후, 진행도에 반영될 거예요.';
+          }
+      }
 
       return { 
           success: true, 
-          id: docRef.id,
+          id: newSubmissionRef.id,
           status: submissionStatus,
           updateMessage,
           aiReasoning: aiReasoning

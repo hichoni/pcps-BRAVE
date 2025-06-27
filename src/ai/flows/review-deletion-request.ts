@@ -65,7 +65,9 @@ const reviewDeletionRequestFlow = ai.defineFlow(
             const submissionData = submissionSnap.data();
             submissionDataForStorage = submissionData;
 
-            if (submissionData.status === 'approved' && challengeConfig) {
+            // FIX: Check 'previousStatus' because the current status is 'pending_deletion'.
+            // Only decrement progress if the submission was 'approved' before the deletion request.
+            if (submissionData.previousStatus === 'approved' && challengeConfig) {
               const areaConfig = challengeConfig[submissionData.areaName];
               
               if (areaConfig && areaConfig.goalType === 'numeric') {
