@@ -194,7 +194,9 @@ Your task is to determine if the image is a typing test result and if the typing
 };
 
 // --- Types for Server Actions ---
-export type SubmissionStatus = 'approved' | 'rejected' | 'pending_review' | 'pending_deletion';
+export const SUBMISSION_STATUSES = ['approved', 'rejected', 'pending_review', 'pending_deletion'] as const;
+export type SubmissionStatus = (typeof SUBMISSION_STATUSES)[number];
+
 
 // For submit-evidence.ts
 export interface SubmitEvidenceInput {

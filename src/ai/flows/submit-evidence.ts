@@ -14,7 +14,7 @@ import { collection, addDoc, serverTimestamp, doc, getDoc, runTransaction, query
 import { v4 as uuidv4 } from 'uuid';
 import { checkCertification } from './certification-checker';
 import { analyzeMediaEvidence } from './analyze-typing-test'; // Now a generic media analyzer
-import { type SubmitEvidenceInput, type SubmitEvidenceOutput, SubmissionStatus, type User, type CertificationCheckOutput } from '@/lib/config';
+import { type SubmitEvidenceInput, type SubmitEvidenceOutput, SUBMISSION_STATUSES, type SubmissionStatus, type User, type CertificationCheckOutput } from '@/lib/config';
 
 export async function submitEvidence(input: SubmitEvidenceInput): Promise<SubmitEvidenceOutput> {
   return submitEvidenceFlow(input);
@@ -34,7 +34,7 @@ const SubmitEvidenceInputSchema = z.object({
 const SubmitEvidenceOutputSchema = z.object({
     success: z.boolean(),
     id: z.string(),
-    status: z.nativeEnum(SubmissionStatus),
+    status: z.enum(SUBMISSION_STATUSES),
     updateMessage: z.string(),
     aiReasoning: z.string()
 });
