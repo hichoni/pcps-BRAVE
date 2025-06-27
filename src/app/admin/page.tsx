@@ -253,17 +253,17 @@ export default function AdminPage() {
                 </div>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
+              <div className="overflow-auto relative max-h-[60vh]">
               <Table className="min-w-full">
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 bg-card z-10">
                       <TableRow>
-                          <TableHead className="w-[200px] sticky top-0 left-0 bg-card z-30">학생 정보</TableHead>
-                          <TableHead className="w-[120px] sticky top-0 left-[200px] bg-card z-30 text-center">인증 등급</TableHead>
+                          <TableHead className="w-[200px] sticky left-0 bg-card z-20">학생 정보</TableHead>
+                          <TableHead className="w-[120px] sticky left-[200px] bg-card z-20 text-center">인증 등급</TableHead>
                           {challengeAreaKeys.map(area => (
-                              <TableHead key={area} className="text-center min-w-[170px] sticky top-0 bg-card z-20">{challengeConfig[area].koreanName}</TableHead>
+                              <TableHead key={area} className="text-center min-w-[170px]">{challengeConfig[area].koreanName}</TableHead>
                           ))}
                           {!user.areaName && (
-                            <TableHead className="text-center w-[120px] sticky top-0 bg-card z-20">관리</TableHead>
+                            <TableHead className="text-center w-[120px] sticky right-0 bg-card z-20">관리</TableHead>
                           )}
                       </TableRow>
                   </TableHeader>
@@ -274,10 +274,10 @@ export default function AdminPage() {
                           const statusInfo = STATUS_CONFIG[studentStatus];
                           return (
                               <TableRow key={student.id} className="h-14">
-                                  <TableCell className="font-medium whitespace-nowrap sticky left-0 bg-card z-10 w-[200px] px-2 py-1 align-middle">
+                                  <TableCell className="font-medium whitespace-nowrap sticky left-0 bg-card w-[200px] px-2 py-1 align-middle">
                                       {`${student.grade}학년 ${student.classNum}반 ${student.studentNum}번 ${student.name}`}
                                   </TableCell>
-                                  <TableCell className="sticky left-[200px] bg-card z-10 w-[120px] px-2 py-1 align-middle">
+                                  <TableCell className="sticky left-[200px] bg-card w-[120px] px-2 py-1 align-middle">
                                     <div className="flex items-center justify-center gap-1.5 font-semibold">
                                         <statusInfo.icon className={cn("h-4 w-4", statusInfo.color)} />
                                         <span className={cn(statusInfo.color)}>{statusInfo.label}</span>
@@ -330,7 +330,7 @@ export default function AdminPage() {
                                       )
                                   })}
                                   {!user.areaName && (
-                                    <TableCell className="text-center w-[120px] px-2 py-1 align-middle">
+                                    <TableCell className="text-center w-[120px] px-2 py-1 align-middle sticky right-0 bg-card">
                                         <div className="flex items-center justify-center gap-1">
                                               <Tooltip>
                                                   <TooltipTrigger asChild>
@@ -394,3 +394,4 @@ export default function AdminPage() {
     </TooltipProvider>
   );
 }
+
