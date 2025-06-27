@@ -55,11 +55,11 @@ const submitEvidenceFlow = ai.defineFlow(
         
         const configDocRef = doc(db, 'config', 'challengeConfig');
         const configDocSnap = await getDoc(configDocRef);
-        if (!configDocSnap.exists()) {
+        if (!configDocSnap.exists() || !configDocSnap.data()) {
             throw new Error("도전 영역 설정을 찾을 수 없습니다. 관리자에게 문의해주세요.");
         }
         const challengeConfig = configDocSnap.data();
-        if (!challengeConfig || typeof challengeConfig !== 'object' || Object.keys(challengeConfig).length === 0) {
+        if (typeof challengeConfig !== 'object' || Object.keys(challengeConfig).length === 0) {
              throw new Error("도전 영역 설정 데이터가 올바르지 않습니다.");
         }
 
@@ -73,10 +73,12 @@ const submitEvidenceFlow = ai.defineFlow(
         if (userSnapshot.empty) {
             throw new Error(`사용자 정보(${input.userId})를 찾을 수 없습니다.`);
         }
-        const studentUser = userSnapshot.docs[0].data() as User;
-        if (!studentUser) {
+        const userDoc = userSnapshot.docs[0];
+         if (!userDoc || !userDoc.data()) {
             throw new Error(`사용자 정보(${input.userId}) 데이터가 올바르지 않습니다.`);
         }
+        const studentUser = userDoc.data() as User;
+
 
         // Submission interval check
         if (areaConfig.submissionIntervalMinutes && areaConfig.submissionIntervalMinutes > 0) {
@@ -177,6 +179,28 @@ const submitEvidenceFlow = ai.defineFlow(
       let aiSufficient: boolean;
       let aiReasoning: string;
       let submissionStatus: SubmissionStatus;
+      let submissionId: string;
+      let updateMessage: string;
+
+      const submissionsCollection = collection(db, 'challengeSubmissions');
+      const newSubmissionRef = doc(submissionsCollection);
+      
+      const docData: any = {
+        userId: input.userId,
+        userName: input.userName,
+        areaName: input.areaName,
+        koreanName: input.koreanName,
+        challengeName: input.challengeName,
+        evidence: input.evidence,
+        createdAt: Timestamp.now(),
+        likes: [],
+        showInGallery: areaConfig.showInGallery ?? true,
+      };
+
+      if (mediaUrl) {
+          docData.mediaUrl = mediaUrl;
+          docData.mediaType = input.mediaType;
+      }
 
       if (areaConfig.autoApprove) {
           let aiResult: CertificationCheckOutput | null = null;
@@ -202,80 +226,58 @@ const submitEvidenceFlow = ai.defineFlow(
           }
 
           submissionStatus = aiSufficient ? 'approved' : 'rejected';
+          docData.status = submissionStatus;
+
+          const transactionResult = await runTransaction(db, async (transaction) => {
+            const achievementDocRef = doc(db, 'achievements', input.userId);
+            const achievementDocSnap = await transaction.get(achievementDocRef);
+
+            let newProgress: number | null = null;
+            if (submissionStatus === 'approved' && areaConfig.goalType === 'numeric') {
+                const rawAchievements = achievementDocSnap?.exists() ? achievementDocSnap.data() : {};
+                const achievements = (typeof rawAchievements === 'object' && rawAchievements !== null) ? rawAchievements : {};
+                const currentAreaState = (typeof achievements[input.areaName] === 'object' && achievements[input.areaName] !== null) ? achievements[input.areaName] : { progress: 0, isCertified: false };
+                newProgress = (Number(currentAreaState.progress) || 0) + 1;
+                
+                const gradeKey = studentUser.grade === 0 ? '6' : String(studentUser.grade ?? '4');
+                const goal = (areaConfig.goal && typeof areaConfig.goal === 'object' && areaConfig.goal[gradeKey]) ? Number(areaConfig.goal[gradeKey]) : 0;
+                const isNowCertified = goal > 0 && newProgress >= goal;
+
+                const newData = {
+                  progress: newProgress,
+                  isCertified: !!currentAreaState.isCertified || isNowCertified,
+                };
+                
+                transaction.set(achievementDocRef, { [input.areaName]: newData }, { merge: true });
+            }
+
+            transaction.set(newSubmissionRef, docData);
+            return newProgress;
+          });
+
+          submissionId = newSubmissionRef.id;
+          if (transactionResult !== null) {
+              updateMessage = `AI가 활동을 확인하고 바로 승인했어요! 진행도가 1만큼 증가했습니다. (현재: ${transactionResult}${areaConfig.unit})`;
+          } else if (submissionStatus === 'rejected') {
+              updateMessage = `AI 심사 결과, 반려되었습니다. 사유: ${aiReasoning}`;
+          } else {
+              updateMessage = '제출 완료! 선생님이 확인하신 후, 진행도에 반영될 거예요.';
+          }
+
       } else {
           submissionStatus = 'pending_review';
-          aiSufficient = false; // Not applicable, but set for clarity
           aiReasoning = 'AI 자동 인증이 비활성화된 영역입니다. 선생님의 확인이 필요합니다.';
-      }
-
-      const isAutoApproved = submissionStatus === 'approved';
-
-      const submissionsCollection = collection(db, 'challengeSubmissions');
-      const newSubmissionRef = doc(submissionsCollection);
-
-      const docData: any = {
-        userId: input.userId,
-        userName: input.userName,
-        areaName: input.areaName,
-        koreanName: input.koreanName,
-        challengeName: input.challengeName,
-        evidence: input.evidence,
-        createdAt: Timestamp.now(),
-        likes: [],
-        status: submissionStatus,
-        showInGallery: areaConfig.showInGallery ?? true,
-      };
-      
-      if (mediaUrl) {
-          docData.mediaUrl = mediaUrl;
-          docData.mediaType = input.mediaType;
-      }
-      
-      const transactionResult = await runTransaction(db, async (transaction) => {
-        // --- READ PHASE ---
-        // Per Firestore transaction rules, all reads must come before all writes.
-        const achievementDocRef = doc(db, 'achievements', input.userId);
-        const achievementDocSnap = await transaction.get(achievementDocRef);
-
-        // --- CALCULATION & WRITE PHASE ---
-        let newProgress: number | null = null;
-        if (isAutoApproved && areaConfig.goalType === 'numeric') {
-            const rawAchievements = achievementDocSnap?.exists() ? achievementDocSnap.data() : {};
-            const achievements = (typeof rawAchievements === 'object' && rawAchievements !== null) ? rawAchievements : {};
-
-            const currentAreaState = (typeof achievements[input.areaName] === 'object' && achievements[input.areaName] !== null) ? achievements[input.areaName] : { progress: 0, isCertified: false };
-
-            newProgress = (Number(currentAreaState.progress) || 0) + 1;
-            
-            const gradeKey = studentUser.grade === 0 ? '6' : String(studentUser.grade ?? '4');
-            const goal = (areaConfig.goal && typeof areaConfig.goal === 'object' && areaConfig.goal[gradeKey]) ? Number(areaConfig.goal[gradeKey]) : 0;
-            const isNowCertified = goal > 0 && newProgress >= goal;
-
-            const newData = {
-              progress: newProgress,
-              isCertified: !!currentAreaState.isCertified || isNowCertified,
-            };
-            
-            transaction.set(achievementDocRef, { [input.areaName]: newData }, { merge: true });
-        }
-
-        transaction.set(newSubmissionRef, docData);
-
-        return newProgress;
-      });
-
-      let updateMessage = '';
-      if (transactionResult !== null) {
-          updateMessage = `AI가 활동을 확인하고 바로 승인했어요! 진행도가 1만큼 증가했습니다. (현재: ${transactionResult}${areaConfig.unit})`;
-      } else if (submissionStatus === 'rejected') {
-          updateMessage = `AI 심사 결과, 반려되었습니다. 사유: ${aiReasoning}`;
-      } else {
+          docData.status = submissionStatus;
+          
+          // For non-auto-approved submissions, just add the document. No transaction needed.
+          const addedDoc = await addDoc(submissionsCollection, docData);
+          submissionId = addedDoc.id;
           updateMessage = '제출 완료! 선생님이 확인하신 후, 진행도에 반영될 거예요.';
       }
 
       return { 
           success: true, 
-          id: newSubmissionRef.id,
+          id: submissionId,
           status: submissionStatus,
           updateMessage,
           aiReasoning: aiReasoning
