@@ -81,8 +81,8 @@ const reviewDeletionRequestFlow = ai.defineFlow(
                 
                 // Construct the new state safely, preserving any other properties like isCertified.
                 const newAreaState = {
-                    ...currentAreaState,
                     progress: newProgress,
+                    isCertified: currentAreaState.isCertified || false,
                 };
                 
                 transaction.set(achievementDocRef, { 
