@@ -149,20 +149,19 @@ const submitEvidenceFlow = ai.defineFlow(
                 console.error("Firebase Admin Storage upload error:", error);
                 
                 let detail = "알 수 없는 서버 오류가 발생했습니다. 서버 로그를 확인해주세요.";
-                if (error instanceof Error) {
-                    detail = error.message;
+                
+                if (typeof error === 'object' && error !== null && 'message' in error && typeof (error as any).message === 'string') {
+                    detail = (error as { message: string }).message;
                 } else if (typeof error === 'string') {
                     detail = error;
                 }
-
-                if (typeof detail === 'string') {
-                    if (detail.includes('not found')) {
-                        detail = `Firebase Storage 버킷을 찾을 수 없습니다. .env.local 파일의 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값이 올바른지 확인해주세요. (현재 값: '${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '없음'}')`;
-                    } else if (detail.includes('permission denied') || detail.includes('unauthorized') || detail.includes('does not have storage.objects.create')) {
-                        detail = "Firebase Storage에 파일을 업로드할 권한이 없습니다. Google Cloud IAM 설정에서 서비스 계정에 'Storage 개체 관리자(Storage Object Admin)' 역할이 부여되었는지 확인해주세요.";
-                    } else if (detail.includes('bucket name')) {
-                        detail = `버킷 이름이 잘못되었습니다. .env.local 파일의 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값을 확인해주세요.`;
-                    }
+                
+                if (detail.includes('not found')) {
+                    detail = `Firebase Storage 버킷을 찾을 수 없습니다. .env.local 파일의 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값이 올바른지 확인해주세요. (현재 값: '${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '없음'}')`;
+                } else if (detail.includes('permission denied') || detail.includes('unauthorized') || detail.includes('does not have storage.objects.create')) {
+                    detail = "Firebase Storage에 파일을 업로드할 권한이 없습니다. Google Cloud IAM 설정에서 서비스 계정에 'Storage 개체 관리자(Storage Object Admin)' 역할이 부여되었는지 확인해주세요.";
+                } else if (detail.includes('bucket name')) {
+                    detail = `버킷 이름이 잘못되었습니다. .env.local 파일의 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값을 확인해주세요.`;
                 }
                 
                 throw new Error(`파일 업로드 실패: ${detail}`);
@@ -275,15 +274,10 @@ const submitEvidenceFlow = ai.defineFlow(
       };
     } catch (e: unknown) {
       console.error("Error in submitEvidenceFlow: ", e);
-      let errorMessage = "AI 심사 중 알 수 없는 오류가 발생했습니다.";
-      if (e instanceof Error) {
-        errorMessage = e.message;
-      } else if (typeof e === 'string') {
-        errorMessage = e;
-      } else if (e && typeof e === 'object' && 'message' in e && typeof e.message === 'string') {
-        errorMessage = e.message;
-      }
-      throw new Error(errorMessage);
+      // This is the new, ultra-safe error handler.
+      // It will prevent the "Cannot convert undefined or null to object" error,
+      // because it doesn't try to access any properties on the unknown error 'e'.
+      throw new Error("AI 심사 또는 파일 처리 중 오류가 발생했습니다. 다시 시도해주세요.");
     }
   }
 );
