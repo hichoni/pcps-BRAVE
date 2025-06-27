@@ -223,6 +223,10 @@ const submitEvidenceFlow = ai.defineFlow(
           docData.status = submissionStatus;
 
           if (submissionStatus === 'approved' && areaConfig.goalType === 'numeric') {
+              // Write the submission first.
+              await setDoc(newSubmissionRef, docData);
+
+              // Then, update the achievement. This is not atomic, but simpler and safer against transaction errors.
               const achievementDocRef = doc(db, 'achievements', input.userId);
               const achievementDocSnap = await getDoc(achievementDocRef);
               
@@ -240,10 +244,7 @@ const submitEvidenceFlow = ai.defineFlow(
                 isCertified: !!currentAreaState.isCertified || isNowCertified,
               };
 
-              const batch = writeBatch(db);
-              batch.set(newSubmissionRef, docData);
-              batch.set(achievementDocRef, { [input.areaName]: newData }, { merge: true });
-              await batch.commit();
+              await setDoc(achievementDocRef, { [input.areaName]: newData }, { merge: true });
 
               updateMessage = `AI가 활동을 확인하고 바로 승인했어요! 진행도가 1만큼 증가했습니다. (현재: ${newProgress}${areaConfig.unit})`;
           } else {
@@ -285,3 +286,5 @@ const submitEvidenceFlow = ai.defineFlow(
     }
   }
 );
+
+    

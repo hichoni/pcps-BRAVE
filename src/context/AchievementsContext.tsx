@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
@@ -31,13 +32,7 @@ const generateInitialStateForUser = (challengeConfig: any): AchievementsState =>
         if (config.goalType === 'numeric') {
             initialProgress = 0;
         } else if (config.goalType === 'objective') {
-            if (area === 'Information') {
-                initialProgress = '입문';
-            } else if (area === 'Physical-Education') {
-                initialProgress = '5등급';
-            } else {
-                initialProgress = '';
-            }
+            initialProgress = '';
         }
 
         studentAchievements[area] = {
@@ -110,45 +105,40 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
   }, [user, authLoading, challengeConfig, configLoading]);
 
 
-  // Completely rewritten for maximum safety against corrupted or null data.
   const getAchievements = useCallback((username: string): AchievementsState => {
     const baseDefaultState = generateInitialStateForUser(challengeConfig);
 
-    // If context isn't ready, return a safe default.
     if (!allAchievements || !challengeConfig) {
         return baseDefaultState;
     }
     
-    // Start with a safe, complete default state.
     const finalState = { ...baseDefaultState };
-    
     const userAchievements = allAchievements[username];
 
-    // If there's no data for the user, or it's not an object, return the default state.
     if (!userAchievements || typeof userAchievements !== 'object') {
         return finalState;
     }
     
-    // Iterate over all possible areas from the default config to ensure all areas are covered and safe.
-    for (const area of Object.keys(finalState)) {
-        const defaultAreaState = finalState[area]; // This is guaranteed to be a valid object.
+    // Iterate over all possible areas from the config to ensure all areas are covered and safe.
+    for (const area of Object.keys(challengeConfig)) {
+        const defaultAreaState = finalState[area];
         const userAreaState = userAchievements[area];
 
-        // Only override the default if the user's data for this specific area is a valid object.
-        if (userAreaState && typeof userAreaState === 'object' && userAreaState !== null) {
-            finalState[area] = {
-                // Safely access properties, falling back to the default if they are missing.
-                progress: userAreaState.progress ?? defaultAreaState.progress,
-                isCertified: userAreaState.isCertified ?? defaultAreaState.isCertified,
-            };
+        if (defaultAreaState) {
+          if (userAreaState && typeof userAreaState === 'object' && userAreaState !== null) {
+              finalState[area] = {
+                  progress: userAreaState.progress ?? defaultAreaState.progress,
+                  isCertified: userAreaState.isCertified ?? defaultAreaState.isCertified,
+              };
+          } else {
+              finalState[area] = defaultAreaState;
+          }
         }
-        // If userAreaState is not a valid object (e.g., null), we do nothing and keep the safe default.
     }
     
     return finalState;
   }, [allAchievements, challengeConfig]);
 
-  // Rewritten to be more robust against corrupted or null data in Firestore.
   const setProgress = useCallback(async (username: string, area: AreaName, progress: number | string) => {
     if (!db || !challengeConfig || !users) return;
 
@@ -160,26 +150,21 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
         const docSnap = await getDoc(achievementDocRef);
         const currentAchievements = docSnap.exists() ? docSnap.data() : {};
         
-        // Safely get the state for the specific area, providing a default if it's not a valid object.
         const currentAreaState = (currentAchievements && typeof currentAchievements[area] === 'object' && currentAchievements[area] !== null)
           ? currentAchievements[area]
-          : { isCertified: false }; // Safe default
+          : { isCertified: false };
 
         let newIsCertified;
 
-        // For objective types with auto-certify rules, the status is directly tied to the value.
         if (areaConfig?.goalType === 'objective' && areaConfig.autoCertifyOn && typeof progress === 'string') {
             newIsCertified = areaConfig.autoCertifyOn.includes(progress);
         } 
-        // For numeric types, certify if goal is met (and don't un-certify).
         else if (areaConfig?.goalType === 'numeric' && typeof progress === 'number' && student?.grade !== undefined) {
             const gradeKey = student.grade === 0 ? '6' : String(student.grade);
             const goal = areaConfig.goal?.[gradeKey] ?? 0;
             const meetsGoal = goal > 0 && progress >= goal;
-            // Use currentAreaState safely, with a fallback.
             newIsCertified = (currentAreaState.isCertified ?? false) || meetsGoal;
         } else {
-            // For objective types without auto-certify rules, or other cases, don't change certification status.
             newIsCertified = currentAreaState.isCertified ?? false;
         }
         
@@ -234,3 +219,5 @@ export const useAchievements = () => {
   }
   return context;
 };
+
+    
