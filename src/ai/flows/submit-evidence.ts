@@ -10,7 +10,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { db } from '@/lib/firebase';
 import { adminStorage } from '@/lib/firebase-admin';
-import { collection, addDoc, serverTimestamp, doc, getDoc, runTransaction, query, where, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc, runTransaction, query, where, orderBy, limit, getDocs, Timestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { checkCertification } from './certification-checker';
 import { analyzeMediaEvidence } from './analyze-typing-test'; // Now a generic media analyzer
@@ -93,11 +93,9 @@ const submitEvidenceFlow = ai.defineFlow(
             if (!querySnapshot.empty) {
                 const submissions = querySnapshot.docs.map(doc => doc.data());
                 
-                // Filter out rejected submissions before checking the interval.
                 const nonRejectedSubmissions = submissions.filter(s => s.status !== 'rejected');
 
                 if (nonRejectedSubmissions.length > 0) {
-                    // Sort to find the most recent non-rejected submission
                     nonRejectedSubmissions.sort((a, b) => 
                         (b.createdAt as Timestamp)?.toMillis() - (a.createdAt as Timestamp)?.toMillis()
                     );
@@ -176,14 +174,7 @@ const submitEvidenceFlow = ai.defineFlow(
             }
         }
         
-      let aiSufficient: boolean;
-      let aiReasoning: string;
-      let submissionStatus: SubmissionStatus;
-      let submissionId: string;
-      let updateMessage: string;
-
-      const submissionsCollection = collection(db, 'challengeSubmissions');
-      const newSubmissionRef = doc(submissionsCollection);
+      const newSubmissionRef = doc(collection(db, 'challengeSubmissions'));
       
       const docData: any = {
         userId: input.userId,
@@ -202,6 +193,10 @@ const submitEvidenceFlow = ai.defineFlow(
           docData.mediaType = input.mediaType;
       }
 
+      let submissionStatus: SubmissionStatus;
+      let aiReasoning: string;
+      let updateMessage: string;
+
       if (areaConfig.autoApprove) {
           let aiResult: CertificationCheckOutput | null = null;
           if (areaConfig.aiVisionCheck && input.mediaDataUri && areaConfig.aiVisionPrompt) {
@@ -218,50 +213,46 @@ const submitEvidenceFlow = ai.defineFlow(
           }
           
           if(aiResult) {
-            aiSufficient = aiResult.isSufficient;
             aiReasoning = aiResult.reasoning;
+            submissionStatus = aiResult.isSufficient ? 'approved' : 'rejected';
           } else {
-            aiSufficient = false;
             aiReasoning = areaConfig.aiVisionCheck ? 'AI가 이미지를 분석하지 못했습니다. 기준에 맞지 않거나 손상된 파일일 수 있습니다.' : 'AI가 제출 내용을 분석하지 못했습니다. 내용을 확인 후 다시 시도해주세요.';
+            submissionStatus = 'rejected';
           }
-
-          submissionStatus = aiSufficient ? 'approved' : 'rejected';
+          
           docData.status = submissionStatus;
 
-          const transactionResult = await runTransaction(db, async (transaction) => {
-            const achievementDocRef = doc(db, 'achievements', input.userId);
-            const achievementDocSnap = await transaction.get(achievementDocRef);
+          if (submissionStatus === 'approved' && areaConfig.goalType === 'numeric') {
+              const achievementDocRef = doc(db, 'achievements', input.userId);
+              const achievementDocSnap = await getDoc(achievementDocRef);
+              
+              const rawAchievements = achievementDocSnap.exists() ? achievementDocSnap.data() : {};
+              const achievements = (typeof rawAchievements === 'object' && rawAchievements !== null) ? rawAchievements : {};
+              const currentAreaState = (typeof achievements[input.areaName] === 'object' && achievements[input.areaName] !== null) ? achievements[input.areaName] : { progress: 0, isCertified: false };
+              
+              const newProgress = (Number(currentAreaState.progress) || 0) + 1;
+              const gradeKey = studentUser.grade === 0 ? '6' : String(studentUser.grade ?? '4');
+              const goal = (areaConfig.goal && typeof areaConfig.goal === 'object' && areaConfig.goal[gradeKey]) ? Number(areaConfig.goal[gradeKey]) : 0;
+              const isNowCertified = goal > 0 && newProgress >= goal;
+              
+              const newData = {
+                progress: newProgress,
+                isCertified: !!currentAreaState.isCertified || isNowCertified,
+              };
 
-            let newProgress: number | null = null;
-            if (submissionStatus === 'approved' && areaConfig.goalType === 'numeric') {
-                const rawAchievements = achievementDocSnap?.exists() ? achievementDocSnap.data() : {};
-                const achievements = (typeof rawAchievements === 'object' && rawAchievements !== null) ? rawAchievements : {};
-                const currentAreaState = (typeof achievements[input.areaName] === 'object' && achievements[input.areaName] !== null) ? achievements[input.areaName] : { progress: 0, isCertified: false };
-                newProgress = (Number(currentAreaState.progress) || 0) + 1;
-                
-                const gradeKey = studentUser.grade === 0 ? '6' : String(studentUser.grade ?? '4');
-                const goal = (areaConfig.goal && typeof areaConfig.goal === 'object' && areaConfig.goal[gradeKey]) ? Number(areaConfig.goal[gradeKey]) : 0;
-                const isNowCertified = goal > 0 && newProgress >= goal;
+              const batch = writeBatch(db);
+              batch.set(newSubmissionRef, docData);
+              batch.set(achievementDocRef, { [input.areaName]: newData }, { merge: true });
+              await batch.commit();
 
-                const newData = {
-                  progress: newProgress,
-                  isCertified: !!currentAreaState.isCertified || isNowCertified,
-                };
-                
-                transaction.set(achievementDocRef, { [input.areaName]: newData }, { merge: true });
-            }
-
-            transaction.set(newSubmissionRef, docData);
-            return newProgress;
-          });
-
-          submissionId = newSubmissionRef.id;
-          if (transactionResult !== null) {
-              updateMessage = `AI가 활동을 확인하고 바로 승인했어요! 진행도가 1만큼 증가했습니다. (현재: ${transactionResult}${areaConfig.unit})`;
-          } else if (submissionStatus === 'rejected') {
-              updateMessage = `AI 심사 결과, 반려되었습니다. 사유: ${aiReasoning}`;
+              updateMessage = `AI가 활동을 확인하고 바로 승인했어요! 진행도가 1만큼 증가했습니다. (현재: ${newProgress}${areaConfig.unit})`;
           } else {
-              updateMessage = '제출 완료! 선생님이 확인하신 후, 진행도에 반영될 거예요.';
+              await setDoc(newSubmissionRef, docData);
+              if (submissionStatus === 'rejected') {
+                  updateMessage = `AI 심사 결과, 반려되었습니다. 사유: ${aiReasoning}`;
+              } else {
+                  updateMessage = 'AI가 활동을 승인했지만, 진행도에는 변동이 없어요.';
+              }
           }
 
       } else {
@@ -269,18 +260,16 @@ const submitEvidenceFlow = ai.defineFlow(
           aiReasoning = 'AI 자동 인증이 비활성화된 영역입니다. 선생님의 확인이 필요합니다.';
           docData.status = submissionStatus;
           
-          // For non-auto-approved submissions, just add the document. No transaction needed.
-          const addedDoc = await addDoc(submissionsCollection, docData);
-          submissionId = addedDoc.id;
+          await setDoc(newSubmissionRef, docData);
           updateMessage = '제출 완료! 선생님이 확인하신 후, 진행도에 반영될 거예요.';
       }
 
       return { 
           success: true, 
-          id: submissionId,
+          id: newSubmissionRef.id,
           status: submissionStatus,
           updateMessage,
-          aiReasoning: aiReasoning
+          aiReasoning
       };
     } catch (e: unknown) {
       console.error("Submit Evidence Flow Error:", e);
