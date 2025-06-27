@@ -283,21 +283,18 @@ const submitEvidenceFlow = ai.defineFlow(
       };
     } catch (e: unknown) {
       console.error("Submit Evidence Flow Error:", e);
-
-      let errorMessage = "알 수 없는 오류가 발생했습니다. 나중에 다시 시도해주세요.";
+      let errorMessage = "An unexpected error occurred. Please check the server logs.";
 
       if (e instanceof Error) {
         errorMessage = e.message;
-      } else if (e && typeof e === 'object' && 'message' in e && typeof (e as any).message === 'string') {
-        errorMessage = (e as { message: string }).message;
-      } else if (typeof e === 'string' && e.length > 0) {
+      } else if (typeof e === 'string' && e) {
         errorMessage = e;
-      } else if (e) {
-        try {
-          errorMessage = JSON.stringify(e);
-        } catch {
-          errorMessage = 'An un-serializable error object was thrown.';
-        }
+      } else if (e && typeof e === 'object' && 'message' in e && typeof (e as any).message === 'string') {
+        errorMessage = (e as {message: string}).message;
+      }
+      
+      if (!errorMessage.trim()) {
+        errorMessage = "An unexpected error occurred with no message.";
       }
       
       throw new Error(errorMessage);
