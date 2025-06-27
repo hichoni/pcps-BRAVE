@@ -24,6 +24,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EditSubmissionDialog } from '@/components/EditSubmissionDialog';
 import { SubmissionStatus } from '@/lib/config';
+import { Badge } from '@/components/ui/badge';
 
 
 interface Submission {
@@ -39,6 +40,7 @@ interface Submission {
   mediaUrl?: string;
   mediaType?: string;
   likes: string[];
+  showInGallery: boolean;
 }
 
 const maskName = (name: string) => {
@@ -111,7 +113,15 @@ function GalleryCard({ submission, user, onSubmissionDeleted, onSubmissionUpdate
 
   return (
     <>
-    <Card className="flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300 border">
+    <Card className="flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300 border relative">
+      <div className="absolute top-2 right-2 flex flex-col items-end gap-1 text-xs z-10 bg-background/80 p-1 rounded-bl-md">
+          <Badge variant={submission.status === 'approved' ? 'default' : 'destructive'} className="capitalize">
+            {submission.status.replace('_', ' ')}
+          </Badge>
+          <Badge variant={submission.showInGallery ? 'secondary' : 'outline'}>
+              {submission.showInGallery ? '갤러리 표시' : '숨김'}
+          </Badge>
+      </div>
       <CardHeader className="flex flex-row items-start gap-4 space-y-0 pb-3">
          <Avatar>
             <AvatarFallback>{submission.userName.charAt(0)}</AvatarFallback>
@@ -246,9 +256,7 @@ export default function GalleryPage() {
       setLoadingInitial(true);
       try {
         const q = query(
-            collection(db, "challengeSubmissions"), 
-            where("status", "==", "approved"),
-            where("showInGallery", "==", true),
+            collection(db, "challengeSubmissions"),
             orderBy("createdAt", "desc"),
             limit(PAGE_SIZE)
         );
@@ -260,6 +268,7 @@ export default function GalleryPage() {
             ...data,
             createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
             likes: data.likes || [],
+            showInGallery: data.showInGallery === true,
           } as Submission;
         });
         setSubmissions(fetchedSubmissions);
@@ -293,8 +302,6 @@ export default function GalleryPage() {
     try {
         const q = query(
             collection(db, "challengeSubmissions"),
-            where("status", "==", "approved"),
-            where("showInGallery", "==", true),
             orderBy("createdAt", "desc"),
             startAfter(lastDoc),
             limit(PAGE_SIZE)
@@ -307,6 +314,7 @@ export default function GalleryPage() {
                 ...data,
                 createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
                 likes: data.likes || [],
+                showInGallery: data.showInGallery === true,
             } as Submission;
         });
 
@@ -461,9 +469,3 @@ export default function GalleryPage() {
     </div>
   );
 }
-
-
-
-
-
-    
