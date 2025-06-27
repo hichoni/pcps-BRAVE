@@ -75,8 +75,8 @@ const reviewDeletionRequestFlow = ai.defineFlow(
                 const achievementDocSnap = await transaction.get(achievementDocRef);
                 
                 const achievements = achievementDocSnap.exists() ? achievementDocSnap.data() : {};
-                // Ensure areaState is an object, even if it doesn't exist in the DB yet.
-                const currentAreaState = achievements[submissionData.areaName] || {};
+                // Ensure areaState is a non-null object to prevent destructuring errors on undefined/null.
+                const currentAreaState = (typeof achievements[submissionData.areaName] === 'object' && achievements[submissionData.areaName] !== null) ? achievements[submissionData.areaName] : {};
                 const newProgress = Math.max(0, (Number(currentAreaState.progress) || 0) - 1);
                 
                 // Construct the new state safely, preserving any other properties like isCertified.
