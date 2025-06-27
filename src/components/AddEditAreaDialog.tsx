@@ -37,7 +37,10 @@ const formSchema = z.object({
     '5': z.coerce.number().optional(),
     '6': z.coerce.number().optional(),
   }),
-  options: z.array(z.object({ value: z.string().min(1, '옵션 값은 비워둘 수 없습니다.') })),
+  options: z.array(z.object({ 
+    value: z.string().min(1, '옵션 값은 비워둘 수 없습니다.'),
+    isCertifying: z.boolean().optional(),
+  })),
   externalUrl: z.string().url({ message: "올바른 URL 형식을 입력해주세요." }).optional().or(z.literal('')),
   mediaRequired: z.boolean().optional(),
   autoApprove: z.boolean().optional(),
@@ -104,46 +107,51 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
   const isEditMode = !!area;
 
   useEffect(() => {
-    if (area) {
-      form.reset({
-        id: area.id,
-        koreanName: area.config.koreanName,
-        challengeName: area.config.challengeName,
-        iconName: area.config.iconName,
-        requirements: area.config.requirements,
-        goalType: area.config.goalType,
-        unit: area.config.unit,
-        goal: area.config.goal,
-        options: area.config.options?.map(o => ({ value: o })) || [],
-        externalUrl: area.config.externalUrl || '',
-        mediaRequired: area.config.mediaRequired || false,
-        autoApprove: area.config.autoApprove || false,
-        showInGallery: area.config.showInGallery ?? true,
-        aiVisionCheck: area.config.aiVisionCheck ?? false,
-        aiVisionPrompt: area.config.aiVisionPrompt ?? '',
-        submissionIntervalMinutes: area.config.submissionIntervalMinutes ?? 0,
-      });
-    } else {
-      form.reset({
-        id: '',
-        koreanName: '',
-        challengeName: '',
-        iconName: '',
-        requirements: '',
-        goalType: 'numeric',
-        unit: '',
-        goal: { '4': 0, '5': 0, '6': 0 },
-        options: [{ value: '' }],
-        externalUrl: '',
-        mediaRequired: false,
-        autoApprove: false,
-        showInGallery: true,
-        aiVisionCheck: false,
-        aiVisionPrompt: '',
-        submissionIntervalMinutes: 0,
-      });
+    if (open) {
+      if (area) {
+        form.reset({
+          id: area.id,
+          koreanName: area.config.koreanName,
+          challengeName: area.config.challengeName,
+          iconName: area.config.iconName,
+          requirements: area.config.requirements,
+          goalType: area.config.goalType,
+          unit: area.config.unit,
+          goal: area.config.goal,
+          options: area.config.options?.map(o => ({ 
+              value: o,
+              isCertifying: area.config.autoCertifyOn?.includes(o) ?? false,
+          })) || [],
+          externalUrl: area.config.externalUrl || '',
+          mediaRequired: area.config.mediaRequired || false,
+          autoApprove: area.config.autoApprove || false,
+          showInGallery: area.config.showInGallery ?? true,
+          aiVisionCheck: area.config.aiVisionCheck ?? false,
+          aiVisionPrompt: area.config.aiVisionPrompt ?? '',
+          submissionIntervalMinutes: area.config.submissionIntervalMinutes ?? 0,
+        });
+      } else {
+        form.reset({
+          id: '',
+          koreanName: '',
+          challengeName: '',
+          iconName: '',
+          requirements: '',
+          goalType: 'numeric',
+          unit: '',
+          goal: { '4': 0, '5': 0, '6': 0 },
+          options: [{ value: '', isCertifying: false }],
+          externalUrl: '',
+          mediaRequired: false,
+          autoApprove: false,
+          showInGallery: true,
+          aiVisionCheck: false,
+          aiVisionPrompt: '',
+          submissionIntervalMinutes: 0,
+        });
+      }
     }
-  }, [area, form, open]);
+  }, [area, open, form]);
 
   useEffect(() => {
     if (!autoApproveEnabled) {
@@ -161,6 +169,10 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
       return;
     }
 
+    const autoCertifyOn = data.options
+      .filter(o => o.isCertifying && o.value)
+      .map(o => o.value);
+
     const newConfigData: StoredAreaConfig = {
       koreanName: data.koreanName,
       challengeName: data.challengeName,
@@ -169,7 +181,8 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
       goalType: data.goalType,
       unit: data.unit,
       goal: data.goalType === 'numeric' ? data.goal : {},
-      options: data.goalType === 'objective' ? data.options.map(o => o.value) : [],
+      options: data.goalType === 'objective' ? data.options.map(o => o.value).filter(Boolean) : [],
+      autoCertifyOn: autoCertifyOn.length > 0 ? autoCertifyOn : undefined,
       externalUrl: data.externalUrl || undefined,
       mediaRequired: data.mediaRequired,
       autoApprove: data.autoApprove,
@@ -351,9 +364,12 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
 
               {goalType === 'objective' && (
                 <div className="space-y-2 p-4 border rounded-md">
-                    <Label>선택지 목록</Label>
+                    <div className="flex justify-between items-center mb-2">
+                        <Label>선택지 목록</Label>
+                        <FormDescription>자동 인증: 체크 시 해당 항목을 받으면 자동 인증됩니다.</FormDescription>
+                    </div>
                     {fields.map((field, index) => (
-                        <div key={field.id} className="flex items-center gap-2">
+                        <div key={field.id} className="flex items-start gap-2">
                            <FormField
                                 control={form.control}
                                 name={`options.${index}.value`}
@@ -366,12 +382,29 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
                                     </FormItem>
                                 )}
                             />
-                            <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}>
+                             <FormField
+                                control={form.control}
+                                name={`options.${index}.isCertifying`}
+                                render={({ field }) => (
+                                  <FormItem className="flex flex-row items-center space-x-2 pt-2">
+                                      <FormControl>
+                                      <Checkbox
+                                          checked={field.value}
+                                          onCheckedChange={field.onChange}
+                                      />
+                                      </FormControl>
+                                      <FormLabel className="text-sm font-normal cursor-pointer">
+                                        자동 인증
+                                      </FormLabel>
+                                  </FormItem>
+                                )}
+                              />
+                            <Button type="button" variant="destructive" size="icon" className="h-9 w-9 mt-0.5" onClick={() => remove(index)}>
                                 <Trash2 className="h-4 w-4"/>
                             </Button>
                         </div>
                     ))}
-                    <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '' })}>
+                    <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '', isCertifying: false })}>
                         <PlusCircle className="mr-2"/> 옵션 추가
                     </Button>
                 </div>
