@@ -180,8 +180,13 @@ const submitEvidenceFlow = ai.defineFlow(
                   photoDataUri: input.mediaDataUri, 
                   prompt: areaConfig.aiVisionPrompt 
               });
-              aiSufficient = visionResult.isSufficient;
-              aiReasoning = visionResult.reasoning;
+              if (visionResult) {
+                aiSufficient = visionResult.isSufficient;
+                aiReasoning = visionResult.reasoning;
+              } else {
+                aiSufficient = false;
+                aiReasoning = 'AI가 이미지를 분석하지 못했습니다. 기준에 맞지 않거나 손상된 파일일 수 있습니다.';
+              }
           } else {
               // Fallback to text-based check
               const textCheckResult = await checkCertification({
@@ -189,8 +194,13 @@ const submitEvidenceFlow = ai.defineFlow(
                   requirements: areaConfig.requirements,
                   evidence: input.evidence,
               });
-              aiSufficient = textCheckResult.isSufficient;
-              aiReasoning = textCheckResult.reasoning;
+              if (textCheckResult) {
+                aiSufficient = textCheckResult.isSufficient;
+                aiReasoning = textCheckResult.reasoning;
+              } else {
+                aiSufficient = false;
+                aiReasoning = 'AI가 제출 내용을 분석하지 못했습니다. 내용을 확인 후 다시 시도해주세요.';
+              }
           }
           submissionStatus = aiSufficient ? 'approved' : 'rejected';
       } else {
@@ -277,11 +287,14 @@ const submitEvidenceFlow = ai.defineFlow(
       let errorMessage = "An unexpected error occurred. Please try again.";
       if (e instanceof Error) {
         errorMessage = e.message;
+      } else if (typeof e === 'string') {
+        errorMessage = e;
+      } else if (e && typeof e === 'object' && 'message' in e && typeof (e as any).message === 'string') {
+        errorMessage = (e as { message: string }).message;
       }
+      
       console.error("Error in submitEvidenceFlow: ", e);
       throw new Error(errorMessage);
     }
   }
 );
-
-    
