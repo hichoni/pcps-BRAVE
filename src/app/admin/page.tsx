@@ -257,13 +257,13 @@ export default function AdminPage() {
               <Table className="min-w-full">
                   <TableHeader>
                       <TableRow>
-                          <TableHead className="w-[200px] sticky left-0 bg-card z-10">학생 정보</TableHead>
-                          <TableHead className="w-[120px] sticky left-[200px] bg-card z-10 text-center">인증 등급</TableHead>
+                          <TableHead className="w-[200px] sticky top-0 left-0 bg-card z-30">학생 정보</TableHead>
+                          <TableHead className="w-[120px] sticky top-0 left-[200px] bg-card z-30 text-center">인증 등급</TableHead>
                           {challengeAreaKeys.map(area => (
-                              <TableHead key={area} className="text-center min-w-[170px]">{challengeConfig[area].koreanName}</TableHead>
+                              <TableHead key={area} className="text-center min-w-[170px] sticky top-0 bg-card z-20">{challengeConfig[area].koreanName}</TableHead>
                           ))}
                           {!user.areaName && (
-                            <TableHead className="text-center w-[120px]">관리</TableHead>
+                            <TableHead className="text-center w-[120px] sticky top-0 bg-card z-20">관리</TableHead>
                           )}
                       </TableRow>
                   </TableHeader>
