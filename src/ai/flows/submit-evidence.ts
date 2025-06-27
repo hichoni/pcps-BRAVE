@@ -179,39 +179,38 @@ const submitEvidenceFlow = ai.defineFlow(
       let aiReasoning = '';
       let submissionStatus: SubmissionStatus;
 
-      // Check if AI auto-approval is enabled for this area
       if (areaConfig.autoApprove) {
-          // Prioritize Vision check if it's enabled and media is provided
           if (areaConfig.aiVisionCheck && input.mediaDataUri && areaConfig.aiVisionPrompt) {
-              const visionResult = await analyzeMediaEvidence({ 
-                  photoDataUri: input.mediaDataUri, 
-                  prompt: areaConfig.aiVisionPrompt 
+              const visionResult = await analyzeMediaEvidence({
+                  photoDataUri: input.mediaDataUri,
+                  prompt: areaConfig.aiVisionPrompt,
               });
+
               if (visionResult) {
-                aiSufficient = visionResult.isSufficient;
-                aiReasoning = visionResult.reasoning;
+                  aiSufficient = visionResult.isSufficient;
+                  aiReasoning = visionResult.reasoning;
               } else {
-                aiSufficient = false;
-                aiReasoning = 'AI가 이미지를 분석하지 못했습니다. 기준에 맞지 않거나 손상된 파일일 수 있습니다.';
+                  // If visionResult is null (AI failed to respond), mark as insufficient.
+                  aiSufficient = false;
+                  aiReasoning = 'AI가 이미지를 분석하지 못했습니다. 기준에 맞지 않거나 손상된 파일일 수 있습니다.';
               }
           } else {
-              // Fallback to text-based check
+              // Fallback to text-based check only if vision check is not applicable
               const textCheckResult = await checkCertification({
                   areaName: input.koreanName,
                   requirements: areaConfig.requirements,
                   evidence: input.evidence,
               });
               if (textCheckResult) {
-                aiSufficient = textCheckResult.isSufficient;
-                aiReasoning = textCheckResult.reasoning;
+                  aiSufficient = textCheckResult.isSufficient;
+                  aiReasoning = textCheckResult.reasoning;
               } else {
-                aiSufficient = false;
-                aiReasoning = 'AI가 제출 내용을 분석하지 못했습니다. 내용을 확인 후 다시 시도해주세요.';
+                  aiSufficient = false;
+                  aiReasoning = 'AI가 제출 내용을 분석하지 못했습니다. 내용을 확인 후 다시 시도해주세요.';
               }
           }
           submissionStatus = aiSufficient ? 'approved' : 'rejected';
       } else {
-          // If auto-approval is off, all submissions go to pending
           submissionStatus = 'pending_review';
           aiReasoning = 'AI 자동 인증이 비활성화된 영역입니다. 선생님의 확인이 필요합니다.';
       }
@@ -220,7 +219,7 @@ const submitEvidenceFlow = ai.defineFlow(
       let updateMessage = '';
 
       const submissionsCollection = collection(db, 'challengeSubmissions');
-      const newSubmissionRef = doc(submissionsCollection); // Create a new doc reference with a unique ID
+      const newSubmissionRef = doc(submissionsCollection);
 
       const docData: any = {
         userId: input.userId,
@@ -240,18 +239,15 @@ const submitEvidenceFlow = ai.defineFlow(
           docData.mediaType = input.mediaType;
       }
       
-      // Use a transaction to ensure both submission and progress are updated together
       await runTransaction(db, async (transaction) => {
         let achievementDocRef;
         let achievementDocSnap;
 
-        // 1. READ all necessary data first.
         if (isAutoApproved && areaConfig.goalType === 'numeric') {
           achievementDocRef = doc(db, 'achievements', input.userId);
           achievementDocSnap = await transaction.get(achievementDocRef);
         }
 
-        // 2. Perform all WRITE operations now.
         transaction.set(newSubmissionRef, docData);
 
         if (isAutoApproved && areaConfig.goalType === 'numeric' && achievementDocRef && achievementDocSnap) {
@@ -305,7 +301,7 @@ const submitEvidenceFlow = ai.defineFlow(
       } else if (e) {
         try {
           const maybeError = JSON.parse(JSON.stringify(e));
-          if(maybeError && typeof maybeError === 'object' && 'message' in maybeError) {
+          if(maybeError && typeof maybeError === 'object' && maybeError !== null && 'message' in maybeError) {
              errorMessage = String(maybeError.message);
           } else {
             errorMessage = String(e);

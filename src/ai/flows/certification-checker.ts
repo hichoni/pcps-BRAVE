@@ -21,7 +21,7 @@ const CertificationCheckOutputSchema = z.object({
   reasoning: z.string().describe('The reasoning behind the decision.'),
 });
 
-export async function checkCertification(input: CertificationCheckInput): Promise<CertificationCheckOutput> {
+export async function checkCertification(input: CertificationCheckInput): Promise<CertificationCheckOutput | null> {
   return certificationCheckerFlow(input);
 }
 
@@ -58,14 +58,10 @@ const certificationCheckerFlow = ai.defineFlow(
   {
     name: 'certificationCheckerFlow',
     inputSchema: CertificationCheckInputSchema,
-    outputSchema: CertificationCheckOutputSchema,
+    outputSchema: z.nullable(CertificationCheckOutputSchema),
   },
   async (input) => {
     const result = await prompt(input);
-    // FIX: Check for null/undefined result or output before destructuring
-    if (!result || !result.output) {
-      throw new Error("AI 모델이 유효한 응답을 생성하지 못했습니다. 제출 내용을 확인 후 다시 시도해주세요.");
-    }
-    return result.output;
+    return result.output ?? null;
   }
 );
