@@ -74,15 +74,27 @@ const reviewDeletionRequestFlow = ai.defineFlow(
                 const achievementDocRef = doc(db, 'achievements', submissionData.userId);
                 const achievementDocSnap = await transaction.get(achievementDocRef);
                 
-                const achievements = achievementDocSnap.exists() ? achievementDocSnap.data() : {};
-                // Ensure areaState is a non-null object to prevent destructuring errors on undefined/null.
-                const currentAreaState = (typeof achievements[submissionData.areaName] === 'object' && achievements[submissionData.areaName] !== null) ? achievements[submissionData.areaName] : {};
-                const newProgress = Math.max(0, (Number(currentAreaState.progress) || 0) - 1);
+                let achievements = {};
+                if (achievementDocSnap.exists()) {
+                    const data = achievementDocSnap.data();
+                    if (typeof data === 'object' && data !== null) {
+                        achievements = data;
+                    }
+                }
+
+                let currentAreaState = { progress: 0, isCertified: false };
+                if (achievements[submissionData.areaName] && typeof achievements[submissionData.areaName] === 'object' && achievements[submissionData.areaName] !== null) {
+                    currentAreaState = {
+                        progress: Number(achievements[submissionData.areaName].progress) || 0,
+                        isCertified: achievements[submissionData.areaName].isCertified === true,
+                    };
+                }
                 
-                // Construct the new state safely, preserving any other properties like isCertified.
+                const newProgress = Math.max(0, currentAreaState.progress - 1);
+                
                 const newAreaState = {
                     progress: newProgress,
-                    isCertified: currentAreaState.isCertified || false,
+                    isCertified: currentAreaState.isCertified,
                 };
                 
                 transaction.set(achievementDocRef, { 
