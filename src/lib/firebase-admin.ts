@@ -20,10 +20,15 @@ if (!admin.apps.length) {
       storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     });
     console.log('Firebase Admin SDK initialized successfully from service-account.json.');
-  } catch (error: any) {
-    let message = error.message;
-    if (error instanceof SyntaxError && message.includes('JSON')) {
-        message = `Failed to parse service-account.json. Please ensure it's the original, unmodified file downloaded from Firebase. Original error: ${error.message}`;
+  } catch (error: unknown) {
+    let message = "An unknown error occurred during Firebase Admin SDK initialization.";
+    if (error instanceof Error) {
+        message = error.message;
+        if (error instanceof SyntaxError && message.includes('JSON')) {
+            message = `Failed to parse service-account.json. Please ensure it's the original, unmodified file downloaded from Firebase. Original error: ${error.message}`;
+        }
+    } else if (typeof error === 'string') {
+        message = error;
     }
     console.error('Firebase Admin SDK initialization error: ' + message);
   }
