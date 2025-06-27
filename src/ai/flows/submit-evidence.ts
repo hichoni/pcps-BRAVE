@@ -146,14 +146,14 @@ const submitEvidenceFlow = ai.defineFlow(
                 mediaUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(filePath)}?alt=media&token=${token}`;
             
             } catch (error: unknown) {
-                console.error("Firebase Admin Storage upload error:", error);
-                
                 let detail = "알 수 없는 서버 오류가 발생했습니다. 서버 로그를 확인해주세요.";
                 
-                if (typeof error === 'object' && error !== null && 'message' in error && typeof (error as any).message === 'string') {
-                    detail = (error as { message: string }).message;
+                if (error instanceof Error) {
+                    detail = error.message;
                 } else if (typeof error === 'string') {
                     detail = error;
+                } else if (typeof error === 'object' && error !== null && 'message' in error && typeof (error as any).message === 'string') {
+                    detail = (error as { message: string }).message;
                 }
                 
                 if (detail.includes('not found')) {
@@ -273,11 +273,15 @@ const submitEvidenceFlow = ai.defineFlow(
           aiReasoning: aiReasoning
       };
     } catch (e: unknown) {
+      // This is now a very robust error handler.
+      let errorMessage = "An unexpected error occurred. Please try again.";
+      if (e instanceof Error) {
+        errorMessage = e.message;
+      }
       console.error("Error in submitEvidenceFlow: ", e);
-      // This is the new, ultra-safe error handler.
-      // It will prevent the "Cannot convert undefined or null to object" error,
-      // because it doesn't try to access any properties on the unknown error 'e'.
-      throw new Error("AI 심사 또는 파일 처리 중 오류가 발생했습니다. 다시 시도해주세요.");
+      throw new Error(errorMessage);
     }
   }
 );
+
+    
