@@ -217,14 +217,19 @@ const submitEvidenceFlow = ai.defineFlow(
       
       // Use a transaction to ensure both submission and progress are updated together
       await runTransaction(db, async (transaction) => {
-        // 1. Write the new submission document
+        let achievementDocRef;
+        let achievementDocSnap;
+
+        // 1. READ all necessary data first.
+        if (isAutoApproved && areaConfig.goalType === 'numeric') {
+          achievementDocRef = doc(db, 'achievements', input.userId);
+          achievementDocSnap = await transaction.get(achievementDocRef);
+        }
+
+        // 2. Perform all WRITE operations now.
         transaction.set(newSubmissionRef, docData);
 
-        // 2. If it was auto-approved, update progress
-        if (isAutoApproved && areaConfig.goalType === 'numeric') {
-          const achievementDocRef = doc(db, 'achievements', input.userId);
-          const achievementDocSnap = await transaction.get(achievementDocRef);
-          
+        if (isAutoApproved && areaConfig.goalType === 'numeric' && achievementDocRef && achievementDocSnap) {
           const achievements = achievementDocSnap.data() || {};
           const areaState: any = achievements[input.areaName] || {};
           const newProgress = (Number(areaState.progress) || 0) + 1;
