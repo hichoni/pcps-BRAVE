@@ -185,25 +185,20 @@ const submitEvidenceFlow = ai.defineFlow(
                   photoDataUri: input.mediaDataUri,
                   prompt: areaConfig.aiVisionPrompt,
               });
-              if (!aiResult) {
-                aiSufficient = false;
-                aiReasoning = 'AI가 이미지를 분석하지 못했습니다. 기준에 맞지 않거나 손상된 파일일 수 있습니다.';
-              }
           } else {
               aiResult = await checkCertification({
                   areaName: input.koreanName,
                   requirements: areaConfig.requirements,
                   evidence: input.evidence,
               });
-              if (!aiResult) {
-                 aiSufficient = false;
-                 aiReasoning = 'AI가 제출 내용을 분석하지 못했습니다. 내용을 확인 후 다시 시도해주세요.';
-              }
           }
           
           if(aiResult) {
             aiSufficient = aiResult.isSufficient;
             aiReasoning = aiResult.reasoning;
+          } else {
+            aiSufficient = false;
+            aiReasoning = areaConfig.aiVisionCheck ? 'AI가 이미지를 분석하지 못했습니다. 기준에 맞지 않거나 손상된 파일일 수 있습니다.' : 'AI가 제출 내용을 분석하지 못했습니다. 내용을 확인 후 다시 시도해주세요.';
           }
 
           submissionStatus = aiSufficient ? 'approved' : 'rejected';
@@ -267,10 +262,9 @@ const submitEvidenceFlow = ai.defineFlow(
             transaction.set(achievementDocRef, { [input.areaName]: newData }, { merge: true });
         }
 
-        // This must be a write operation.
         transaction.set(newSubmissionRef, docData);
 
-        return newProgress; // Return the calculated new progress
+        return newProgress;
       });
 
       let updateMessage = '';

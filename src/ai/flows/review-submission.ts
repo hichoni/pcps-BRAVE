@@ -46,27 +46,34 @@ const reviewSubmissionFlow = ai.defineFlow(
     const submissionRef = doc(db, 'challengeSubmissions', submissionId);
 
     try {
+      // Fetch all necessary data BEFORE the transaction
       const submissionSnapForUser = await getDoc(submissionRef);
       if (!submissionSnapForUser.exists()) {
         throw new Error("검토할 제출물을 찾을 수 없습니다.");
       }
       const studentUsername = submissionSnapForUser.data().userId;
+
       const userQuery = query(collection(db, 'users'), where("username", "==", studentUsername), limit(1));
-      const userSnapshot = await getDocs(userQuery);
+      const configDocRef = doc(db, 'config', 'challengeConfig');
+      
+      const [userSnapshot, configDocSnap] = await Promise.all([
+        getDocs(userQuery),
+        getDoc(configDocRef)
+      ]);
+
       if (userSnapshot.empty) {
           throw new Error(`사용자 정보(${studentUsername})를 찾을 수 없습니다.`);
       }
       const studentUser = userSnapshot.docs[0].data() as User;
 
-      const configDocRef = doc(db, 'config', 'challengeConfig');
-      const configDocSnap = await getDoc(configDocRef);
       if (!configDocSnap.exists()) {
           throw new Error("도전 영역 설정을 찾을 수 없습니다.");
       }
       const challengeConfig = configDocSnap.data();
 
+
       await runTransaction(db, async (transaction) => {
-        // --- READ PHASE ---
+        // --- READ PHASE (INSIDE TRANSACTION) ---
         const submissionSnap = await transaction.get(submissionRef);
         if (!submissionSnap.exists()) {
           throw new Error("검토할 제출물을 찾을 수 없습니다.");
@@ -77,16 +84,14 @@ const reviewSubmissionFlow = ai.defineFlow(
         const areaConfig = challengeConfig[submissionData.areaName];
         const achievementDocRef = doc(db, 'achievements', submissionData.userId);
 
-        // Only read achievement data if we need to update it
         if (isApproved && areaConfig && areaConfig.goalType === 'numeric') {
             achievementDocSnap = await transaction.get(achievementDocRef);
         }
 
-        // --- WRITE PHASE ---
+        // --- WRITE PHASE (INSIDE TRANSACTION) ---
         const newStatus = isApproved ? 'approved' : 'rejected';
         transaction.update(submissionRef, { status: newStatus });
 
-        // If approved, and it's a numeric goal, update the student's progress
         if (isApproved && areaConfig && areaConfig.goalType === 'numeric') {
             const achievements = achievementDocSnap?.exists() ? achievementDocSnap.data() : {};
             const areaState = achievements[submissionData.areaName] || { progress: 0, isCertified: false };
