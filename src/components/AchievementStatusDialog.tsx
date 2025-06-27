@@ -394,7 +394,10 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                                     const Icon = status.icon;
                                     const isPending = sub.status === 'pending_review' || sub.status === 'pending_deletion';
                                     return (
-                                        <div key={sub.id} className="text-sm p-2 bg-secondary/50 rounded-md flex justify-between items-center group">
+                                        <div key={sub.id} className={cn(
+                                            "text-sm p-2 rounded-md flex justify-between items-center group transition-colors",
+                                            sub.status === 'pending_deletion' ? 'bg-orange-500/10 border border-orange-500/20 opacity-80' : 'bg-secondary/50'
+                                        )}>
                                             <div className="flex-grow">
                                                 <div className="flex justify-between items-start">
                                                     <p className="text-muted-foreground truncate pr-4 flex-grow">{sub.evidence}</p>
@@ -533,7 +536,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel disabled={isDeleting}>취소</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDeleteRequest} disabled={isDeleting}>
+                    <AlertDialogAction onClick={handleDeleteRequest} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
                         {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : '삭제 요청'}
                     </AlertDialogAction>
                 </AlertDialogFooter>

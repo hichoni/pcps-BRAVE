@@ -248,6 +248,7 @@ export default function GalleryPage() {
         const q = query(
             collection(db, "challengeSubmissions"), 
             where("showInGallery", "==", true),
+            where("status", "==", "approved"),
             orderBy("createdAt", "desc"),
             limit(PAGE_SIZE)
         );
@@ -293,6 +294,7 @@ export default function GalleryPage() {
         const q = query(
             collection(db, "challengeSubmissions"),
             where("showInGallery", "==", true),
+            where("status", "==", "approved"),
             orderBy("createdAt", "desc"),
             startAfter(lastDoc),
             limit(PAGE_SIZE)
@@ -446,3 +448,4 @@ export default function GalleryPage() {
     </div>
   );
 }
+
