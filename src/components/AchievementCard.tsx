@@ -47,7 +47,8 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
 
   const renderProgress = () => {
     if (areaConfig.goalType === 'numeric') {
-        const goal = areaConfig.goal[user.grade ?? '4'] ?? 0;
+        const gradeKey = user.grade === 0 ? '6' : String(user.grade ?? '4');
+        const goal = areaConfig.goal[gradeKey] ?? 0;
         const currentProgress = (progress as number) || 0;
         const unit = areaConfig.unit;
 
