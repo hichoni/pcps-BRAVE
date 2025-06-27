@@ -220,7 +220,7 @@ const submitEvidenceFlow = ai.defineFlow(
         koreanName: input.koreanName,
         challengeName: input.challengeName,
         evidence: input.evidence,
-        createdAt: serverTimestamp(),
+        createdAt: Timestamp.now(),
         likes: [],
         status: submissionStatus,
         showInGallery: areaConfig.showInGallery ?? true,
