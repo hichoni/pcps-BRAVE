@@ -107,19 +107,33 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
   }, [fetchConfig]);
 
   const updateArea = useCallback(async (areaId: AreaName, newConfig: StoredAreaConfig) => {
-    const currentConfig = challengeConfig || {};
-    const updatedConfig = resolveConfigWithIcons({ ...currentConfig, [areaId]: newConfig });
-    setChallengeConfig(updatedConfig);
+    // Optimistically update the UI state.
+    setChallengeConfig(prevConfig => {
+        if (!prevConfig) return null;
+        
+        const newResolvedConfig = { ...prevConfig };
+        
+        // Resolve the new config for just the area being updated.
+        newResolvedConfig[areaId] = {
+            ...newConfig,
+            name: areaId,
+            icon: ICONS[newConfig.iconName] || ShieldOff,
+        };
+        
+        return newResolvedConfig;
+    });
 
     if (!db) return;
     try {
       const configDocRef = doc(db, CONFIG_DOC_PATH);
+      // Persist only the storable part of the config to Firestore.
       await updateDoc(configDocRef, { [areaId]: newConfig });
     } catch (error) {
       console.error("Failed to save challenge config to Firestore", error);
-      fetchConfig(); // Revert on failure
+      // If the database update fails, refetch the original state to revert the optimistic UI update.
+      fetchConfig();
     }
-  }, [challengeConfig, fetchConfig]);
+  }, [fetchConfig]);
 
   const addArea = useCallback(async (areaId: AreaName, newConfig: StoredAreaConfig) => {
      const currentConfig = challengeConfig || {};
