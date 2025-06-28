@@ -6,13 +6,22 @@ To get started, take a look at src/app/page.tsx.
 
 ## 배포하기 (Publishing your app)
 
-This app is configured for deployment using Firebase App Hosting.
+이 앱은 Firebase App Hosting을 사용하여 배포하도록 구성되어 있습니다. Studio에는 두 가지 주요 배포 방법이 있습니다.
 
-To deploy your app, simply click the **"Publish"** button in the Firebase Studio interface (usually located in the top-right corner).
+### 1. 테스트 및 미리보기를 위한 'Publish' 버튼 (권장)
 
-This will automatically:
-1.  Build your Next.js application for production.
-2.  Read the `apphosting.yaml` file for configuration.
-3.  Deploy the built application to a live URL on Firebase App Hosting.
+Studio 인터페이스의 **'Publish'** 버튼은 현재 코드를 **별도의 테스트(미리보기) 환경**에 빠르고 쉽게 배포하는 기능입니다.
 
-There is no need to manually run `npm run build` or use `git push` for deployment when using the integrated "Publish" feature.
+*   **언제 사용하나요?**: 변경 사항을 실제 서비스에 반영하기 전에, 다른 사람들과 함께 테스트하거나 확인하고 싶을 때 사용합니다.
+*   **어떻게 작동하나요?**: 'Publish'를 누르면 `...studio...`와 같은 주소가 포함된 새로운 테스트용 URL이 생성됩니다. 이 주소는 기존에 사용하시던 실제 서비스 주소와는 다릅니다.
+*   **장점**: 실제 사용자들이 이용하는 서비스에 영향을 주지 않고 안전하게 변경 내용을 테스트할 수 있습니다.
+
+### 2. 실제 서비스에 반영하기 (`git push`)
+
+만약 `git push`를 통해 배포하는 기존 워크플로우를 사용하고 계셨다면, **최종적으로 실제 서비스에 변경 사항을 반영할 때는 계속 그 방법을 사용하시는 것이 좋습니다.**
+
+Studio에서 작업한 내용은 자동으로 Git에 커밋되므로, 터미널에서 `git push` 명령을 실행하여 기존에 설정된 프로덕션(실제 서비스) 환경을 업데이트할 수 있습니다.
+
+**요약:**
+*   **빠른 테스트/미리보기**: Studio의 **'Publish'** 버튼 사용 (새로운 테스트 주소 생성)
+*   **실제 서비스 업데이트**: 기존 방식대로 **`git push`** 사용 (원래 사용하던 주소 업데이트)
