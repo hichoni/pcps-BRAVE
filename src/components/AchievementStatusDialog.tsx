@@ -26,7 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Input } from './ui/input';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, Timestamp, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, Timestamp, orderBy, limit, getDocs } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -105,14 +105,16 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
     }
 
     let unsubscribe: (() => void) | undefined;
+    let unsubscribeInterval: (() => void) | undefined;
 
-    if (initialMode === 'history') {
+    const fetchHistory = () => {
         setSubmissionsLoading(true);
+        // Firestore does not allow orderBy on a different field than the range filter.
+        // We fetch all relevant documents and sort them client-side.
         const q = query(
           collection(db, "challengeSubmissions"),
           where("userId", "==", user.username),
-          where("areaName", "==", areaName),
-          orderBy("createdAt", "desc")
+          where("areaName", "==", areaName)
         );
         
         unsubscribe = onSnapshot(q, (snapshot) => {
@@ -124,6 +126,9 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
               createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
             } as Submission;
           });
+          // Sort client-side
+          fetchedSubmissions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
           setSubmissions(fetchedSubmissions);
           setSubmissionsLoading(false);
         }, (error) => {
@@ -131,12 +136,13 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
             toast({
                 variant: "destructive",
                 title: "오류",
-                description: "활동 목록을 불러오는 데 실패했습니다."
+                description: "활동 목록을 불러오는 데 실패했습니다. 다시 시도해주세요."
             });
             setSubmissionsLoading(false);
         });
-    } else { // 'submit' mode
-        setSubmissionsLoading(false); // No list to load in submit mode
+    }
+
+    const checkInterval = () => {
         if (areaConfig.submissionIntervalMinutes && areaConfig.submissionIntervalMinutes > 0) {
             const submissionsQuery = query(
                 collection(db, "challengeSubmissions"),
@@ -147,7 +153,8 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
                 limit(1)
             );
 
-            unsubscribe = onSnapshot(submissionsQuery, (querySnapshot) => {
+            // Use getDocs for a one-time check as this shouldn't change while dialog is open.
+            getDocs(submissionsQuery).then(querySnapshot => {
                 if (!querySnapshot.empty) {
                     const lastValidSubmission = querySnapshot.docs[0].data();
                     const lastSubmissionTime = (lastValidSubmission.createdAt as Timestamp).toDate();
@@ -163,17 +170,27 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
                 } else {
                      setIntervalLock({ locked: false, minutesToWait: 0 });
                 }
-            }, (error) => {
+            }).catch(error => {
                 console.error("Error checking submission interval:", error);
                 setIntervalLock({ locked: false, minutesToWait: 0 });
+                toast({
+                  variant: "destructive",
+                  title: "오류",
+                  description: "활동 정보를 확인하는 데 실패했습니다. 인터넷 연결을 확인해주세요."
+                });
             });
         }
     }
 
+    if (initialMode === 'history') {
+        fetchHistory();
+    } else { // 'submit' mode
+        setSubmissionsLoading(false); // No list to load in submit mode
+        checkInterval();
+    }
+
     return () => {
-        if (unsubscribe) {
-          unsubscribe();
-        }
+        if (unsubscribe) unsubscribe();
     };
   }, [open, user, areaName, toast, areaConfig, initialMode]);
 
@@ -187,25 +204,12 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
 
     const text = evidenceValue.trim();
 
-    // Handle immediate feedback for short or empty text
-    if (text.length === 0) {
-      setAiFeedback(null);
-      setIsChecking(false);
-      setShowLengthWarning(false);
-      return;
-    }
-    
-    if (text.length < 10) {
-      setAiFeedback("AI 조언을 받으려면 10글자 이상 입력해주세요.");
-      setIsChecking(false);
-      setShowLengthWarning(true);
-      return;
-    }
-
-    setShowLengthWarning(false);
-
     // Debounce the API call
     const handler = setTimeout(async () => {
+      // Don't run for very short text to save resources
+      if (text.length < 10) {
+        return;
+      }
       setIsChecking(true);
       try {
         const result = await getTextFeedback({
@@ -222,6 +226,17 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
         setIsChecking(false);
       }
     }, 1500); // 1.5-second delay
+    
+    // Immediate feedback for short text length
+    if (text.length === 0) {
+      setAiFeedback(null);
+      setShowLengthWarning(false);
+    } else if (text.length < 10) {
+      setAiFeedback("AI 조언을 받으려면 10글자 이상 입력해주세요.");
+      setShowLengthWarning(true);
+    } else {
+      setShowLengthWarning(false);
+    }
 
     return () => {
       clearTimeout(handler);
@@ -398,12 +413,16 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
     }
   };
 
+  const dialogTitle = initialMode === 'history' 
+    ? `[${koreanName}] 활동 내역` 
+    : `[${koreanName}] ${challengeName}`;
+
   return (
     <AlertDialog onOpenChange={(open) => { if (!open && submissionToDelete) setSubmissionToDelete(null); }}>
       <Dialog open={open} onOpenChange={onDialogClose}>
         <DialogContent className="sm:max-w-lg h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b shrink-0">
-            <DialogTitle className="font-headline text-2xl">{`[${koreanName}] ${initialMode === 'history' ? '활동 내역' : challengeName}`}</DialogTitle>
+            <DialogTitle className="font-headline text-2xl">{dialogTitle}</DialogTitle>
           </DialogHeader>
           
           <div className="flex-1 overflow-y-auto px-6 min-h-0">
