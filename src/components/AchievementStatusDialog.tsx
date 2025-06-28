@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback, useId } from 'react';
@@ -55,7 +56,7 @@ const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const resizeImage = (file: File, maxWidth: number, maxHeight: number, quality: number): Promise<{ dataUri: string; file: File }> => {
   return new Promise((resolve, reject) => {
     if (file.type.includes('heic') || file.type.includes('heif')) {
-      return reject(new Error('HEIC/HEIF 형식은 지원되지 않습니다.'));
+        return reject(new Error('HEIC/HEIF 형식은 지원되지 않습니다.'));
     }
 
     const objectUrl = URL.createObjectURL(file);
@@ -64,7 +65,6 @@ const resizeImage = (file: File, maxWidth: number, maxHeight: number, quality: n
     img.onload = () => {
         try {
             let { width, height } = img;
-
             if (width > height) {
                 if (width > maxWidth) {
                     height = Math.round(height * (maxWidth / width));
@@ -86,34 +86,49 @@ const resizeImage = (file: File, maxWidth: number, maxHeight: number, quality: n
                 URL.revokeObjectURL(objectUrl);
                 return reject(new Error('브라우저의 이미지 처리 엔진을 사용할 수 없습니다.'));
             }
-            
-            ctx.drawImage(img, 0, 0, width, height);
-            
-            const dataUri = canvas.toDataURL('image/jpeg', quality);
-            
-            canvas.toBlob((blob) => {
-                if (!blob) {
-                    URL.revokeObjectURL(objectUrl);
-                    return reject(new Error('이미지 변환에 실패했습니다.'));
-                }
-                const resizedFile = new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
-                    type: 'image/jpeg',
-                    lastModified: Date.now(),
-                });
-                URL.revokeObjectURL(objectUrl);
-                resolve({ dataUri, file: resizedFile });
-            }, 'image/jpeg', quality);
 
+            ctx.drawImage(img, 0, 0, width, height);
+
+            canvas.toBlob(
+                (blob) => {
+                    if (!blob) {
+                        URL.revokeObjectURL(objectUrl);
+                        return reject(new Error('이미지 변환에 실패했습니다. 파일이 손상되었거나 브라우저에서 지원하지 않는 형식일 수 있습니다.'));
+                    }
+                    
+                    const resizedFile = new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
+                        type: 'image/jpeg',
+                        lastModified: Date.now(),
+                    });
+                    
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        URL.revokeObjectURL(objectUrl);
+                        if (typeof reader.result === 'string') {
+                            resolve({ dataUri: reader.result, file: resizedFile });
+                        } else {
+                            reject(new Error('파일을 미리보기용 데이터로 변환하는 데 실패했습니다.'));
+                        }
+                    };
+                    reader.onerror = () => {
+                        URL.revokeObjectURL(objectUrl);
+                        reject(new Error('파일 미리보기를 생성하는 중 오류가 발생했습니다.'));
+                    };
+                    reader.readAsDataURL(blob);
+                },
+                'image/jpeg',
+                quality
+            );
         } catch (e) {
             URL.revokeObjectURL(objectUrl);
-            console.error("Canvas processing error:", e);
-            reject(new Error('사진 처리 중 메모리 오류가 발생했습니다. 더 작은 사진을 사용해주세요.'));
+            console.error("An unexpected error occurred during image processing:", e);
+            reject(new Error('사진 처리 중 예상치 못한 오류가 발생했습니다. 다른 사진으로 시도해보세요.'));
         }
     };
 
     img.onerror = () => {
         URL.revokeObjectURL(objectUrl);
-        reject(new Error('사진을 읽을 수 없습니다. 지원되지 않는 형식(예: HEIC)이거나 손상된 파일일 수 있습니다.'));
+        reject(new Error('사진 파일을 읽을 수 없습니다. 지원되지 않는 형식이거나 손상된 파일일 수 있습니다.'));
     };
     
     img.src = objectUrl;
@@ -239,15 +254,13 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     setMediaFile(null);
     setMediaPreview(null);
     form.setValue('media', null);
+    
+    const file = fileInput.files?.[0];
+    if (!file) return;
+
     setIsProcessingImage(true);
 
     try {
-        const file = fileInput.files?.[0];
-
-        if (!file) {
-          return;
-        }
-
         if (file.size > MAX_FILE_SIZE_BYTES) {
           throw new Error(`파일 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`);
         }
@@ -560,9 +573,9 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
             </Form>
           </div>
           
-          <DialogFooter className="p-6 pt-4 border-t shrink-0 flex-col sm:flex-row sm:justify-end gap-2">
+          <DialogFooter className="p-6 pt-4 border-t shrink-0 flex flex-col gap-2 sm:flex-row sm:justify-end sm:gap-2">
               <DialogClose asChild>
-                  <Button type="button" variant="secondary" className="w-full sm:w-auto">
+                  <Button type="button" variant="secondary" className="w-full sm:w-auto order-last sm:order-first">
                       닫기
                   </Button>
               </DialogClose>
