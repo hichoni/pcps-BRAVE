@@ -88,34 +88,27 @@ const submitEvidenceFlow = ai.defineFlow(
         // Submission interval check
         if (areaConfig.submissionIntervalMinutes && areaConfig.submissionIntervalMinutes > 0) {
             const submissionsCollection = collection(db, 'challengeSubmissions');
+            // This query is more efficient and reliable. It finds the most recent, non-rejected submission.
             const q = query(
                 submissionsCollection,
                 where("userId", "==", input.userId),
-                where("areaName", "==", input.areaName)
+                where("areaName", "==", input.areaName),
+                where("status", "in", ['approved', 'pending_review', 'pending_deletion']),
+                orderBy("createdAt", "desc"),
+                limit(1)
             );
 
             const querySnapshot = await getDocs(q);
             if (!querySnapshot.empty) {
-                const submissions = querySnapshot.docs.map(doc => doc.data());
-                
-                const nonRejectedSubmissions = submissions.filter(s => s.status !== 'rejected');
-
-                if (nonRejectedSubmissions.length > 0) {
-                    nonRejectedSubmissions.sort((a, b) => 
-                        (b.createdAt as Timestamp)?.toMillis() - (a.createdAt as Timestamp)?.toMillis()
-                    );
-                    
-                    const lastValidSubmission = nonRejectedSubmissions[0];
-
-                    if (lastValidSubmission && lastValidSubmission.createdAt) {
-                        const lastSubmissionTime = (lastValidSubmission.createdAt as Timestamp).toDate();
-                        const now = new Date();
-                        const minutesSinceLastSubmission = (now.getTime() - lastSubmissionTime.getTime()) / (1000 * 60);
-            
-                        if (minutesSinceLastSubmission < areaConfig.submissionIntervalMinutes) {
-                            const minutesToWait = Math.ceil(areaConfig.submissionIntervalMinutes - minutesSinceLastSubmission);
-                            throw new Error(`제출 간격 제한: 다음 제출까지 ${minutesToWait}분 남았습니다.`);
-                        }
+                const lastValidSubmission = querySnapshot.docs[0].data();
+                if (lastValidSubmission && lastValidSubmission.createdAt) {
+                    const lastSubmissionTime = (lastValidSubmission.createdAt as Timestamp).toDate();
+                    const now = new Date();
+                    const minutesSinceLastSubmission = (now.getTime() - lastSubmissionTime.getTime()) / (1000 * 60);
+    
+                    if (minutesSinceLastSubmission < areaConfig.submissionIntervalMinutes) {
+                        const minutesToWait = Math.ceil(areaConfig.submissionIntervalMinutes - minutesSinceLastSubmission);
+                        throw new Error(`제출 간격 제한: 다음 제출까지 ${minutesToWait}분 남았습니다.`);
                     }
                 }
             }
