@@ -5,15 +5,22 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { AreaName, DEFAULT_AREAS_CONFIG, ICONS, AreaConfig as BaseAreaConfig, StoredAreaConfig } from '@/lib/config';
 import { ShieldOff } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, updateDoc, FieldValue, deleteField } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 
 export type ChallengeConfig = Record<AreaName, BaseAreaConfig>;
 
+export interface AnnouncementConfig {
+  text: string;
+  enabled: boolean;
+}
+
 interface ChallengeConfigContextType {
   challengeConfig: ChallengeConfig | null;
+  announcement: AnnouncementConfig | null;
   updateArea: (areaId: AreaName, newConfig: StoredAreaConfig) => Promise<void>;
   addArea: (areaId: AreaName, newConfig: StoredAreaConfig) => Promise<void>;
   deleteArea: (areaId: AreaName) => Promise<void>;
+  updateAnnouncement: (newAnnouncement: AnnouncementConfig) => Promise<void>;
   loading: boolean;
 }
 
@@ -40,9 +47,17 @@ const resolveConfigWithIcons = (storedConfig: Record<AreaName, StoredAreaConfig>
 };
 
 const CONFIG_DOC_PATH = 'config/challengeConfig';
+const ANNOUNCEMENT_DOC_PATH = 'config/announcement';
+
+const defaultAnnouncement: AnnouncementConfig = { 
+  text: "4~6학년 친구들만 인증할 수 있어요!\n인증 기간: 2025년 5월 1일 ~ 10월 31일", 
+  enabled: true 
+};
+
 
 export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) => {
   const [challengeConfig, setChallengeConfig] = useState<ChallengeConfig | null>(null);
+  const [announcement, setAnnouncement] = useState<AnnouncementConfig | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchConfig = useCallback(async () => {
@@ -51,21 +66,35 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
 
     if (!db) {
       configData = { ...DEFAULT_AREAS_CONFIG };
+      setAnnouncement(defaultAnnouncement);
     } else {
       try {
         const configDocRef = doc(db, CONFIG_DOC_PATH);
-        const configDocSnap = await getDoc(configDocRef);
+        const announcementDocRef = doc(db, ANNOUNCEMENT_DOC_PATH);
+
+        const [configDocSnap, announcementDocSnap] = await Promise.all([
+            getDoc(configDocRef),
+            getDoc(announcementDocRef)
+        ]);
 
         if (configDocSnap.exists() && typeof configDocSnap.data() === 'object' && configDocSnap.data() !== null) {
-           const fromDb = configDocSnap.data() as Record<AreaName, StoredAreaConfig>;
-           configData = fromDb;
+           configData = configDocSnap.data() as Record<AreaName, StoredAreaConfig>;
         } else {
           configData = { ...DEFAULT_AREAS_CONFIG };
           await setDoc(configDocRef, configData);
         }
+        
+        if (announcementDocSnap.exists()) {
+            setAnnouncement(announcementDocSnap.data() as AnnouncementConfig);
+        } else {
+            await setDoc(announcementDocRef, defaultAnnouncement);
+            setAnnouncement(defaultAnnouncement);
+        }
+
       } catch (error) {
-        console.warn("Failed to fetch/read challenge config from Firestore", error);
+        console.warn("Failed to fetch/read config from Firestore", error);
         configData = { ...DEFAULT_AREAS_CONFIG };
+        setAnnouncement(defaultAnnouncement);
       }
     }
     
@@ -125,8 +154,20 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
     }
   }, [fetchConfig]);
 
+  const updateAnnouncement = useCallback(async (newAnnouncement: AnnouncementConfig) => {
+    setAnnouncement(newAnnouncement);
+    if (!db) return;
+    try {
+      const announcementDocRef = doc(db, ANNOUNCEMENT_DOC_PATH);
+      await setDoc(announcementDocRef, newAnnouncement);
+    } catch (error) {
+      console.error("Failed to save announcement to Firestore", error);
+      fetchConfig(); // Revert
+    }
+  }, [fetchConfig]);
+
   return (
-    <ChallengeConfigContext.Provider value={{ challengeConfig, updateArea, addArea, deleteArea, loading }}>
+    <ChallengeConfigContext.Provider value={{ challengeConfig, announcement, updateAnnouncement, updateArea, addArea, deleteArea, loading }}>
       {children}
     </ChallengeConfigContext.Provider>
   );

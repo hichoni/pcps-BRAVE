@@ -4,14 +4,81 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { useChallengeConfig, ChallengeConfig } from '@/context/ChallengeConfigContext';
+import { useChallengeConfig, AnnouncementConfig } from '@/context/ChallengeConfigContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Settings, ArrowLeft, PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { Loader2, Settings, ArrowLeft, PlusCircle, Edit, Trash2, Info, Save } from 'lucide-react';
 import { AreaName, StoredAreaConfig } from '@/lib/config';
 import { AddEditAreaDialog } from '@/components/AddEditAreaDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+
+function AnnouncementEditor() {
+    const { announcement, updateAnnouncement, loading } = useChallengeConfig();
+    const { toast } = useToast();
+    const [text, setText] = useState('');
+    const [enabled, setEnabled] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (announcement) {
+            setText(announcement.text);
+            setEnabled(announcement.enabled);
+        }
+    }, [announcement]);
+    
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            await updateAnnouncement({ text, enabled });
+            toast({ title: '성공', description: '공지사항이 저장되었습니다.' });
+        } catch (error) {
+            toast({ variant: 'destructive', title: '오류', description: '저장에 실패했습니다.' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    if (loading || !announcement) {
+        return (
+            <Card className="my-8">
+                <CardHeader>
+                    <Skeleton className="h-8 w-48" />
+                    <Skeleton className="h-4 w-full" />
+                </CardHeader>
+                <CardContent>
+                    <Skeleton className="h-24 w-full" />
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return (
+        <Card className="my-8">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Info /> 대시보드 공지사항 관리</CardTitle>
+                <CardDescription>학생 대시보드 상단에 표시될 공지사항을 수정합니다.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <Textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="공지 내용을 입력하세요..." rows={3} />
+                <div className="flex items-center space-x-2">
+                    <Switch id="announcement-enabled" checked={enabled} onCheckedChange={setEnabled} />
+                    <Label htmlFor="announcement-enabled">공지사항 활성화</Label>
+                </div>
+            </CardContent>
+            <CardFooter>
+                 <Button onClick={handleSave} disabled={isSaving}>
+                    {isSaving ? <Loader2 className="animate-spin" /> : <Save className="mr-2" />}
+                    저장하기
+                 </Button>
+            </CardFooter>
+        </Card>
+    );
+}
 
 function ChallengeList() {
   const { challengeConfig, deleteArea, loading } = useChallengeConfig();
@@ -50,7 +117,8 @@ function ChallengeList() {
 
   return (
     <AlertDialog onOpenChange={(open) => !open && setDeletingArea(null)}>
-      <div className="flex justify-end mb-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold font-headline text-foreground">도전 영역 목록</h2>
         <Button onClick={handleAddNew}>
           <PlusCircle className="mr-2" /> 새 도전 영역 추가
         </Button>
@@ -153,6 +221,7 @@ export default function ChallengeConfigPage() {
             <ArrowLeft className="mr-2"/> 학생 관리로
         </Button>
       </header>
+      <AnnouncementEditor />
       <ChallengeList />
     </div>
   );

@@ -13,7 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { KeyRound, ShieldAlert, GalleryThumbnails } from 'lucide-react';
+import { KeyRound, ShieldAlert, GalleryThumbnails, Info } from 'lucide-react';
 import { ChangePinDialog } from '@/components/ChangePinDialog';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils';
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const { getAchievements, loading: achievementsLoading } = useAchievements();
-  const { challengeConfig, loading: configLoading } = useChallengeConfig();
+  const { challengeConfig, announcement, loading: configLoading } = useChallengeConfig();
   const [isChangePinDialogOpen, setChangePinDialogOpen] = useState(false);
 
   const loading = authLoading || achievementsLoading || configLoading;
@@ -45,6 +45,17 @@ export default function Dashboard() {
   return (
     <div className="container mx-auto px-4 py-8">
       <Header />
+      
+      {announcement?.enabled && announcement.text && (
+        <Alert className="mb-8">
+            <Info className="h-4 w-4" />
+            <AlertTitle className="font-bold">안내사항</AlertTitle>
+            <AlertDescription className="whitespace-pre-wrap">
+              {announcement.text}
+            </AlertDescription>
+        </Alert>
+      )}
+
       <main>
         {user?.pin === '0000' && (
           <Alert variant="destructive" className="mb-8">
@@ -60,34 +71,9 @@ export default function Dashboard() {
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
             <CertificateStatus />
           
-            <Card className="h-full flex flex-col justify-center p-4 text-center shadow-lg border bg-card">
-                <CardHeader className="p-2">
-                <CardTitle className="font-headline text-lg sm:text-xl">✨ 참여 안내 ✨</CardTitle>
-                </CardHeader>
-                <CardContent className="p-2 flex-grow flex flex-col items-center justify-center">
-                <p className="font-semibold text-sm">4~6학년 친구들만 인증할 수 있어요!</p>
-                <p className="text-muted-foreground mb-3 text-xs">인증 기간: 2025년 5월 1일 ~ 10월 31일</p>
-                <Separator className="my-3"/>
-                <div className="space-y-1 text-left">
-                    <p className="font-semibold flex items-center gap-2 text-sm">
-                        <span className="text-lg sm:text-xl">🥇</span> 
-                        <span><strong className="text-primary">금장:</strong> 4개 영역 인증</span>
-                    </p>
-                    <p className="font-semibold flex items-center gap-2 text-sm">
-                        <span className="text-lg sm:text-xl">🥈</span>
-                        <span><strong className="text-primary">은장:</strong> 3개 영역 인증</span>
-                    </p>
-                    <p className="font-semibold flex items-center gap-2 text-sm">
-                        <span className="text-lg sm:text-xl">🥉</span>
-                        <span><strong className="text-primary">동장:</strong> 2개 영역 인증</span>
-                    </p>
-                </div>
-                </CardContent>
-            </Card>
-
             <Link href="/gallery" passHref className="h-full">
               <Card className={cn(
                   "h-full flex flex-col items-center justify-center p-4 text-center shadow-lg border bg-card",
