@@ -99,10 +99,10 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
         const defaultGoalText = `목표: ${goal}${unit}`;
 
         return (
-            <div className="text-center">
-                <p className="text-xs sm:text-sm text-muted-foreground">{goalText || defaultGoalText}</p>
-                <p className="font-bold text-base sm:text-lg text-primary h-7">
-                    현재: {currentProgress}{unit}
+            <div className="p-3 bg-secondary/50 rounded-lg text-center space-y-1">
+                <p className="text-xs text-muted-foreground font-medium">{goalText || defaultGoalText}</p>
+                <p className="font-bold text-xl text-primary">
+                    {currentProgress}{unit}
                 </p>
             </div>
         );
@@ -112,16 +112,16 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
         const defaultGoalText = '교사 확인';
 
         return (
-            <div className="text-center">
-                 <p className="text-xs sm:text-sm text-muted-foreground">{goalText || defaultGoalText}</p>
-                 <div className="font-bold text-base sm:text-lg text-primary flex items-center justify-center gap-2 h-7">
+             <div className="p-3 bg-secondary/50 rounded-lg text-center space-y-1">
+                 <p className="text-xs text-muted-foreground font-medium">{goalText || defaultGoalText}</p>
+                 <div className="font-bold text-xl text-primary flex items-center justify-center gap-2 h-7">
                     {hasProgress ? (
                         <>
                             <Trophy className="w-5 h-5"/>
                             <span>{progress}</span>
                         </>
                     ) : (
-                        <span className="text-xs sm:text-sm font-normal text-muted-foreground">아직 인증된 등급이 없습니다.</span>
+                        <span className="text-sm font-normal text-muted-foreground">미인증</span>
                     )}
                 </div>
             </div>
@@ -136,7 +136,7 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
         "flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300 border",
         isCertified && "bg-gradient-to-br from-yellow-50 via-amber-50 to-yellow-100 border-amber-400 shadow-amber-500/20"
       )}>
-        <CardHeader className="p-4">
+        <CardHeader className="p-4 pb-2">
           <div className="flex justify-between items-start">
             <div className="flex items-center gap-3 mb-2">
               <AreaIcon className={cn("w-8 h-8", isCertified ? "text-amber-500" : "text-primary")} />
@@ -154,14 +154,14 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
               </Badge>
             )}
           </div>
-          <CardDescription className="text-xs sm:text-sm pt-1 !mt-0 h-10">
+          <CardDescription className="text-xs sm:text-sm pt-1 !mt-0">
             {areaConfig.challengeName}
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-4 pt-0 flex-grow flex flex-col items-center justify-center">
+        <CardContent className="p-4 pt-2">
           {renderProgress()}
         </CardContent>
-        <CardFooter className="p-4 pt-0 flex items-center gap-2 w-full">
+        <CardFooter className="p-4 pt-2 mt-auto flex items-center gap-2 w-full">
             { !isTeacherInput && (
                 <>
                     <Button variant="secondary" className="flex-grow font-semibold" onClick={() => openDialog('history')}>
