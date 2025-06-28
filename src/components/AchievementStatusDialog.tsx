@@ -48,8 +48,10 @@ const evidenceSchema = z.object({
 
 type EvidenceFormValues = z.infer<typeof evidenceSchema>;
 
-const MAX_FILE_SIZE_MB = 10;
-const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+const MAX_IMAGE_SIZE_MB = 10;
+const MAX_VIDEO_SIZE_MB = 100;
+const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
+const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
 
 
 const StatusInfo = {
@@ -254,15 +256,41 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
       return;
     }
 
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-        toast({
-            variant: 'destructive',
-            title: '파일 크기 초과',
-            description: `파일 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`,
-        });
-        if (fileInputRef.current) fileInputRef.current.value = '';
-        setFileName(null);
-        return;
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+
+    let limitBytes = 0;
+    let limitMb = 0;
+    let fileType = '';
+
+    if (isImage) {
+      limitBytes = MAX_IMAGE_SIZE_BYTES;
+      limitMb = MAX_IMAGE_SIZE_MB;
+      fileType = '사진';
+    } else if (isVideo) {
+      limitBytes = MAX_VIDEO_SIZE_BYTES;
+      limitMb = MAX_VIDEO_SIZE_MB;
+      fileType = '영상';
+    } else {
+      toast({
+        variant: 'destructive',
+        title: '지원하지 않는 파일 형식',
+        description: '사진 또는 영상 파일만 업로드할 수 있습니다.',
+      });
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setFileName(null);
+      return;
+    }
+
+    if (file.size > limitBytes) {
+      toast({
+        variant: 'destructive',
+        title: '파일 크기 초과',
+        description: `${fileType} 파일 크기는 ${limitMb}MB를 넘을 수 없습니다.`,
+      });
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setFileName(null);
+      return;
     }
     setFileName(file.name);
   };
@@ -287,27 +315,44 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
       let mediaType: string | undefined = undefined;
 
       if (fileToUpload) {
-        if (fileToUpload.type.startsWith('image/')) {
-           try {
-              fileToUpload = await resizeImage(fileToUpload, 1024); // Max width 1024px
-            } catch (resizeError) {
-              console.error("Image resize failed, uploading original:", resizeError);
-              toast({
-                variant: 'default',
-                title: '이미지 리사이징 실패',
-                description: '원본 이미지로 업로드를 시도합니다.',
-              });
-            }
+        const isImage = fileToUpload.type.startsWith('image/');
+        const isVideo = fileToUpload.type.startsWith('video/');
+
+        if (isImage) {
+          try {
+            fileToUpload = await resizeImage(fileToUpload, 1024); // Max width 1024px
+          } catch (resizeError) {
+            console.error("Image resize failed, uploading original:", resizeError);
+            toast({
+              variant: 'default',
+              title: '이미지 리사이징 실패',
+              description: '원본 이미지로 업로드를 시도합니다.',
+            });
+          }
         }
 
-        if (fileToUpload.size > MAX_FILE_SIZE_BYTES) {
-           toast({
-                variant: 'destructive',
-                title: '파일 크기 초과',
-                description: `처리 후 파일 크기가 ${MAX_FILE_SIZE_MB}MB를 초과하여 업로드할 수 없습니다.`,
-           });
-           setIsSubmitting(false);
-           return;
+        let limitBytes = 0;
+        let limitMb = 0;
+        let fileType = '';
+
+        if (isImage) {
+          limitBytes = MAX_IMAGE_SIZE_BYTES;
+          limitMb = MAX_IMAGE_SIZE_MB;
+          fileType = '사진';
+        } else if (isVideo) {
+          limitBytes = MAX_VIDEO_SIZE_BYTES;
+          limitMb = MAX_VIDEO_SIZE_MB;
+          fileType = '영상';
+        }
+
+        if (limitBytes > 0 && fileToUpload.size > limitBytes) {
+          toast({
+            variant: 'destructive',
+            title: '파일 크기 초과',
+            description: `처리 후 ${fileType} 파일 크기가 ${limitMb}MB를 초과하여 업로드할 수 없습니다.`,
+          });
+          setIsSubmitting(false);
+          return;
         }
 
         mediaUrl = await uploadFile(fileToUpload, user.username);
@@ -538,7 +583,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
                           className="file:text-primary file:font-semibold text-xs h-9 mt-1"
                         />
                         <FormDescription className="text-xs mt-1">
-                          {MAX_FILE_SIZE_MB}MB 이하의 파일을 올려주세요.
+                          사진 {MAX_IMAGE_SIZE_MB}MB, 영상 {MAX_VIDEO_SIZE_MB}MB 이하의 파일을 올려주세요.
                         </FormDescription>
                       </div>
 
