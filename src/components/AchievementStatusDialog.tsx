@@ -53,88 +53,6 @@ type EvidenceFormValues = z.infer<typeof evidenceSchema>;
 const MAX_FILE_SIZE_MB = 10;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
-const resizeImage = (file: File, maxWidth: number, maxHeight: number, quality: number): Promise<{ dataUri: string; file: File }> => {
-  return new Promise((resolve, reject) => {
-    if (file.type.includes('heic') || file.type.includes('heif')) {
-        return reject(new Error('HEIC/HEIF 형식은 지원되지 않습니다.'));
-    }
-
-    const objectUrl = URL.createObjectURL(file);
-    const img = new Image();
-
-    img.onload = () => {
-        try {
-            let { width, height } = img;
-            if (width > height) {
-                if (width > maxWidth) {
-                    height = Math.round(height * (maxWidth / width));
-                    width = maxWidth;
-                }
-            } else {
-                if (height > maxHeight) {
-                    width = Math.round(width * (maxHeight / height));
-                    height = maxHeight;
-                }
-            }
-
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                URL.revokeObjectURL(objectUrl);
-                return reject(new Error('브라우저의 이미지 처리 엔진을 사용할 수 없습니다.'));
-            }
-
-            ctx.drawImage(img, 0, 0, width, height);
-
-            canvas.toBlob(
-                (blob) => {
-                    if (!blob) {
-                        URL.revokeObjectURL(objectUrl);
-                        return reject(new Error('이미지 변환에 실패했습니다. 파일이 손상되었거나 브라우저에서 지원하지 않는 형식일 수 있습니다.'));
-                    }
-                    
-                    const resizedFile = new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
-                        type: 'image/jpeg',
-                        lastModified: Date.now(),
-                    });
-                    
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        URL.revokeObjectURL(objectUrl);
-                        if (typeof reader.result === 'string') {
-                            resolve({ dataUri: reader.result, file: resizedFile });
-                        } else {
-                            reject(new Error('파일을 미리보기용 데이터로 변환하는 데 실패했습니다.'));
-                        }
-                    };
-                    reader.onerror = () => {
-                        URL.revokeObjectURL(objectUrl);
-                        reject(new Error('파일 미리보기를 생성하는 중 오류가 발생했습니다.'));
-                    };
-                    reader.readAsDataURL(blob);
-                },
-                'image/jpeg',
-                quality
-            );
-        } catch (e) {
-            URL.revokeObjectURL(objectUrl);
-            console.error("An unexpected error occurred during image processing:", e);
-            reject(new Error('사진 처리 중 예상치 못한 오류가 발생했습니다. 다른 사진으로 시도해보세요.'));
-        }
-    };
-
-    img.onerror = () => {
-        URL.revokeObjectURL(objectUrl);
-        reject(new Error('사진 파일을 읽을 수 없습니다. 지원되지 않는 형식이거나 손상된 파일일 수 있습니다.'));
-    };
-    
-    img.src = objectUrl;
-  });
-};
-
 
 const StatusInfo = {
     approved: { icon: FileCheck, text: '승인됨', color: 'text-green-600' },
@@ -265,41 +183,25 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
           throw new Error(`파일 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`);
         }
         
-        const isImage = file.type.startsWith('image/');
+        // No resizing. Just read the file as a data URI. This is much more stable.
+        const dataUri = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = (error) => reject(new Error('파일을 읽는 중 오류가 발생했습니다.'));
+            reader.readAsDataURL(file);
+        });
 
-        if (isImage) {
-            const { dataUri, file: processedFile } = await resizeImage(file, 1280, 720, 0.8);
-            setMediaFile(processedFile);
-            setMediaPreview(dataUri);
-            form.setValue('media', dataUri);
-        } else {
-            const dataUri = await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result as string);
-                reader.onerror = () => reject(new Error('동영상 파일을 읽는 중 오류가 발생했습니다.'));
-                reader.readAsDataURL(file);
-            });
-            setMediaFile(file);
-            setMediaPreview(dataUri);
-            form.setValue('media', dataUri);
-        }
+        setMediaFile(file);
+        setMediaPreview(dataUri);
+        form.setValue('media', dataUri);
+
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : '알 수 없는 파일 처리 오류가 발생했습니다.';
         
-        let finalDescription: React.ReactNode = errorMessage;
-        if (errorMessage.toLowerCase().includes('heic') || errorMessage.includes('지원되지 않는 형식')) {
-            finalDescription = (
-              <div>
-                <p>지원하지 않는 이미지 형식(HEIC 등)일 수 있습니다.</p>
-                <p className="mt-2 font-bold">💡 해결 방법: 아이폰의 경우, 해당 사진을 스크린샷으로 찍어 다시 업로드 해보세요.</p>
-              </div>
-            );
-        }
-
         toast({
             variant: 'destructive',
             title: '파일 처리 오류',
-            description: finalDescription,
+            description: errorMessage,
             duration: 9000,
         });
         setMediaFile(null);
@@ -416,7 +318,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
             <ListChecks className="mr-2 h-4 w-4" /> 도전하기
           </Button>
         </DialogTrigger>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0">
+        <DialogContent className="sm:max-w-lg h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b shrink-0">
             <DialogTitle className="font-headline text-2xl">{koreanName} 활동 현황</DialogTitle>
             <DialogDescription>
