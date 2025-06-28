@@ -47,7 +47,7 @@ const evidenceSchema = z.object({
 
 type EvidenceFormValues = z.infer<typeof evidenceSchema>;
 
-const MAX_FILE_SIZE_MB = 25;
+const MAX_FILE_SIZE_MB = 10;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 
@@ -356,8 +356,9 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
             <DialogTitle className="font-headline text-2xl">{`[${koreanName}] ${initialMode === 'history' ? '활동 내역' : challengeName}`}</DialogTitle>
           </DialogHeader>
           
+          <div className="flex-1 overflow-y-auto px-6 min-h-0">
           {initialMode === 'history' ? (
-            <div className="px-6 py-4 flex-1 flex flex-col min-h-0">
+            <div className="py-4 flex-1 flex flex-col min-h-0">
               <h3 className="text-sm font-semibold mb-2 shrink-0">내 활동 목록</h3>
               <div className="w-full rounded-md border p-2 space-y-2 flex-grow overflow-y-auto">
                 {submissionsLoading ? (
@@ -401,91 +402,90 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
               </div>
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto px-6 min-h-0">
-              <Form {...form}>
-                <form id={formId} onSubmit={form.handleSubmit(handleFormSubmit)} className="py-4 space-y-6">
-                  {intervalLock.locked ? (
-                      <Alert>
-                          <Info className="h-4 w-4" />
-                          <AlertTitle className="font-bold">지금은 도전할 수 없어요!</AlertTitle>
-                          <AlertDescription>
-                            {`활동 제출 후 ${areaConfig.submissionIntervalMinutes}분(교사가 설정한 시간)이 지나야 해요. (${intervalLock.minutesToWait}분 남음)`}
-                          </AlertDescription>
-                      </Alert>
-                  ) : (
-                    <div>
-                      <h3 className="text-sm font-semibold mb-2">새 활동 공유하기</h3>
-                      <fieldset disabled={isSubmitting || isChecking} className="space-y-4">
-                        <FormField
-                          control={form.control}
-                          name="evidence"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="sr-only">활동 내용</FormLabel>
-                              <FormControl>
-                                <Textarea
-                                  placeholder={
-                                    "여기에 나의 실천 내용을 자세히 적어주세요. (예: 어떤 책을 읽고 무엇을 느꼈는지, 봉사활동을 통해 무엇을 배우고 실천했는지 등)"
-                                  }
-                                  {...field}
-                                  rows={3}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <div className="flex items-center justify-center min-h-[4rem]">
-                          {isChecking ? (
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse p-2">
-                              <BrainCircuit className="h-4 w-4" />
-                              <span>AI가 실시간으로 내용을 분석하고 있습니다...</span>
-                            </div>
-                          ) : (showLengthWarning || aiFeedback) && (
-                            <Alert variant="default" className="p-2 w-full">
-                              <BrainCircuit className="h-4 w-4" />
-                              <AlertTitle className="text-xs font-semibold mb-0.5">
-                                AI 실시간 조언
-                              </AlertTitle>
-                              <AlertDescription className="text-xs">
-                                {aiFeedback}
-                              </AlertDescription>
-                            </Alert>
-                          )}
-                        </div>
-                        
-                        <div>
-                          <FormLabel htmlFor="media-file-input" className="text-xs">
-                            증명 파일 (사진/영상)
-                            {areaConfig.mediaRequired && <span className="text-destructive ml-1">*필수</span>}
-                          </FormLabel>
-                          <Input
-                            id="media-file-input"
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*,video/*"
-                            onChange={handleFileChange}
-                            className="file:text-primary file:font-semibold text-xs h-9 mt-1"
-                          />
-                          <FormDescription className="text-xs mt-1">
-                            {MAX_FILE_SIZE_MB}MB 이하의 파일을 올려주세요.
-                          </FormDescription>
-                        </div>
-
-                        {fileName && (
-                          <div className="text-sm p-3 bg-secondary rounded-md text-secondary-foreground flex items-center gap-2">
-                             <FileCheck className="h-4 w-4 text-primary" />
-                             <span className="font-medium">{fileName}</span>
-                          </div>
+            <Form {...form}>
+              <form id={formId} onSubmit={form.handleSubmit(handleFormSubmit)} className="py-4 space-y-6">
+                {intervalLock.locked ? (
+                    <Alert>
+                        <Info className="h-4 w-4" />
+                        <AlertTitle className="font-bold">지금은 도전할 수 없어요!</AlertTitle>
+                        <AlertDescription>
+                          {`활동 제출 후 ${areaConfig.submissionIntervalMinutes}분(교사가 설정한 시간)이 지나야 해요. (${intervalLock.minutesToWait}분 남음)`}
+                        </AlertDescription>
+                    </Alert>
+                ) : (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">새 활동 공유하기</h3>
+                    <fieldset disabled={isSubmitting || isChecking} className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="evidence"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="sr-only">활동 내용</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                placeholder={
+                                  "여기에 나의 실천 내용을 자세히 적어주세요. (예: 어떤 책을 읽고 무엇을 느꼈는지, 봉사활동을 통해 무엇을 배우고 실천했는지 등)"
+                                }
+                                {...field}
+                                rows={3}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
                         )}
-                      </fieldset>
-                    </div>
-                  )}
-                </form>
-              </Form>
-            </div>
+                      />
+
+                      <div className="flex items-center justify-center min-h-[4rem]">
+                        {isChecking ? (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse p-2">
+                            <BrainCircuit className="h-4 w-4" />
+                            <span>AI가 실시간으로 내용을 분석하고 있습니다...</span>
+                          </div>
+                        ) : (showLengthWarning || aiFeedback) && (
+                          <Alert variant="default" className="p-2 w-full">
+                            <BrainCircuit className="h-4 w-4" />
+                            <AlertTitle className="text-xs font-semibold mb-0.5">
+                              AI 실시간 조언
+                            </AlertTitle>
+                            <AlertDescription className="text-xs">
+                              {aiFeedback}
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <FormLabel htmlFor="media-file-input" className="text-xs">
+                          증명 파일 (사진/영상)
+                          {areaConfig.mediaRequired && <span className="text-destructive ml-1">*필수</span>}
+                        </FormLabel>
+                        <Input
+                          id="media-file-input"
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*,video/*"
+                          onChange={handleFileChange}
+                          className="file:text-primary file:font-semibold text-xs h-9 mt-1"
+                        />
+                        <FormDescription className="text-xs mt-1">
+                          {MAX_FILE_SIZE_MB}MB 이하의 파일을 올려주세요.
+                        </FormDescription>
+                      </div>
+
+                      {fileName && (
+                        <div className="text-sm p-3 bg-secondary rounded-md text-secondary-foreground flex items-center gap-2">
+                           <FileCheck className="h-4 w-4 text-primary" />
+                           <span className="font-medium">{fileName}</span>
+                        </div>
+                      )}
+                    </fieldset>
+                  </div>
+                )}
+              </form>
+            </Form>
           )}
+          </div>
           
           <DialogFooter className="p-6 pt-4 border-t shrink-0 flex flex-col gap-2 sm:flex-row sm:justify-end sm:gap-2">
               <DialogClose asChild>
