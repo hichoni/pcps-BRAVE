@@ -26,7 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Input } from './ui/input';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, Timestamp, orderBy, limit } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -92,94 +92,121 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
 
   const evidenceValue = form.watch('evidence');
 
+  // This single effect handles data fetching and checks when the dialog opens.
   useEffect(() => {
     // If the dialog is not open, or we don't have the necessary info, do nothing.
     if (!user || !open || !db || !areaConfig) {
         // Reset loading state if dialog is closed
-        if (!open) setSubmissionsLoading(false);
+        if (!open) {
+          setSubmissionsLoading(true);
+          setIntervalLock({ locked: false, minutesToWait: 0 });
+        }
         return;
     }
-    
-    // We need to fetch data for both modes:
-    // - 'history' mode to display the list.
-    // - 'submit' mode to check for the submission interval lock.
-    setSubmissionsLoading(true);
 
-    // This query is more robust as it only uses one 'where' clause,
-    // avoiding the need for a composite index in Firestore.
-    // We will filter by areaName on the client side.
-    const submissionsQuery = query(
-      collection(db, "challengeSubmissions"),
-      where("userId", "==", user.username)
-    );
-    
-    const unsubscribeHistory = onSnapshot(submissionsQuery, (querySnapshot) => {
-        const allUserSubmissions = querySnapshot.docs
-            .map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    evidence: data.evidence,
-                    createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
-                    status: data.status,
-                    areaName: data.areaName, // Temporarily include areaName for filtering
-                };
-            });
+    let unsubscribe: (() => void) | undefined;
 
-        // Filter for the current area and sort by date descending
-        const fetchedSubmissions = allUserSubmissions
-            .filter(sub => sub.areaName === areaName)
-            .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-
-        // For 'history' mode, update the state for display
-        if (initialMode === 'history') {
-            setSubmissions(fetchedSubmissions as Submission[]);
-        }
+    if (initialMode === 'history') {
+        setSubmissionsLoading(true);
+        const q = query(
+          collection(db, "challengeSubmissions"),
+          where("userId", "==", user.username),
+          where("areaName", "==", areaName),
+          orderBy("createdAt", "desc")
+        );
         
-        // For 'submit' mode, check the submission interval
+        unsubscribe = onSnapshot(q, (snapshot) => {
+          const fetchedSubmissions = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              ...data,
+              createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
+            } as Submission;
+          });
+          setSubmissions(fetchedSubmissions);
+          setSubmissionsLoading(false);
+        }, (error) => {
+            console.error("Error fetching submission history:", error);
+            toast({
+                variant: "destructive",
+                title: "오류",
+                description: "활동 목록을 불러오는 데 실패했습니다."
+            });
+            setSubmissionsLoading(false);
+        });
+    } else { // 'submit' mode
+        setSubmissionsLoading(false); // No list to load in submit mode
         if (areaConfig.submissionIntervalMinutes && areaConfig.submissionIntervalMinutes > 0) {
-            const relevantSubmissions = fetchedSubmissions.filter(sub => 
-                ['approved', 'pending_review', 'pending_deletion'].includes(sub.status)
+            const submissionsQuery = query(
+                collection(db, "challengeSubmissions"),
+                where("userId", "==", user.username),
+                where("areaName", "==", areaName),
+                where("status", "in", ['approved', 'pending_review', 'pending_deletion']),
+                orderBy("createdAt", "desc"),
+                limit(1)
             );
-            
-            if (relevantSubmissions.length > 0) {
-                const lastSubmissionTime = relevantSubmissions[0].createdAt;
-                const now = new Date();
-                const minutesSince = (now.getTime() - lastSubmissionTime.getTime()) / (1000 * 60);
 
-                if (minutesSince < areaConfig.submissionIntervalMinutes) {
-                    const minutesToWait = Math.ceil(areaConfig.submissionIntervalMinutes - minutesSince);
-                    setIntervalLock({ locked: true, minutesToWait });
+            unsubscribe = onSnapshot(submissionsQuery, (querySnapshot) => {
+                if (!querySnapshot.empty) {
+                    const lastValidSubmission = querySnapshot.docs[0].data();
+                    const lastSubmissionTime = (lastValidSubmission.createdAt as Timestamp).toDate();
+                    const now = new Date();
+                    const minutesSinceLastSubmission = (now.getTime() - lastSubmissionTime.getTime()) / (1000 * 60);
+
+                    if (minutesSinceLastSubmission < areaConfig.submissionIntervalMinutes) {
+                        const minutesToWait = Math.ceil(areaConfig.submissionIntervalMinutes - minutesSinceLastSubmission);
+                        setIntervalLock({ locked: true, minutesToWait });
+                    } else {
+                         setIntervalLock({ locked: false, minutesToWait: 0 });
+                    }
                 } else {
                      setIntervalLock({ locked: false, minutesToWait: 0 });
                 }
-            } else {
-                 setIntervalLock({ locked: false, minutesToWait: 0 });
-            }
+            }, (error) => {
+                console.error("Error checking submission interval:", error);
+                setIntervalLock({ locked: false, minutesToWait: 0 });
+            });
         }
-        setSubmissionsLoading(false);
-    }, (error) => {
-        console.error("Error fetching submissions for dialog:", error);
-        // Use a more generic error message that fits both modes
-        toast({
-            variant: "destructive",
-            title: "오류",
-            description: "활동 정보를 확인하는 데 실패했습니다. 인터넷 연결을 확인해주세요."
-        });
-        setSubmissionsLoading(false);
-    });
+    }
 
     return () => {
-        unsubscribeHistory();
+        if (unsubscribe) {
+          unsubscribe();
+        }
     };
   }, [open, user, areaName, toast, areaConfig, initialMode]);
 
 
+  // Effect for AI real-time feedback
   useEffect(() => {
-    if (!open || !areaConfig || initialMode !== 'submit') return;
+    // Exit if the dialog is closed, or not in submit mode, or config is missing
+    if (!open || !areaConfig || initialMode !== 'submit') {
+      return;
+    }
 
     const text = evidenceValue.trim();
-    const handleTextFeedback = async () => {
+
+    // Handle immediate feedback for short or empty text
+    if (text.length === 0) {
+      setAiFeedback(null);
+      setIsChecking(false);
+      setShowLengthWarning(false);
+      return;
+    }
+    
+    if (text.length < 10) {
+      setAiFeedback("AI 조언을 받으려면 10글자 이상 입력해주세요.");
+      setIsChecking(false);
+      setShowLengthWarning(true);
+      return;
+    }
+
+    setShowLengthWarning(false);
+
+    // Debounce the API call
+    const handler = setTimeout(async () => {
+      setIsChecking(true);
       try {
         const result = await getTextFeedback({
           text: evidenceValue,
@@ -194,30 +221,12 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
       } finally {
         setIsChecking(false);
       }
-    };
-    
-    if (text.length > 0 && text.length < 10) {
-      setShowLengthWarning(true);
-      setAiFeedback("AI 조언을 받으려면 10글자 이상 입력해주세요.");
-      setIsChecking(false);
-      return;
-    }
-    
-    setShowLengthWarning(false);
-      
-    if (text.length === 0) {
-      setAiFeedback(null);
-      setIsChecking(false);
-      return;
-    }
-
-    setIsChecking(true);
-    const handler = setTimeout(handleTextFeedback, 1500);
+    }, 1500); // 1.5-second delay
 
     return () => {
       clearTimeout(handler);
     };
-  }, [evidenceValue, fileName, areaName, areaConfig, open, initialMode]);
+  }, [evidenceValue, fileName, areaConfig, open, initialMode]);
   
   if (!user || !challengeConfig || user.grade === undefined || !areaConfig) return null;
   
