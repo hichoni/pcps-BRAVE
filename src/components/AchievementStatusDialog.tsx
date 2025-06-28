@@ -35,6 +35,7 @@ import { ko } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { deleteSubmission } from '@/ai/flows/delete-submission';
+import { uploadFile } from '@/services/client-storage';
 
 interface Submission {
   id: string;
@@ -50,7 +51,7 @@ const evidenceSchema = z.object({
 
 type EvidenceFormValues = z.infer<typeof evidenceSchema>;
 
-const MAX_FILE_SIZE_MB = 10;
+const MAX_FILE_SIZE_MB = 25; // Increase limit as we no longer process on client
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 
@@ -69,7 +70,6 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [submissionsLoading, setSubmissionsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
@@ -85,6 +85,14 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   });
 
   const evidenceValue = form.watch('evidence');
+
+  useEffect(() => {
+    return () => {
+      if (mediaPreview) {
+        URL.revokeObjectURL(mediaPreview);
+      }
+    };
+  }, [mediaPreview]);
 
   useEffect(() => {
     if (!user || !dialogOpen || !db) return;
@@ -167,51 +175,40 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     };
   }, [evidenceValue, areaName, koreanName, areaConfig, toast]);
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const fileInput = event.target;
     setMediaFile(null);
-    setMediaPreview(null);
+    if (mediaPreview) {
+      URL.revokeObjectURL(mediaPreview);
+      setMediaPreview(null);
+    }
     form.setValue('media', null);
     
     const file = fileInput.files?.[0];
     if (!file) return;
 
-    setIsProcessingImage(true);
-
     try {
-        if (file.size > MAX_FILE_SIZE_BYTES) {
-          throw new Error(`파일 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`);
-        }
-        
-        // No resizing. Just read the file as a data URI. This is much more stable.
-        const dataUri = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = (error) => reject(new Error('파일을 읽는 중 오류가 발생했습니다.'));
-            reader.readAsDataURL(file);
-        });
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        throw new Error(`파일 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`);
+      }
 
-        setMediaFile(file);
-        setMediaPreview(dataUri);
-        form.setValue('media', dataUri);
-
+      setMediaFile(file);
+      setMediaPreview(URL.createObjectURL(file));
+      form.setValue('media', file.name);
     } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : '알 수 없는 파일 처리 오류가 발생했습니다.';
-        
-        toast({
-            variant: 'destructive',
-            title: '파일 처리 오류',
-            description: errorMessage,
-            duration: 9000,
-        });
-        setMediaFile(null);
-        setMediaPreview(null);
-        form.setValue('media', null);
-        if (fileInput) fileInput.value = '';
-    } finally {
-        setIsProcessingImage(false);
+      const errorMessage = error instanceof Error ? error.message : '알 수 없는 파일 처리 오류가 발생했습니다.';
+      toast({
+        variant: 'destructive',
+        title: '파일 처리 오류',
+        description: errorMessage,
+        duration: 9000,
+      });
+      setMediaFile(null);
+      setMediaPreview(null);
+      if (fileInput) fileInput.value = '';
     }
   };
+
 
   const handleFormSubmit = async (data: EvidenceFormValues) => {
     if (!user || !user.name) return;
@@ -227,6 +224,14 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
 
     setIsSubmitting(true);
     try {
+      let mediaUrl: string | undefined = undefined;
+      let mediaType: string | undefined = undefined;
+
+      if (mediaFile) {
+        mediaUrl = await uploadFile(mediaFile, user.username);
+        mediaType = mediaFile.type;
+      }
+      
       const result = await submitEvidence({
         userId: user.username,
         userName: user.name,
@@ -234,8 +239,8 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
         koreanName: areaConfig.koreanName,
         challengeName: areaConfig.challengeName,
         evidence: data.evidence || '미디어 파일 제출',
-        mediaDataUri: mediaPreview ?? undefined,
-        mediaType: mediaFile?.type ?? undefined,
+        mediaUrl: mediaUrl,
+        mediaType: mediaType,
       });
       
       toast({
@@ -251,7 +256,10 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
 
       form.reset();
       setMediaFile(null);
-      setMediaPreview(null);
+      if (mediaPreview) {
+        URL.revokeObjectURL(mediaPreview);
+        setMediaPreview(null);
+      }
     } catch (error: unknown) {
       console.error('Evidence Submission Error:', error);
       let errorMessage = '알 수 없는 오류가 발생했습니다.';
@@ -278,7 +286,10 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
       if (!isOpen) {
           form.reset();
           setMediaFile(null);
-          setMediaPreview(null);
+          if (mediaPreview) {
+            URL.revokeObjectURL(mediaPreview);
+            setMediaPreview(null);
+          }
           setAiFeedback(null);
       }
       setDialogOpen(isOpen);
@@ -437,27 +448,17 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                               accept={areaName === 'Information' ? "image/*" : "image/*,video/*"}
                               onChange={handleFileChange}
                               className="file:text-primary file:font-semibold text-xs h-9"
-                              disabled={isSubmitting || isProcessingImage}
+                              disabled={isSubmitting}
                               {...fieldProps}
                             />
                           </FormControl>
                           <FormDescription className="text-xs">
-                            {areaName === 'Information'
-                              ? '200타 이상 결과 화면을 올려주세요. 10MB 이하.'
-                              : '10MB 이하. 큰 사진은 자동으로 최적화됩니다.'
-                            }
+                            {MAX_FILE_SIZE_MB}MB 이하의 파일을 올려주세요.
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-
-                    {isProcessingImage && (
-                        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                            <Loader2 className="animate-spin h-4 w-4"/>
-                            <span>파일 처리 중...</span>
-                        </div>
-                    )}
 
                     {mediaPreview && mediaFile && (
                       <div className="mt-2">
@@ -481,9 +482,9 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                       닫기
                   </Button>
               </DialogClose>
-              <Button type="submit" form={formId} className="w-full sm:w-auto" disabled={isSubmitting || isChecking || isProcessingImage}>
-                  {isProcessingImage ? <Loader2 className="animate-spin" /> : (isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2"/>)}
-                  {isProcessingImage ? '파일 처리 중...' : (isSubmitting ? '제출 중...' : '제출하기')}
+              <Button type="submit" form={formId} className="w-full sm:w-auto" disabled={isSubmitting || isChecking}>
+                  {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2"/>}
+                  {isSubmitting ? '제출 중...' : '제출하기'}
               </Button>
           </DialogFooter>
         </DialogContent>

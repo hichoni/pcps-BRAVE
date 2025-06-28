@@ -9,16 +9,12 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { db } from '@/lib/firebase';
-import { adminStorage } from '@/lib/firebase-admin';
 import { collection, addDoc, serverTimestamp, doc, getDoc, runTransaction, query, where, orderBy, limit, getDocs, Timestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { checkCertification } from './certification-checker';
 import { analyzeMediaEvidence } from './analyze-typing-test'; // Now a generic media analyzer
-import { type SubmitEvidenceInput, type SubmitEvidenceOutput, SUBMISSION_STATUSES, type SubmissionStatus, type User, type CertificationCheckOutput } from '@/lib/config';
+import { type SubmitEvidenceInput as PublicSubmitEvidenceInput, type SubmitEvidenceOutput, SUBMISSION_STATUSES, type SubmissionStatus, type User, type CertificationCheckOutput } from '@/lib/config';
 
-export async function submitEvidence(input: SubmitEvidenceInput): Promise<SubmitEvidenceOutput> {
-  return submitEvidenceFlow(input);
-}
 
 const SubmitEvidenceInputSchema = z.object({
   userId: z.string().describe("The student's unique username."),
@@ -27,24 +23,33 @@ const SubmitEvidenceInputSchema = z.object({
   koreanName: z.string().describe('The Korean name of the achievement area.'),
   challengeName: z.string().describe('The name of the challenge.'),
   evidence: z.string().min(1, "Evidence must not be empty.").max(1000, "Evidence cannot be more than 1000 characters long.").describe('The evidence provided by the student.'),
-  mediaDataUri: z.string().optional().describe("A media file (image or video) as a data URI."),
+  mediaUrl: z.string().url().optional().describe("A public URL to the media file (image or video)."),
   mediaType: z.string().optional().describe("The MIME type of the media file."),
 });
 
-const SubmitEvidenceOutputSchema = z.object({
-    success: z.boolean(),
-    id: z.string(),
-    status: z.enum(SUBMISSION_STATUSES),
-    updateMessage: z.string(),
-    aiReasoning: z.string()
-});
+// We keep the public type separate to not break other parts of the app if they import it.
+// This flow will now internally handle this specific Zod schema.
+export type SubmitEvidenceInput = z.infer<typeof SubmitEvidenceInputSchema>;
+
+
+export async function submitEvidence(input: PublicSubmitEvidenceInput): Promise<SubmitEvidenceOutput> {
+  // We cast the public input type to the one this flow now expects.
+  // This is safe because the client is now sending the correct shape.
+  return submitEvidenceFlow(input as SubmitEvidenceInput);
+}
 
 
 const submitEvidenceFlow = ai.defineFlow(
   {
     name: 'submitEvidenceFlow',
     inputSchema: SubmitEvidenceInputSchema,
-    outputSchema: SubmitEvidenceOutputSchema,
+    outputSchema: z.object({
+        success: z.boolean(),
+        id: z.string(),
+        status: z.enum(SUBMISSION_STATUSES),
+        updateMessage: z.string(),
+        aiReasoning: z.string()
+    }),
   },
   async (input) => {
     try {
@@ -116,64 +121,6 @@ const submitEvidenceFlow = ai.defineFlow(
             }
         }
 
-        let mediaUrl: string | undefined = undefined;
-
-        if (input.mediaDataUri && input.mediaType) {
-            if (!adminStorage) {
-                throw new Error("서버 설정 오류: Firebase Admin SDK가 초기화되지 않았습니다. service-account.json 파일이 올바른지, 혹은 서버 로그에 다른 오류가 있는지 확인해주세요.");
-            }
-            try {
-                const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
-                if (!bucketName) {
-                    throw new Error("서버 설정 오류: .env.local 파일에 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값이 설정되지 않았습니다.");
-                }
-                if (bucketName.startsWith('gs://')) {
-                    throw new Error("서버 설정 오류: .env.local 파일의 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값에 'gs://'를 포함해서는 안 됩니다. 'gs://'를 제외하고 입력해주세요.");
-                }
-
-                const bucket = adminStorage.bucket(bucketName);
-
-                const fileExtension = input.mediaType.split('/')[1] || 'jpeg';
-                const filePath = `evidence/${input.userId}/${Date.now()}.${fileExtension}`;
-                const file = bucket.file(filePath);
-                
-                const dataUriParts = input.mediaDataUri.split(',');
-                if (dataUriParts.length !== 2 || !dataUriParts[1]) {
-                    throw new Error('올바르지 않은 미디어 데이터 형식입니다. 파일이 손상되었을 수 있습니다.');
-                }
-                const buffer = Buffer.from(dataUriParts[1], 'base64');
-                
-                const token = uuidv4();
-
-                await file.save(buffer, {
-                    metadata: {
-                        contentType: input.mediaType,
-                        metadata: {
-                            firebaseStorageDownloadTokens: token,
-                        }
-                    },
-                });
-
-                mediaUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(filePath)}?alt=media&token=${token}`;
-            
-            } catch (error: unknown) {
-                let detail = "알 수 없는 서버 오류가 발생했습니다. 서버 로그를 확인해주세요.";
-                if (error instanceof Error) {
-                    detail = error.message;
-                }
-                
-                if (detail.includes('not found')) {
-                    detail = `Firebase Storage 버킷을 찾을 수 없습니다. .env.local 파일의 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값이 올바른지 확인해주세요. (현재 값: '${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '없음'}')`;
-                } else if (detail.includes('permission denied') || detail.includes('unauthorized') || detail.includes('does not have storage.objects.create')) {
-                    detail = "Firebase Storage에 파일을 업로드할 권한이 없습니다. Google Cloud IAM 설정에서 서비스 계정에 'Storage 개체 관리자(Storage Object Admin)' 역할이 부여되었는지 확인해주세요.";
-                } else if (detail.includes('bucket name')) {
-                    detail = `버킷 이름이 잘못되었습니다. .env.local 파일의 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET 값을 확인해주세요.`;
-                }
-                
-                throw new Error(`파일 업로드 실패: ${detail}`);
-            }
-        }
-        
       const newSubmissionRef = doc(collection(db, 'challengeSubmissions'));
       
       const docData: any = {
@@ -188,8 +135,8 @@ const submitEvidenceFlow = ai.defineFlow(
         showInGallery: areaConfig.showInGallery ?? true,
       };
 
-      if (mediaUrl) {
-          docData.mediaUrl = mediaUrl;
+      if (input.mediaUrl) {
+          docData.mediaUrl = input.mediaUrl;
           docData.mediaType = input.mediaType;
       }
 
@@ -199,9 +146,18 @@ const submitEvidenceFlow = ai.defineFlow(
 
       if (areaConfig.autoApprove) {
           let aiResult: CertificationCheckOutput | null = null;
-          if (areaConfig.aiVisionCheck && input.mediaDataUri && areaConfig.aiVisionPrompt) {
+          if (areaConfig.aiVisionCheck && input.mediaUrl && areaConfig.aiVisionPrompt) {
+              // Fetch the image from the URL, convert it to a data URI for the vision model
+              const response = await fetch(input.mediaUrl);
+              if (!response.ok) {
+                throw new Error(`미디어 파일을 불러오는 데 실패했습니다: ${response.statusText}`);
+              }
+              const imageBuffer = await response.arrayBuffer();
+              const mediaType = response.headers.get('content-type') || input.mediaType || 'image/jpeg';
+              const photoDataUri = `data:${mediaType};base64,${Buffer.from(imageBuffer).toString('base64')}`;
+
               aiResult = await analyzeMediaEvidence({
-                  photoDataUri: input.mediaDataUri,
+                  photoDataUri: photoDataUri,
                   prompt: areaConfig.aiVisionPrompt,
               });
           } else {

@@ -206,7 +206,7 @@ export interface SubmitEvidenceInput {
   koreanName: string;
   challengeName: string;
   evidence: string;
-  mediaDataUri?: string;
+  mediaUrl?: string;
   mediaType?: string;
 }
 
