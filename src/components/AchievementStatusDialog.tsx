@@ -21,9 +21,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { useAuth } from '@/context/AuthContext';
 import { AreaName, SubmissionStatus } from '@/lib/config';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
-import { ListChecks, Send, Loader2, UploadCloud, ThumbsUp, ThumbsDown, BrainCircuit, FileCheck, FileX, History, Trash2, Info, ShieldAlert } from 'lucide-react';
+import { ListChecks, Send, Loader2, UploadCloud, FileCheck, FileX, History, Trash2, Info, BrainCircuit } from 'lucide-react';
 import { submitEvidence } from '@/ai/flows/submit-evidence';
-import { checkCertification } from '@/ai/flows/certification-checker';
+import { getTextFeedback } from '@/ai/flows/text-feedback';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Input } from './ui/input';
@@ -72,7 +72,8 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(false);
-  const [aiFeedback, setAiFeedback] = useState<{ isSufficient: boolean; reasoning: string } | null>(null);
+  const [aiFeedback, setAiFeedback] = useState<string | null>(null);
+  const [showLengthWarning, setShowLengthWarning] = useState(false);
   const [submissionToDelete, setSubmissionToDelete] = useState<Submission | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const formId = useId();
@@ -121,24 +122,21 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     return () => unsubscribe();
   }, [dialogOpen, user, areaName, toast]);
 
-
-  if (!user || !challengeConfig || user.grade === undefined) return null;
-  
-  const areaConfig = challengeConfig[areaName];
-
-  if (!areaConfig) return null;
-  
-  const { koreanName, challengeName } = areaConfig;
-
   useEffect(() => {
-    if (areaName === 'Information') {
-        setAiFeedback(null);
-        setIsChecking(false);
-        return;
-    }
-      
-    if (evidenceValue.trim().length < 10) {
+    if (!dialogOpen) return;
+
+    const text = evidenceValue.trim();
+    if (text.length > 0 && text.length < 10) {
+      setShowLengthWarning(true);
       setAiFeedback(null);
+      setIsChecking(false);
+      return;
+    }
+    setShowLengthWarning(false);
+      
+    if (text.length < 10) {
+      setAiFeedback(null);
+      setIsChecking(false);
       return;
     }
 
@@ -148,51 +146,53 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     const handler = setTimeout(async () => {
       if (!areaConfig) return;
       try {
-        const result = await checkCertification({
-          areaName: koreanName,
+        const result = await getTextFeedback({
+          text: evidenceValue,
           requirements: areaConfig.requirements,
-          evidence: evidenceValue,
+          hasMedia: !!fileName,
+          mediaRequired: !!areaConfig.mediaRequired,
         });
-        setAiFeedback(result);
+        setAiFeedback(result?.feedback ?? null);
       } catch (error) {
         console.error("Real-time AI check failed:", error);
+        // Don't show an error toast for feedback failures to avoid annoying the user
       } finally {
         setIsChecking(false);
       }
-    }, 1500);
+    }, 1500); // 1.5-second debounce
 
     return () => {
       clearTimeout(handler);
     };
-  }, [evidenceValue, areaName, koreanName, areaConfig, toast]);
+  }, [evidenceValue, fileName, areaName, areaConfig, dialogOpen]);
+
+
+  if (!user || !challengeConfig || user.grade === undefined) return null;
+  
+  const areaConfig = challengeConfig[areaName];
+
+  if (!areaConfig) return null;
+  
+  const { koreanName, challengeName } = areaConfig;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    try {
-        const file = event.target.files?.[0];
-        if (!file) {
-            setFileName(null);
-            return;
-        }
+    const file = event.target.files?.[0];
+    if (!file) {
+      setFileName(null);
+      return;
+    }
 
-        if (file.size > MAX_FILE_SIZE_BYTES) {
-            toast({
-                variant: 'destructive',
-                title: '파일 크기 초과',
-                description: `파일 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`,
-            });
-            event.target.value = '';
-            setFileName(null);
-            return;
-        }
-        setFileName(file.name);
-    } catch (error) {
-        console.error("File selection error:", error);
+    if (file.size > MAX_FILE_SIZE_BYTES) {
         toast({
             variant: 'destructive',
-            title: '파일 선택 오류',
-            description: '파일을 선택하는 중 문제가 발생했습니다. 다른 파일을 선택해보세요.'
+            title: '파일 크기 초과',
+            description: `파일 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`,
         });
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        setFileName(null);
+        return;
     }
+    setFileName(file.name);
   };
 
   const handleFormSubmit = async (data: EvidenceFormValues) => {
@@ -276,6 +276,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
           }
           setFileName(null);
           setAiFeedback(null);
+          setShowLengthWarning(false);
       }
       setDialogOpen(isOpen);
   }
@@ -383,12 +384,10 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                           <FormControl>
                             <Textarea
                               placeholder={
-                                areaName === 'Information'
-                                ? "타자 연습 날짜나 간단한 메모를 남겨주세요."
-                                : "여기에 나의 실천 내용을 자세히 적어주세요. (예: 어떤 책을 읽고 무엇을 느꼈는지, 봉사활동을 통해 무엇을 배우고 실천했는지 등)"
+                                "여기에 나의 실천 내용을 자세히 적어주세요. (예: 어떤 책을 읽고 무엇을 느꼈는지, 봉사활동을 통해 무엇을 배우고 실천했는지 등)"
                               }
                               {...field}
-                              rows={areaName === 'Information' ? 2 : 3}
+                              rows={3}
                             />
                           </FormControl>
                           <FormMessage />
@@ -396,38 +395,38 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                       )}
                     />
 
-                    {areaName !== 'Information' && (
-                      <div className="flex items-center justify-center min-h-[4rem]">
-                        {isChecking && (
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse p-2">
-                            <BrainCircuit className="h-4 w-4" />
-                            <span>AI가 실시간으로 내용을 분석하고 있습니다...</span>
-                          </div>
-                        )}
-                        {!isChecking && aiFeedback && (
-                          <Alert variant={aiFeedback.isSufficient ? "default" : "destructive"} className="p-2 w-full">
-                            {aiFeedback.isSufficient ? <ThumbsUp className="h-4 w-4" /> : <ThumbsDown className="h-4 w-4" />}
-                            <AlertTitle className="text-xs font-semibold mb-0.5">
-                              {aiFeedback.isSufficient ? "AI 피드백: 좋은 내용입니다!" : "AI 피드백: 기준에 조금 부족해요."}
-                            </AlertTitle>
-                            <AlertDescription className="text-xs">
-                              {aiFeedback.reasoning}
-                            </AlertDescription>
-                          </Alert>
-                        )}
-                      </div>
-                    )}
+                    <div className="flex items-center justify-center min-h-[4rem]">
+                      {isChecking && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse p-2">
+                          <BrainCircuit className="h-4 w-4" />
+                          <span>AI가 실시간으로 내용을 분석하고 있습니다...</span>
+                        </div>
+                      )}
+                      {!isChecking && (showLengthWarning || aiFeedback) && (
+                        <Alert variant="default" className="p-2 w-full">
+                          <BrainCircuit className="h-4 w-4" />
+                          <AlertTitle className="text-xs font-semibold mb-0.5">
+                            AI 실시간 조언
+                          </AlertTitle>
+                          <AlertDescription className="text-xs">
+                            {showLengthWarning
+                              ? 'AI 조언을 받으려면 10글자 이상 입력해주세요.'
+                              : aiFeedback}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
                     
                     <div>
                       <FormLabel htmlFor="media-file-input" className="text-xs">
-                        {areaName === 'Information' ? '타자 연습 결과 스크린샷' : '증명 파일 (사진/영상)'}
+                        증명 파일 (사진/영상)
                         {areaConfig.mediaRequired && <span className="text-destructive ml-1">*필수</span>}
                       </FormLabel>
                       <Input
                         id="media-file-input"
                         ref={fileInputRef}
                         type="file"
-                        accept={areaName === 'Information' ? "image/*" : "image/*,video/*"}
+                        accept="image/*,video/*"
                         onChange={handleFileChange}
                         className="file:text-primary file:font-semibold text-xs h-9 mt-1"
                         disabled={isSubmitting}
@@ -480,3 +479,5 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     </AlertDialog>
   );
 }
+
+    
