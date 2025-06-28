@@ -96,7 +96,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
 
     setSubmissionsLoading(true);
     if (initialMode === 'submit') {
-      setIntervalLock({ locked: false, minutesToWait: 0 }); // Reset on open only if submitting
+      setIntervalLock({ locked: false, minutesToWait: 0 });
     }
 
     const historyQuery = query(
@@ -159,7 +159,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
     return () => {
         unsubscribeHistory();
     };
-  }, [open, user, areaName, toast, areaConfig, initialMode, db]);
+  }, [open, user, areaName, toast, areaConfig, initialMode]);
 
 
   useEffect(() => {
