@@ -51,7 +51,7 @@ const evidenceSchema = z.object({
 
 type EvidenceFormValues = z.infer<typeof evidenceSchema>;
 
-const MAX_FILE_SIZE_MB = 25; // Increase limit as we no longer process on client
+const MAX_FILE_SIZE_MB = 25;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 
@@ -72,7 +72,6 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
-  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [aiFeedback, setAiFeedback] = useState<{ isSufficient: boolean; reasoning: string } | null>(null);
   const [submissionToDelete, setSubmissionToDelete] = useState<Submission | null>(null);
@@ -85,14 +84,6 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   });
 
   const evidenceValue = form.watch('evidence');
-
-  useEffect(() => {
-    return () => {
-      if (mediaPreview) {
-        URL.revokeObjectURL(mediaPreview);
-      }
-    };
-  }, [mediaPreview]);
 
   useEffect(() => {
     if (!user || !dialogOpen || !db) return;
@@ -178,35 +169,23 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const fileInput = event.target;
     setMediaFile(null);
-    if (mediaPreview) {
-      URL.revokeObjectURL(mediaPreview);
-      setMediaPreview(null);
-    }
     form.setValue('media', null);
     
     const file = fileInput.files?.[0];
     if (!file) return;
 
-    try {
-      if (file.size > MAX_FILE_SIZE_BYTES) {
-        throw new Error(`파일 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`);
-      }
-
-      setMediaFile(file);
-      setMediaPreview(URL.createObjectURL(file));
-      form.setValue('media', file.name);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '알 수 없는 파일 처리 오류가 발생했습니다.';
-      toast({
-        variant: 'destructive',
-        title: '파일 처리 오류',
-        description: errorMessage,
-        duration: 9000,
-      });
-      setMediaFile(null);
-      setMediaPreview(null);
-      if (fileInput) fileInput.value = '';
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+        toast({
+            variant: 'destructive',
+            title: '파일 크기 초과',
+            description: `파일 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`,
+        });
+        if (fileInput) fileInput.value = '';
+        return;
     }
+
+    setMediaFile(file);
+    form.setValue('media', file.name);
   };
 
 
@@ -256,10 +235,6 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
 
       form.reset();
       setMediaFile(null);
-      if (mediaPreview) {
-        URL.revokeObjectURL(mediaPreview);
-        setMediaPreview(null);
-      }
     } catch (error: unknown) {
       console.error('Evidence Submission Error:', error);
       let errorMessage = '알 수 없는 오류가 발생했습니다.';
@@ -286,10 +261,6 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
       if (!isOpen) {
           form.reset();
           setMediaFile(null);
-          if (mediaPreview) {
-            URL.revokeObjectURL(mediaPreview);
-            setMediaPreview(null);
-          }
           setAiFeedback(null);
       }
       setDialogOpen(isOpen);
@@ -460,14 +431,10 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                       )}
                     />
 
-                    {mediaPreview && mediaFile && (
-                      <div className="mt-2">
-                        <p className="text-xs font-medium mb-1">미리보기:</p>
-                        {mediaFile.type.startsWith('image/') ? (
-                          <img src={mediaPreview} alt="미리보기" className="rounded-md max-h-40 w-auto mx-auto border" />
-                        ) : (
-                          <video src={mediaPreview} controls className="rounded-md max-h-40 w-auto mx-auto border" />
-                        )}
+                    {mediaFile && (
+                      <div className="text-sm p-3 bg-secondary rounded-md text-secondary-foreground flex items-center gap-2">
+                         <FileCheck className="h-4 w-4 text-primary" />
+                         <span className="font-medium">{mediaFile.name}</span>
                       </div>
                     )}
                   </div>
@@ -507,3 +474,5 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     </AlertDialog>
   );
 }
+
+    
