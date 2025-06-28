@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useCallback, useId } from 'react';
@@ -33,7 +32,6 @@ import { Separator } from './ui/separator';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { ScrollArea } from './ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { deleteSubmission } from '@/ai/flows/delete-submission';
 
@@ -56,6 +54,10 @@ const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 const resizeImage = (file: File, maxWidth: number, maxHeight: number, quality: number): Promise<{ dataUri: string; file: File }> => {
   return new Promise((resolve, reject) => {
+    if (file.type.includes('heic') || file.type.includes('heif')) {
+      return reject(new Error('HEIC/HEIF 형식은 지원되지 않습니다.'));
+    }
+
     const objectUrl = URL.createObjectURL(file);
     const img = new Image();
 
@@ -82,7 +84,7 @@ const resizeImage = (file: File, maxWidth: number, maxHeight: number, quality: n
             const ctx = canvas.getContext('2d');
             if (!ctx) {
                 URL.revokeObjectURL(objectUrl);
-                return reject(new Error('이미지 처리 엔진을 사용할 수 없습니다. 다른 브라우저로 시도해주세요.'));
+                return reject(new Error('브라우저의 이미지 처리 엔진을 사용할 수 없습니다.'));
             }
             
             ctx.drawImage(img, 0, 0, width, height);
@@ -92,9 +94,9 @@ const resizeImage = (file: File, maxWidth: number, maxHeight: number, quality: n
             canvas.toBlob((blob) => {
                 if (!blob) {
                     URL.revokeObjectURL(objectUrl);
-                    return reject(new Error('이미지 변환에 실패했습니다. 다른 사진으로 시도하거나, 원본 파일이 손상되지 않았는지 확인해주세요.'));
+                    return reject(new Error('이미지 변환에 실패했습니다.'));
                 }
-                const resizedFile = new File([blob], file.name, {
+                const resizedFile = new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
                     type: 'image/jpeg',
                     lastModified: Date.now(),
                 });
@@ -105,18 +107,19 @@ const resizeImage = (file: File, maxWidth: number, maxHeight: number, quality: n
         } catch (e) {
             URL.revokeObjectURL(objectUrl);
             console.error("Canvas processing error:", e);
-            reject(new Error('사진 처리 중 메모리 오류가 발생했습니다. 더 작은 사진을 사용하거나 앱을 재시작해주세요.'));
+            reject(new Error('사진 처리 중 메모리 오류가 발생했습니다. 더 작은 사진을 사용해주세요.'));
         }
     };
 
     img.onerror = () => {
         URL.revokeObjectURL(objectUrl);
-        reject(new Error('이미지 파일을 읽을 수 없습니다. 지원되지 않는 형식이거나 손상된 파일일 수 있습니다.'));
+        reject(new Error('사진을 읽을 수 없습니다. 지원되지 않는 형식(예: HEIC)이거나 손상된 파일일 수 있습니다.'));
     };
     
     img.src = objectUrl;
   });
 };
+
 
 const StatusInfo = {
     approved: { icon: FileCheck, text: '승인됨', color: 'text-green-600' },
@@ -224,7 +227,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
       } finally {
         setIsChecking(false);
       }
-    }, 1500); // 1.5초 후에 AI 분석 시작
+    }, 1500);
 
     return () => {
       clearTimeout(handler);
@@ -246,7 +249,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
         }
 
         if (file.size > MAX_FILE_SIZE_BYTES) {
-          throw new Error(`파일 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다. 현재 파일 크기: ${(file.size / 1024 / 1024).toFixed(1)}MB`);
+          throw new Error(`파일 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`);
         }
         
         const isImage = file.type.startsWith('image/');
@@ -269,10 +272,21 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
         }
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : '알 수 없는 파일 처리 오류가 발생했습니다.';
+        
+        let finalDescription: React.ReactNode = errorMessage;
+        if (errorMessage.toLowerCase().includes('heic') || errorMessage.includes('지원되지 않는 형식')) {
+            finalDescription = (
+              <div>
+                <p>지원하지 않는 이미지 형식(HEIC 등)일 수 있습니다.</p>
+                <p className="mt-2 font-bold">💡 해결 방법: 아이폰의 경우, 해당 사진을 스크린샷으로 찍어 다시 업로드 해보세요.</p>
+              </div>
+            );
+        }
+
         toast({
             variant: 'destructive',
             title: '파일 처리 오류',
-            description: errorMessage,
+            description: finalDescription,
             duration: 9000,
         });
         setMediaFile(null);
