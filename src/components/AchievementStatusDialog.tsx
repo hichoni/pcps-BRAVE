@@ -57,68 +57,69 @@ const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const resizeImage = (file: File, maxWidth: number, maxHeight: number, quality: number): Promise<{ dataUri: string; file: File }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    
+
     reader.onload = (event) => {
-      const img = new Image();
-      
-      img.onload = () => {
-        try {
-          let { width, height } = img;
-
-          if (width > height) {
-            if (width > maxWidth) {
-              height = Math.round(height * (maxWidth / width));
-              width = maxWidth;
-            }
-          } else {
-            if (height > maxHeight) {
-              width = Math.round(width * (maxHeight / height));
-              height = maxHeight;
-            }
-          }
-
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          
-          const ctx = canvas.getContext('2d');
-          if (!ctx) {
-            return reject(new Error('이미지 처리 엔진(Canvas)을 사용할 수 없습니다.'));
-          }
-          
-          ctx.drawImage(img, 0, 0, width, height);
-          
-          const dataUri = canvas.toDataURL('image/jpeg', quality);
-          
-          canvas.toBlob((blob) => {
-            if (!blob) {
-              return reject(new Error('이미지 변환에 실패했습니다. 다른 사진으로 시도해주세요.'));
-            }
-            const resizedFile = new File([blob], file.name, {
-              type: 'image/jpeg',
-              lastModified: Date.now(),
-            });
-            resolve({ dataUri, file: resizedFile });
-          }, 'image/jpeg', quality);
-
-        } catch (e) {
-          reject(new Error('사진 처리 중 메모리 오류가 발생했습니다. 더 작은 사진을 사용해주세요.'));
+        if (typeof event.target?.result !== 'string') {
+            return reject(new Error('파일을 불러오는 데 실패했습니다. 파일이 비어있거나 손상되었을 수 있습니다.'));
         }
-      };
+        
+        const img = new Image();
+        
+        img.onload = () => {
+            try {
+                let { width, height } = img;
 
-      img.onerror = () => {
-        reject(new Error('이미지 파일을 읽을 수 없습니다. 손상된 파일일 수 있습니다.'));
-      };
-      
-      if (typeof event.target?.result === 'string') {
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height = Math.round(height * (maxWidth / width));
+                        width = maxWidth;
+                    }
+                } else {
+                    if (height > maxHeight) {
+                        width = Math.round(width * (maxHeight / height));
+                        height = maxHeight;
+                    }
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    return reject(new Error('이미지 처리 엔진을 사용할 수 없습니다. 다른 브라우저로 시도해주세요.'));
+                }
+                
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                const dataUri = canvas.toDataURL('image/jpeg', quality);
+                
+                canvas.toBlob((blob) => {
+                    if (!blob) {
+                        return reject(new Error('이미지 변환에 실패했습니다. 다른 사진으로 시도하거나, 원본 파일이 손상되지 않았는지 확인해주세요.'));
+                    }
+                    const resizedFile = new File([blob], file.name, {
+                        type: 'image/jpeg',
+                        lastModified: Date.now(),
+                    });
+                    resolve({ dataUri, file: resizedFile });
+                }, 'image/jpeg', quality);
+
+            } catch (e) {
+                console.error("Canvas processing error:", e);
+                reject(new Error('사진 처리 중 메모리 오류가 발생했습니다. 더 작은 사진을 사용하거나 앱을 재시작해주세요.'));
+            }
+        };
+
+        img.onerror = () => {
+            reject(new Error('이미지 파일을 읽을 수 없습니다. 지원되지 않는 형식이거나 손상된 파일일 수 있습니다.'));
+        };
+        
         img.src = event.target.result;
-      } else {
-        reject(new Error('파일을 불러오는 데 실패했습니다.'));
-      }
     };
 
     reader.onerror = () => {
-      reject(new Error('파일 읽기에 실패했습니다. 파일 권한을 확인해주세요.'));
+        reject(new Error('파일 읽기에 실패했습니다. 파일 접근 권한을 확인해주세요.'));
     };
     
     reader.readAsDataURL(file);
@@ -240,54 +241,58 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const fileInput = event.target;
-    const file = fileInput.files?.[0];
-
+    // Immediately reset state to avoid lingering data from previous attempts
     setMediaFile(null);
     setMediaPreview(null);
     form.setValue('media', null);
     setIsProcessingImage(true);
 
-    if (!file) {
-      setIsProcessingImage(false);
-      return;
-    }
-
     try {
-      if (file.size > MAX_FILE_SIZE_BYTES) {
-        throw new Error(`파일 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`);
-      }
+        const file = fileInput.files?.[0];
 
-      const isImage = file.type.startsWith('image/');
+        if (!file) {
+          setIsProcessingImage(false); // No file selected, stop processing
+          return;
+        }
 
-      if (isImage) {
-        const { dataUri, file: processedFile } = await resizeImage(file, 1280, 720, 0.8);
-        setMediaFile(processedFile);
-        setMediaPreview(dataUri);
-        form.setValue('media', dataUri); // Pass dataUri for submission
-      } else {
-        const dataUri = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = (error) => reject(new Error('파일을 읽는 중 오류가 발생했습니다.'));
-          reader.readAsDataURL(file);
-        });
-        setMediaFile(file);
-        setMediaPreview(dataUri);
-        form.setValue('media', dataUri); // Pass dataUri for submission
-      }
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+          throw new Error(`파일 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다. 현재 파일 크기: ${(file.size / 1024 / 1024).toFixed(1)}MB`);
+        }
+        
+        const isImage = file.type.startsWith('image/');
+
+        if (isImage) {
+            const { dataUri, file: processedFile } = await resizeImage(file, 1280, 720, 0.8);
+            setMediaFile(processedFile);
+            setMediaPreview(dataUri);
+            form.setValue('media', dataUri);
+        } else {
+            // Video or other file types
+            const dataUri = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = (error) => reject(new Error('동영상 파일을 읽는 중 오류가 발생했습니다.'));
+                reader.readAsDataURL(file);
+            });
+            setMediaFile(file);
+            setMediaPreview(dataUri);
+            form.setValue('media', dataUri);
+        }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '알 수 없는 파일 처리 오류가 발생했습니다.';
-      toast({
-        variant: 'destructive',
-        title: '파일 처리 오류',
-        description: errorMessage,
-      });
-      setMediaFile(null);
-      setMediaPreview(null);
-      form.setValue('media', null);
-      if (fileInput) fileInput.value = '';
+        const errorMessage = error instanceof Error ? error.message : '알 수 없는 파일 처리 오류가 발생했습니다.';
+        toast({
+            variant: 'destructive',
+            title: '파일 처리 오류',
+            description: errorMessage,
+            duration: 9000,
+        });
+        // Ensure state is fully reset on error
+        setMediaFile(null);
+        setMediaPreview(null);
+        form.setValue('media', null);
+        if (fileInput) fileInput.value = '';
     } finally {
-      setIsProcessingImage(false);
+        setIsProcessingImage(false);
     }
   };
 
@@ -584,5 +589,3 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     </AlertDialog>
   );
 }
-
-    
