@@ -54,81 +54,76 @@ type EvidenceFormValues = z.infer<typeof evidenceSchema>;
 const MAX_FILE_SIZE_MB = 10;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
-const dataURItoBlob = (dataURI: string): Blob | null => {
-  try {
-    const parts = dataURI.split(',');
-    if (parts.length < 2) return null;
-
-    const byteString = atob(parts[1]);
-    const mimeString = parts[0].split(':')[1].split(';')[0];
-    
-    const ab = new ArrayBuffer(byteString.length);
-    const ia = new Uint8Array(ab);
-    for (let i = 0; i < byteString.length; i++) {
-      ia[i] = byteString.charCodeAt(i);
-    }
-    return new Blob([ab], { type: mimeString });
-  } catch (e) {
-    console.error("Error converting data URI to blob", e);
-    return null;
-  }
-}
-
 const resizeImage = (file: File, maxWidth: number, maxHeight: number, quality: number): Promise<{ dataUri: string; file: File }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
+    
     reader.onload = (event) => {
-      if (!event.target?.result) {
-        return reject(new Error("FileReader did not return a result."));
-      }
       const img = new Image();
+      
       img.onload = () => {
-        let width = img.width;
-        let height = img.height;
+        try {
+          let { width, height } = img;
 
-        if (width > height) {
-          if (width > maxWidth) {
-            height *= maxWidth / width;
-            width = maxWidth;
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round(height * (maxWidth / width));
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round(width * (maxHeight / height));
+              height = maxHeight;
+            }
           }
-        } else {
-          if (height > maxHeight) {
-            width *= maxHeight / height;
-            height = maxHeight;
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            return reject(new Error('이미지 처리 엔진(Canvas)을 사용할 수 없습니다.'));
           }
-        }
+          
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          const dataUri = canvas.toDataURL('image/jpeg', quality);
+          
+          canvas.toBlob((blob) => {
+            if (!blob) {
+              return reject(new Error('이미지 변환에 실패했습니다. 다른 사진으로 시도해주세요.'));
+            }
+            const resizedFile = new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            });
+            resolve({ dataUri, file: resizedFile });
+          }, 'image/jpeg', quality);
 
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          return reject(new Error('Could not get canvas context'));
+        } catch (e) {
+          reject(new Error('사진 처리 중 메모리 오류가 발생했습니다. 더 작은 사진을 사용해주세요.'));
         }
-        ctx.drawImage(img, 0, 0, width, height);
-        
-        const dataUri = canvas.toDataURL('image/jpeg', quality);
-        const blob = dataURItoBlob(dataUri);
-
-        if (!blob) {
-            return reject(new Error("Failed to convert resized canvas to blob."));
-        }
-
-        const resizedFile = new File([blob], file.name, {
-            type: 'image/jpeg',
-            lastModified: Date.now(),
-        });
-        
-        resolve({ dataUri, file: resizedFile });
       };
-      img.onerror = (err) => reject(new Error('Image failed to load. The file might be corrupted.'));
-      img.src = event.target.result as string;
+
+      img.onerror = () => {
+        reject(new Error('이미지 파일을 읽을 수 없습니다. 손상된 파일일 수 있습니다.'));
+      };
+      
+      if (typeof event.target?.result === 'string') {
+        img.src = event.target.result;
+      } else {
+        reject(new Error('파일을 불러오는 데 실패했습니다.'));
+      }
     };
-    reader.onerror = (err) => reject(new Error('FileReader failed to read the file.'));
+
+    reader.onerror = () => {
+      reject(new Error('파일 읽기에 실패했습니다. 파일 권한을 확인해주세요.'));
+    };
+    
     reader.readAsDataURL(file);
   });
 };
-
 
 const StatusInfo = {
     approved: { icon: FileCheck, text: '승인됨', color: 'text-green-600' },
@@ -243,67 +238,55 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   }, [evidenceValue, areaName, koreanName, areaConfig, toast]);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    
     const fileInput = event.target;
+    const file = fileInput.files?.[0];
 
-    // Reset state first if no file is selected
-    if (!file) {
-        setMediaFile(null);
-        setMediaPreview(null);
-        if (fileInput) fileInput.value = '';
-        return;
-    }
-
-    // --- Validation ---
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-        toast({
-            variant: 'destructive',
-            title: '파일 크기 초과',
-            description: `미디어 파일의 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`,
-        });
-        if (fileInput) fileInput.value = ''; // Clear the input
-        setMediaFile(null);
-        setMediaPreview(null);
-        return;
-    }
-
-    const isImage = file.type.startsWith('image/');
+    // Clear previous state immediately
+    setMediaFile(null);
+    setMediaPreview(null);
     setIsProcessingImage(true);
 
+    if (!file) {
+      setIsProcessingImage(false);
+      return;
+    }
+
     try {
-        if (isImage) {
-            // --- Image Resizing Path ---
-            const { dataUri, file: processedFile } = await resizeImage(file, 1280, 720, 0.8);
-            setMediaFile(processedFile);
-            setMediaPreview(dataUri);
-        } else {
-            // --- Non-Image (Video) Path ---
-            const dataUri = await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result as string);
-                reader.onerror = () => reject(new Error('파일을 읽는 중에 오류가 발생했습니다.'));
-                reader.readAsDataURL(file);
-            });
-            setMediaFile(file);
-            setMediaPreview(dataUri);
-        }
-    } catch (error) {
-        console.error("File processing error:", error);
-        let errorMessage = "파일 처리 중 오류가 발생했습니다. 파일이 손상되었거나 지원하지 않는 형식일 수 있습니다.";
-        if (error instanceof Error) {
-            errorMessage = error.message;
-        }
-        toast({
-            variant: 'destructive',
-            title: '파일 처리 오류',
-            description: errorMessage,
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        throw new Error(`파일 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`);
+      }
+
+      const isImage = file.type.startsWith('image/');
+
+      if (isImage) {
+        // Handle image with resizing
+        const { dataUri, file: processedFile } = await resizeImage(file, 1280, 720, 0.8);
+        setMediaFile(processedFile);
+        setMediaPreview(dataUri);
+      } else {
+        // Handle video or other files
+        const dataUri = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
         });
-        setMediaFile(null);
-        setMediaPreview(null);
-        if (fileInput) fileInput.value = ''; // Clear the input
+        setMediaFile(file);
+        setMediaPreview(dataUri);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '알 수 없는 파일 처리 오류가 발생했습니다.';
+      toast({
+        variant: 'destructive',
+        title: '파일 처리 오류',
+        description: errorMessage,
+      });
+      // Ensure state is clean on error
+      setMediaFile(null);
+      setMediaPreview(null);
+      fileInput.value = ''; // Reset the file input so user can select the same file again
     } finally {
-        setIsProcessingImage(false);
+      setIsProcessingImage(false);
     }
   };
 
