@@ -93,22 +93,28 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
   const evidenceValue = form.watch('evidence');
 
   useEffect(() => {
-    if (!user || !open || !db || !areaConfig) return;
-
-    setSubmissionsLoading(true);
-    if (initialMode === 'submit') {
-      setIntervalLock({ locked: false, minutesToWait: 0 });
+    // If the dialog is not open, or we don't have the necessary info, do nothing.
+    if (!user || !open || !db || !areaConfig) {
+        // Reset loading state if dialog is closed
+        if (!open) setSubmissionsLoading(false);
+        return;
     }
+    
+    // We need to fetch data for both modes:
+    // - 'history' mode to display the list.
+    // - 'submit' mode to check for the submission interval lock.
+    setSubmissionsLoading(true);
 
+    // This query is more robust as it only uses one 'where' clause,
+    // avoiding the need for a composite index in Firestore.
+    // We will filter by areaName on the client side.
     const submissionsQuery = query(
       collection(db, "challengeSubmissions"),
-      where("userId", "==", user.username),
-      where("areaName", "==", areaName),
-      orderBy("createdAt", "desc")
+      where("userId", "==", user.username)
     );
     
     const unsubscribeHistory = onSnapshot(submissionsQuery, (querySnapshot) => {
-        const fetchedSubmissions = querySnapshot.docs
+        const allUserSubmissions = querySnapshot.docs
             .map(doc => {
                 const data = doc.data();
                 return {
@@ -116,12 +122,21 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
                     evidence: data.evidence,
                     createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
                     status: data.status,
-                } as Submission;
+                    areaName: data.areaName, // Temporarily include areaName for filtering
+                };
             });
 
-        setSubmissions(fetchedSubmissions);
-        setSubmissionsLoading(false);
+        // Filter for the current area and sort by date descending
+        const fetchedSubmissions = allUserSubmissions
+            .filter(sub => sub.areaName === areaName)
+            .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+        // For 'history' mode, update the state for display
+        if (initialMode === 'history') {
+            setSubmissions(fetchedSubmissions as Submission[]);
+        }
         
+        // For 'submit' mode, check the submission interval
         if (areaConfig.submissionIntervalMinutes && areaConfig.submissionIntervalMinutes > 0) {
             const relevantSubmissions = fetchedSubmissions.filter(sub => 
                 ['approved', 'pending_review', 'pending_deletion'].includes(sub.status)
@@ -142,12 +157,14 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
                  setIntervalLock({ locked: false, minutesToWait: 0 });
             }
         }
+        setSubmissionsLoading(false);
     }, (error) => {
         console.error("Error fetching submissions for dialog:", error);
+        // Use a more generic error message that fits both modes
         toast({
             variant: "destructive",
             title: "오류",
-            description: "활동 목록을 불러오는 데 실패했습니다."
+            description: "활동 정보를 확인하는 데 실패했습니다. 인터넷 연결을 확인해주세요."
         });
         setSubmissionsLoading(false);
     });
@@ -382,7 +399,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
           
           <div className="flex-1 overflow-y-auto px-6 min-h-0">
           {initialMode === 'history' ? (
-            <div className="py-4 flex-1 flex flex-col min-h-0">
+            <div className="py-4 flex-1 flex flex-col min-h-0 h-full">
               <h3 className="text-sm font-semibold mb-2 shrink-0">내 활동 목록</h3>
               <div className="w-full rounded-md border p-2 space-y-2 flex-grow overflow-y-auto">
                 {submissionsLoading ? (
