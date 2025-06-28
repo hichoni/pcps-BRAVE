@@ -97,8 +97,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     const historyQuery = query(
         collection(db, "challengeSubmissions"),
         where("userId", "==", user.username),
-        where("areaName", "==", areaName),
-        orderBy("createdAt", "desc")
+        where("areaName", "==", areaName)
     );
 
     const unsubscribeHistory = onSnapshot(historyQuery, (querySnapshot) => {
@@ -111,6 +110,9 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                 status: data.status,
             } as Submission;
         });
+        
+        fetchedSubmissions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
         setSubmissions(fetchedSubmissions);
         setSubmissionsLoading(false);
     }, (error) => {
@@ -129,23 +131,26 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
             collection(db, "challengeSubmissions"),
             where("userId", "==", user.username),
             where("areaName", "==", areaName),
-            where("status", "in", ['approved', 'pending_review', 'pending_deletion']),
-            orderBy("createdAt", "desc"),
-            limit(1)
+            where("status", "in", ['approved', 'pending_review', 'pending_deletion'])
         );
         
         unsubscribeInterval = onSnapshot(intervalQuery, (snapshot) => {
             if (!snapshot.empty) {
-                const lastSubmission = snapshot.docs[0].data();
-                const lastSubmissionTime = (lastSubmission.createdAt as Timestamp).toDate();
-                const now = new Date();
-                const minutesSince = (now.getTime() - lastSubmissionTime.getTime()) / (1000 * 60);
+                const allValidSubmissions = snapshot.docs.map(doc => doc.data());
+                allValidSubmissions.sort((a,b) => (b.createdAt as Timestamp).toMillis() - (a.createdAt as Timestamp).toMillis());
+                const lastSubmission = allValidSubmissions[0];
 
-                if (minutesSince < areaConfig.submissionIntervalMinutes!) {
-                    const minutesToWait = Math.ceil(areaConfig.submissionIntervalMinutes! - minutesSince);
-                    setIntervalLock({ locked: true, minutesToWait });
-                } else {
-                    setIntervalLock({ locked: false, minutesToWait: 0 });
+                if (lastSubmission && lastSubmission.createdAt) {
+                    const lastSubmissionTime = (lastSubmission.createdAt as Timestamp).toDate();
+                    const now = new Date();
+                    const minutesSince = (now.getTime() - lastSubmissionTime.getTime()) / (1000 * 60);
+    
+                    if (minutesSince < areaConfig.submissionIntervalMinutes!) {
+                        const minutesToWait = Math.ceil(areaConfig.submissionIntervalMinutes! - minutesSince);
+                        setIntervalLock({ locked: true, minutesToWait });
+                    } else {
+                        setIntervalLock({ locked: false, minutesToWait: 0 });
+                    }
                 }
             } else {
                 setIntervalLock({ locked: false, minutesToWait: 0 });
@@ -164,22 +169,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     if (!dialogOpen || !areaConfig) return;
 
     const text = evidenceValue.trim();
-    if (text.length > 0 && text.length < 10) {
-      setShowLengthWarning(true);
-      setAiFeedback("AI 조언을 받으려면 10글자 이상 입력해주세요.");
-      setIsChecking(false);
-      return;
-    }
-    setShowLengthWarning(false);
-      
-    if (text.length === 0) {
-      setAiFeedback(null);
-      setIsChecking(false);
-      return;
-    }
-
-    setIsChecking(true);
-    const handler = setTimeout(async () => {
+    const handleTextFeedback = async () => {
       try {
         const result = await getTextFeedback({
           text: evidenceValue,
@@ -190,10 +180,29 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
         setAiFeedback(result?.feedback ?? null);
       } catch (error) {
         console.error("Real-time AI check failed:", error);
+        setAiFeedback('AI 조언을 가져오는 데 실패했습니다.');
       } finally {
         setIsChecking(false);
       }
-    }, 1500);
+    };
+    
+    if (text.length > 0 && text.length < 10) {
+      setShowLengthWarning(true);
+      setAiFeedback("AI 조언을 받으려면 10글자 이상 입력해주세요.");
+      setIsChecking(false);
+      return;
+    }
+    
+    setShowLengthWarning(false);
+      
+    if (text.length === 0) {
+      setAiFeedback(null);
+      setIsChecking(false);
+      return;
+    }
+
+    setIsChecking(true);
+    const handler = setTimeout(handleTextFeedback, 1500);
 
     return () => {
       clearTimeout(handler);
@@ -413,7 +422,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                         <Info className="h-4 w-4" />
                         <AlertTitle className="font-bold">지금은 도전할 수 없어요!</AlertTitle>
                         <AlertDescription>
-                          {`이전 활동 제출 후 ${areaConfig.submissionIntervalMinutes}분(교사가 설정한 시간)이 지나야 해요. (${intervalLock.minutesToWait}분 남음)`}
+                          {`활동 제출 후 ${areaConfig.submissionIntervalMinutes}분(교사가 설정한 시간)이 지나야 해요. (${intervalLock.minutesToWait}분 남음)`}
                         </AlertDescription>
                     </Alert>
                 ) : (
