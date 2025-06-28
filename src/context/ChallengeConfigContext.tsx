@@ -40,6 +40,7 @@ const resolveConfigWithIcons = (storedConfig: Record<AreaName, StoredAreaConfig>
                 ...mergedConfig,
                 name: area,
                 icon: ICONS[mergedConfig.iconName] || ShieldOff, // Fallback icon
+                iconName: mergedConfig.iconName,
             };
         }
     });
@@ -111,16 +112,21 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
     setChallengeConfig(prevConfig => {
         if (!prevConfig) return null;
         
-        const newResolvedConfig = { ...prevConfig };
-        
-        // Resolve the new config for just the area being updated.
-        newResolvedConfig[areaId] = {
+        const existingAreaConfig = prevConfig[areaId];
+
+        // Create the new resolved config object by merging the old state
+        // with the new data from the form.
+        const newResolvedAreaConfig: BaseAreaConfig = {
+            ...existingAreaConfig,
             ...newConfig,
-            name: areaId,
-            icon: ICONS[newConfig.iconName] || ShieldOff,
+            name: areaId, // Ensure name is correct
+            icon: ICONS[newConfig.iconName] || ShieldOff, // Re-resolve the icon
         };
         
-        return newResolvedConfig;
+        return {
+            ...prevConfig,
+            [areaId]: newResolvedAreaConfig,
+        };
     });
 
     if (!db) return;
@@ -136,9 +142,23 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
   }, [fetchConfig]);
 
   const addArea = useCallback(async (areaId: AreaName, newConfig: StoredAreaConfig) => {
-     const currentConfig = challengeConfig || {};
-     const updatedConfig = resolveConfigWithIcons({ ...currentConfig, [areaId]: newConfig });
-     setChallengeConfig(updatedConfig);
+     setChallengeConfig(prev => {
+        if (!prev) {
+          return resolveConfigWithIcons({ [areaId]: newConfig });
+        }
+        
+        const newResolvedAreaConfig: BaseAreaConfig = {
+          ...newConfig,
+          name: areaId,
+          icon: ICONS[newConfig.iconName] || ShieldOff,
+          iconName: newConfig.iconName,
+        };
+
+        return {
+          ...prev,
+          [areaId]: newResolvedAreaConfig,
+        };
+     });
     
     if (!db) return;
     try {
@@ -148,7 +168,7 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
         console.error("Failed to add area", e);
         fetchConfig(); // Revert on failure
     }
-  }, [challengeConfig, fetchConfig]);
+  }, [fetchConfig]);
 
   const deleteArea = useCallback(async (areaId: AreaName) => {
     setChallengeConfig(prev => {

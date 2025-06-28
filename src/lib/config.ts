@@ -56,6 +56,7 @@ export type GoalType = 'numeric' | 'objective';
 export type AreaConfig = {
   name: string;
   icon: LucideIcon;
+  iconName: string;
   koreanName: string;
   challengeName: string;
   requirements: string;
@@ -75,7 +76,6 @@ export type AreaConfig = {
 };
 
 export type StoredAreaConfig = Omit<AreaConfig, 'icon' | 'name'> & { 
-  iconName: string;
   externalUrl?: string;
   mediaRequired?: boolean;
   autoApprove?: boolean;
