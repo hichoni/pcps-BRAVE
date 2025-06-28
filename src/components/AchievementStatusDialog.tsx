@@ -66,11 +66,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const { challengeConfig } = useChallengeConfig();
   const { toast } = useToast();
 
-  if (!user || !challengeConfig || user.grade === undefined) return null;
-  
-  const areaConfig = challengeConfig[areaName];
-
-  if (!areaConfig) return null;
+  const areaConfig = challengeConfig?.[areaName];
   
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [submissionsLoading, setSubmissionsLoading] = useState(true);
@@ -129,12 +125,12 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   }, [dialogOpen, user, areaName, toast]);
 
   useEffect(() => {
-    if (!dialogOpen) return;
+    if (!dialogOpen || !areaConfig) return;
 
     const text = evidenceValue.trim();
     if (text.length > 0 && text.length < 10) {
       setShowLengthWarning(true);
-      setAiFeedback(null);
+      setAiFeedback("AI 조언을 받으려면 10글자 이상 입력해주세요.");
       setIsChecking(false);
       return;
     }
@@ -150,7 +146,6 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     setAiFeedback(null);
 
     const handler = setTimeout(async () => {
-      if (!areaConfig) return;
       try {
         const result = await getTextFeedback({
           text: evidenceValue,
@@ -171,6 +166,9 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
       clearTimeout(handler);
     };
   }, [evidenceValue, fileName, areaName, areaConfig, dialogOpen]);
+  
+  if (!user || !challengeConfig || user.grade === undefined) return null;
+  if (!areaConfig) return null; // Ensure areaConfig exists
   
   const { koreanName, challengeName } = areaConfig;
 
@@ -256,12 +254,21 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
         errorMessage = error;
       }
       
-      toast({
-        variant: 'destructive',
-        title: '제출 오류',
-        description: errorMessage,
-        duration: 9000,
-      });
+      if (errorMessage.startsWith('제출 간격 제한:')) {
+        toast({
+          variant: 'default',
+          title: '제출 간격 제한',
+          description: errorMessage.replace('제출 간격 제한: ', ''),
+          duration: 9000,
+        });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: '제출 오류',
+          description: errorMessage,
+          duration: 9000,
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -405,9 +412,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                             AI 실시간 조언
                           </AlertTitle>
                           <AlertDescription className="text-xs">
-                            {showLengthWarning
-                              ? 'AI 조언을 받으려면 10글자 이상 입력해주세요.'
-                              : aiFeedback}
+                            {aiFeedback}
                           </AlertDescription>
                         </Alert>
                       )}
