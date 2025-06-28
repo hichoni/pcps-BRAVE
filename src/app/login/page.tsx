@@ -176,7 +176,7 @@ export default function LoginPage() {
 
   const combinedLoading = loading || usersLoading;
 
-  if (!isClient || authLoading) {
+  if (!isClient || authLoading || usersLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-secondary p-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -354,6 +354,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-
-    
