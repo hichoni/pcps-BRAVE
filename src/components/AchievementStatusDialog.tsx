@@ -127,18 +127,22 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
 
     let unsubscribeInterval: () => void = () => {};
     if (areaConfig.submissionIntervalMinutes && areaConfig.submissionIntervalMinutes > 0) {
+        // Use a simpler query and filter on the client to avoid composite index issues.
         const intervalQuery = query(
             collection(db, "challengeSubmissions"),
             where("userId", "==", user.username),
-            where("areaName", "==", areaName),
-            where("status", "in", ['approved', 'pending_review', 'pending_deletion'])
+            where("areaName", "==", areaName)
         );
         
         unsubscribeInterval = onSnapshot(intervalQuery, (snapshot) => {
-            if (!snapshot.empty) {
-                const allValidSubmissions = snapshot.docs.map(doc => doc.data());
-                allValidSubmissions.sort((a,b) => (b.createdAt as Timestamp).toMillis() - (a.createdAt as Timestamp).toMillis());
-                const lastSubmission = allValidSubmissions[0];
+            const allUserSubmissions = snapshot.docs.map(doc => doc.data());
+            const relevantSubmissions = allUserSubmissions.filter(sub => 
+                ['approved', 'pending_review', 'pending_deletion'].includes(sub.status)
+            );
+
+            if (relevantSubmissions.length > 0) {
+                relevantSubmissions.sort((a,b) => (b.createdAt as Timestamp).toMillis() - (a.createdAt as Timestamp).toMillis());
+                const lastSubmission = relevantSubmissions[0];
 
                 if (lastSubmission && lastSubmission.createdAt) {
                     const lastSubmissionTime = (lastSubmission.createdAt as Timestamp).toDate();
@@ -155,6 +159,9 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
             } else {
                 setIntervalLock({ locked: false, minutesToWait: 0 });
             }
+        }, (error) => {
+            console.error("Error checking submission interval. Locking will be disabled.", error);
+            setIntervalLock({ locked: false, minutesToWait: 0 });
         });
     }
 
