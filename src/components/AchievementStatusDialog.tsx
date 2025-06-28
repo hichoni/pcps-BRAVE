@@ -35,6 +35,7 @@ import { ko } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from './ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
+import { deleteSubmission } from '@/ai/flows/delete-submission';
 
 interface Submission {
   id: string;
@@ -262,7 +263,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
         const { dataUri, file: processedFile } = await resizeImage(file, 1280, 720, 0.8);
         setMediaFile(processedFile);
         setMediaPreview(dataUri);
-        form.setValue('media', processedFile);
+        form.setValue('media', dataUri); // Pass dataUri for submission
       } else {
         const dataUri = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
@@ -272,7 +273,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
         });
         setMediaFile(file);
         setMediaPreview(dataUri);
-        form.setValue('media', file);
+        form.setValue('media', dataUri); // Pass dataUri for submission
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '알 수 없는 파일 처리 오류가 발생했습니다.';
@@ -403,12 +404,12 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
             </DialogDescription>
           </DialogHeader>
           
-          <ScrollArea className="flex-1 px-6">
+          <div className="flex-1 overflow-y-auto px-6 min-h-0">
             <Form {...form}>
               <form id={formId} onSubmit={form.handleSubmit(handleFormSubmit)} className="py-4 space-y-6">
                 <div>
                   <h3 className="text-sm font-semibold mb-2">내 활동 목록</h3>
-                  <div className="w-full rounded-md border p-2 space-y-2 min-h-[5rem]">
+                  <div className="w-full rounded-md border p-2 space-y-2 min-h-[5rem] max-h-48 overflow-y-auto">
                     {submissionsLoading ? (
                       <div className="flex items-center justify-center h-full text-muted-foreground">
                         <Loader2 className="h-5 w-5 animate-spin"/>
@@ -502,7 +503,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                     <FormField
                       control={form.control}
                       name="media"
-                      render={({ field }) => (
+                      render={({ field: { onChange, ...fieldProps } }) => (
                         <FormItem>
                           <FormLabel className="text-xs">
                             {areaName === 'Information' ? '타자 연습 결과 스크린샷' : '증명 파일 (사진/영상)'}
@@ -515,6 +516,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                               onChange={handleFileChange}
                               className="file:text-primary file:font-semibold text-xs h-9"
                               disabled={isSubmitting || isProcessingImage}
+                              {...fieldProps}
                             />
                           </FormControl>
                           <FormDescription className="text-xs">
@@ -527,6 +529,13 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                         </FormItem>
                       )}
                     />
+
+                    {isProcessingImage && (
+                        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                            <Loader2 className="animate-spin h-4 w-4"/>
+                            <span>파일 처리 중...</span>
+                        </div>
+                    )}
 
                     {mediaPreview && mediaFile && (
                       <div className="mt-2">
@@ -542,7 +551,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                 </div>
               </form>
             </Form>
-          </ScrollArea>
+          </div>
           
           <DialogFooter className="p-6 pt-4 border-t shrink-0 flex-col sm:flex-row sm:justify-end gap-2">
               <DialogClose asChild>
@@ -575,3 +584,5 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     </AlertDialog>
   );
 }
+
+    
