@@ -7,8 +7,9 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, runTransaction, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { doc, getDoc, runTransaction, collection, query, where, getDocs, limit, Timestamp, setDoc } from 'firebase/firestore';
 import { type ReviewSubmissionInput, type ReviewSubmissionOutput, type User } from '@/lib/config';
+import { generateEncouragement } from './generate-encouragement';
 
 const ReviewSubmissionInputSchema = z.object({
   submissionId: z.string().describe("The ID of the submission document to review."),
@@ -71,6 +72,7 @@ const reviewSubmissionFlow = ai.defineFlow(
       }
       const challengeConfig = configDocSnap.data();
 
+      let wasNewlyCertified = false;
 
       await runTransaction(db, async (transaction) => {
         // --- READ PHASE (INSIDE TRANSACTION) ---
@@ -110,6 +112,10 @@ const reviewSubmissionFlow = ai.defineFlow(
             const goal = (areaConfig.goal && typeof areaConfig.goal === 'object' && areaConfig.goal[gradeKey] !== undefined) ? Number(areaConfig.goal[gradeKey]) : 0;
             const isNowCertified = goal > 0 && newProgress >= goal;
             
+            if (!areaState.isCertified && isNowCertified) {
+              wasNewlyCertified = true;
+            }
+            
             const newData = {
               progress: newProgress,
               isCertified: areaState.isCertified || isNowCertified,
@@ -120,6 +126,28 @@ const reviewSubmissionFlow = ai.defineFlow(
             }, { merge: true });
         }
       });
+      
+      if (wasNewlyCertified) {
+          const achievementDocSnap = await getDoc(doc(db, 'achievements', studentUser.username));
+          const latestAchievements = achievementDocSnap.exists() ? achievementDocSnap.data() : {};
+          const certifiedCount = Object.values(latestAchievements).filter((a: any) => a && a.isCertified).length;
+
+          const encouragementResult = await generateEncouragement({
+              studentName: studentUser.name,
+              certifiedCount: certifiedCount,
+              newlyCertifiedAreaName: challengeConfig[submissionSnapForUser.data().areaName].koreanName,
+          });
+
+          if (encouragementResult?.message) {
+              const userStateRef = doc(db, 'userDynamicState', studentUser.username);
+              await setDoc(userStateRef, {
+                  encouragement: {
+                      message: encouragementResult.message,
+                      createdAt: Timestamp.now(),
+                  }
+              }, { merge: true });
+          }
+      }
 
       return { success: true, message: `제출물이 성공적으로 ${isApproved ? '승인' : '반려'} 처리되었습니다.` };
     } catch (error: any) {

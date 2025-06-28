@@ -13,6 +13,7 @@ import { collection, addDoc, serverTimestamp, doc, getDoc, runTransaction, query
 import { v4 as uuidv4 } from 'uuid';
 import { checkCertification } from './certification-checker';
 import { analyzeMediaEvidence } from './analyze-typing-test'; // Now a generic media analyzer
+import { generateEncouragement } from './generate-encouragement';
 import { type SubmitEvidenceInput as PublicSubmitEvidenceInput, type SubmitEvidenceOutput, SUBMISSION_STATUSES, type SubmissionStatus, type User, type CertificationCheckOutput } from '@/lib/config';
 
 
@@ -172,6 +173,8 @@ const submitEvidenceFlow = ai.defineFlow(
           docData.status = submissionStatus;
 
           if (submissionStatus === 'approved' && areaConfig.goalType === 'numeric') {
+              let wasNewlyCertified = false;
+              
               const batch = writeBatch(db);
               batch.set(newSubmissionRef, docData);
 
@@ -187,6 +190,10 @@ const submitEvidenceFlow = ai.defineFlow(
               const goal = (areaConfig.goal && typeof areaConfig.goal === 'object' && areaConfig.goal[gradeKey] !== undefined) ? Number(areaConfig.goal[gradeKey]) : 0;
               const isNowCertified = goal > 0 && newProgress >= goal;
               
+              if (!currentAreaState.isCertified && isNowCertified) {
+                wasNewlyCertified = true;
+              }
+              
               const newData = {
                 progress: newProgress,
                 isCertified: !!currentAreaState.isCertified || isNowCertified,
@@ -197,6 +204,29 @@ const submitEvidenceFlow = ai.defineFlow(
               await batch.commit();
 
               updateMessage = `AI가 활동을 확인하고 바로 승인했어요! 진행도가 1만큼 증가했습니다. (현재: ${newProgress}${areaConfig.unit})`;
+              
+              if (wasNewlyCertified) {
+                const achievementDocSnapAfter = await getDoc(achievementDocRef);
+                const latestAchievements = achievementDocSnapAfter.exists() ? achievementDocSnapAfter.data() : {};
+                const certifiedCount = Object.values(latestAchievements).filter((a: any) => a && a.isCertified).length;
+
+                const encouragementResult = await generateEncouragement({
+                    studentName: input.userName,
+                    certifiedCount: certifiedCount,
+                    newlyCertifiedAreaName: areaConfig.koreanName,
+                });
+
+                if (encouragementResult?.message) {
+                    const userStateRef = doc(db, 'userDynamicState', input.userId);
+                    await setDoc(userStateRef, {
+                        encouragement: {
+                            message: encouragementResult.message,
+                            createdAt: Timestamp.now(),
+                        }
+                    }, { merge: true });
+                }
+              }
+
           } else {
               await setDoc(newSubmissionRef, docData);
               if (submissionStatus === 'rejected') {
