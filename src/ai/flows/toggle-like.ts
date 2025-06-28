@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A flow to toggle a like on a challenge submission.
@@ -66,7 +67,7 @@ const toggleLikeFlow = ai.defineFlow(
         
         const newLikeCount = newIsLiked ? likes.length + 1 : likes.length - 1;
 
-        return { newLikeCount, newIsLiked };
+        return { newLikeCount, isLiked: newIsLiked };
       });
       
       return { success: true, ...result };
