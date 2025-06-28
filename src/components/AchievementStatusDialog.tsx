@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback, useId } from 'react';
+import React, { useState, useEffect, useCallback, useId, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,7 +21,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { useAuth } from '@/context/AuthContext';
 import { AreaName, SubmissionStatus } from '@/lib/config';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
-import { ListChecks, Send, Loader2, UploadCloud, ThumbsUp, ThumbsDown, BrainCircuit, FileCheck, FileX, History, Trash2 } from 'lucide-react';
+import { ListChecks, Send, Loader2, UploadCloud, ThumbsUp, ThumbsDown, BrainCircuit, FileCheck, FileX, History, Trash2, Info, ShieldAlert } from 'lucide-react';
 import { submitEvidence } from '@/ai/flows/submit-evidence';
 import { checkCertification } from '@/ai/flows/certification-checker';
 import { useToast } from '@/hooks/use-toast';
@@ -46,7 +46,6 @@ interface Submission {
 
 const evidenceSchema = z.object({
   evidence: z.string().min(1, { message: '간단한 활동 내용을 입력해주세요.' }).max(1000, { message: '1000자 이내로 입력해주세요.'}),
-  media: z.any().optional(),
 });
 
 type EvidenceFormValues = z.infer<typeof evidenceSchema>;
@@ -71,12 +70,13 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const [submissionsLoading, setSubmissionsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [aiFeedback, setAiFeedback] = useState<{ isSufficient: boolean; reasoning: string } | null>(null);
   const [submissionToDelete, setSubmissionToDelete] = useState<Submission | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const formId = useId();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<EvidenceFormValues>({
     resolver: zodResolver(evidenceSchema),
@@ -167,30 +167,38 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   }, [evidenceValue, areaName, koreanName, areaConfig, toast]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const fileInput = event.target;
-    setMediaFile(null);
-    form.setValue('media', null);
-    
-    const file = fileInput.files?.[0];
-    if (!file) return;
+    try {
+        const file = event.target.files?.[0];
+        if (!file) {
+            setFileName(null);
+            return;
+        }
 
-    if (file.size > MAX_FILE_SIZE_BYTES) {
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+            toast({
+                variant: 'destructive',
+                title: '파일 크기 초과',
+                description: `파일 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`,
+            });
+            event.target.value = '';
+            setFileName(null);
+            return;
+        }
+        setFileName(file.name);
+    } catch (error) {
+        console.error("File selection error:", error);
         toast({
             variant: 'destructive',
-            title: '파일 크기 초과',
-            description: `파일 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`,
+            title: '파일 선택 오류',
+            description: '파일을 선택하는 중 문제가 발생했습니다. 다른 파일을 선택해보세요.'
         });
-        if (fileInput) fileInput.value = '';
-        return;
     }
-
-    setMediaFile(file);
-    form.setValue('media', file.name);
   };
-
 
   const handleFormSubmit = async (data: EvidenceFormValues) => {
     if (!user || !user.name) return;
+
+    const mediaFile = fileInputRef.current?.files?.[0];
 
     if (areaConfig.mediaRequired && !mediaFile) {
         toast({
@@ -234,7 +242,10 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
       });
 
       form.reset();
-      setMediaFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      setFileName(null);
     } catch (error: unknown) {
       console.error('Evidence Submission Error:', error);
       let errorMessage = '알 수 없는 오류가 발생했습니다.';
@@ -260,7 +271,10 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const onDialogClose = (isOpen: boolean) => {
       if (!isOpen) {
           form.reset();
-          setMediaFile(null);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+          }
+          setFileName(null);
           setAiFeedback(null);
       }
       setDialogOpen(isOpen);
@@ -403,38 +417,30 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                         )}
                       </div>
                     )}
+                    
+                    <div>
+                      <FormLabel htmlFor="media-file-input" className="text-xs">
+                        {areaName === 'Information' ? '타자 연습 결과 스크린샷' : '증명 파일 (사진/영상)'}
+                        {areaConfig.mediaRequired && <span className="text-destructive ml-1">*필수</span>}
+                      </FormLabel>
+                      <Input
+                        id="media-file-input"
+                        ref={fileInputRef}
+                        type="file"
+                        accept={areaName === 'Information' ? "image/*" : "image/*,video/*"}
+                        onChange={handleFileChange}
+                        className="file:text-primary file:font-semibold text-xs h-9 mt-1"
+                        disabled={isSubmitting}
+                      />
+                      <FormDescription className="text-xs mt-1">
+                        {MAX_FILE_SIZE_MB}MB 이하의 파일을 올려주세요.
+                      </FormDescription>
+                    </div>
 
-                    <FormField
-                      control={form.control}
-                      name="media"
-                      render={({ field: { onChange, ...fieldProps } }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs">
-                            {areaName === 'Information' ? '타자 연습 결과 스크린샷' : '증명 파일 (사진/영상)'}
-                            {areaConfig.mediaRequired && <span className="text-destructive ml-1">*필수</span>}
-                          </FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="file" 
-                              accept={areaName === 'Information' ? "image/*" : "image/*,video/*"}
-                              onChange={handleFileChange}
-                              className="file:text-primary file:font-semibold text-xs h-9"
-                              disabled={isSubmitting}
-                              {...fieldProps}
-                            />
-                          </FormControl>
-                          <FormDescription className="text-xs">
-                            {MAX_FILE_SIZE_MB}MB 이하의 파일을 올려주세요.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {mediaFile && (
+                    {fileName && (
                       <div className="text-sm p-3 bg-secondary rounded-md text-secondary-foreground flex items-center gap-2">
                          <FileCheck className="h-4 w-4 text-primary" />
-                         <span className="font-medium">{mediaFile.name}</span>
+                         <span className="font-medium">{fileName}</span>
                       </div>
                     )}
                   </div>
@@ -474,5 +480,3 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     </AlertDialog>
   );
 }
-
-    
