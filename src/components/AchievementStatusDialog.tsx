@@ -248,7 +248,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
       setFileName(null);
     } catch (error: unknown) {
       console.error('Evidence Submission Error:', error);
-      let errorMessage = '알 수 없는 오류가 발생했습니다.';
+      let errorMessage = "알 수 없는 오류가 발생했습니다.";
       if (error instanceof Error) {
         errorMessage = error.message;
       } else if (typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string') {
@@ -317,10 +317,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
         </DialogTrigger>
         <DialogContent className="sm:max-w-lg h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b shrink-0">
-            <DialogTitle className="font-headline text-2xl">{koreanName} 활동 현황</DialogTitle>
-            <DialogDescription>
-              {challengeName} - 이제까지의 활동 내역을 확인하고, 새로운 활동을 공유해보세요.
-            </DialogDescription>
+            <DialogTitle className="font-headline text-2xl">{`[${koreanName}] ${challengeName}`}</DialogTitle>
           </DialogHeader>
           
           <div className="flex-1 overflow-y-auto px-6 min-h-0">
@@ -479,5 +476,3 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     </AlertDialog>
   );
 }
-
-    
