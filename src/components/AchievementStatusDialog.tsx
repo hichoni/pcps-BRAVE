@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback, useId, useRef } from 'react';
@@ -25,14 +26,14 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Input } from './ui/input';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
-import { Separator } from './ui/separator';
+import { collection, query, where, onSnapshot, Timestamp, orderBy } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { deleteSubmission } from '@/ai/flows/delete-submission';
 import { uploadFile } from '@/services/client-storage';
+import { resizeImage } from '@/lib/image-utils';
 
 interface Submission {
   id: string;
@@ -102,7 +103,8 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
     const submissionsQuery = query(
       collection(db, "challengeSubmissions"),
       where("userId", "==", user.username),
-      where("areaName", "==", areaName)
+      where("areaName", "==", areaName),
+      orderBy("createdAt", "desc")
     );
     
     const unsubscribeHistory = onSnapshot(submissionsQuery, (querySnapshot) => {
@@ -115,8 +117,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
                     createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
                     status: data.status,
                 } as Submission;
-            })
-            .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+            });
 
         setSubmissions(fetchedSubmissions);
         setSubmissionsLoading(false);
@@ -135,7 +136,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
                     const minutesToWait = Math.ceil(areaConfig.submissionIntervalMinutes - minutesSince);
                     setIntervalLock({ locked: true, minutesToWait });
                 } else {
-                    setIntervalLock({ locked: false, minutesToWait: 0 });
+                     setIntervalLock({ locked: false, minutesToWait: 0 });
                 }
             } else {
                  setIntervalLock({ locked: false, minutesToWait: 0 });
@@ -228,9 +229,9 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
   const handleFormSubmit = async (data: EvidenceFormValues) => {
     if (!user || !user.name) return;
 
-    const mediaFile = fileInputRef.current?.files?.[0];
+    let fileToUpload = fileInputRef.current?.files?.[0];
 
-    if (areaConfig.mediaRequired && !mediaFile) {
+    if (areaConfig.mediaRequired && !fileToUpload) {
         toast({
             variant: 'destructive',
             title: '파일 누락',
@@ -244,9 +245,32 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
       let mediaUrl: string | undefined = undefined;
       let mediaType: string | undefined = undefined;
 
-      if (mediaFile) {
-        mediaUrl = await uploadFile(mediaFile, user.username);
-        mediaType = mediaFile.type;
+      if (fileToUpload) {
+        if (fileToUpload.type.startsWith('image/')) {
+           try {
+              fileToUpload = await resizeImage(fileToUpload, 1024); // Max width 1024px
+            } catch (resizeError) {
+              console.error("Image resize failed, uploading original:", resizeError);
+              toast({
+                variant: 'default',
+                title: '이미지 리사이징 실패',
+                description: '원본 이미지로 업로드를 시도합니다.',
+              });
+            }
+        }
+
+        if (fileToUpload.size > MAX_FILE_SIZE_BYTES) {
+           toast({
+                variant: 'destructive',
+                title: '파일 크기 초과',
+                description: `처리 후 파일 크기가 ${MAX_FILE_SIZE_MB}MB를 초과하여 업로드할 수 없습니다.`,
+           });
+           setIsSubmitting(false);
+           return;
+        }
+
+        mediaUrl = await uploadFile(fileToUpload, user.username);
+        mediaType = fileToUpload.type;
       }
       
       const result = await submitEvidence({
