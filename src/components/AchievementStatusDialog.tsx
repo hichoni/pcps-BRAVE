@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -243,47 +244,66 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-        if (file.size > MAX_FILE_SIZE_BYTES) {
-            toast({
-                variant: 'destructive',
-                title: '파일 크기 초과',
-                description: `미디어 파일의 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`,
-            });
-            event.target.value = '';
-            return;
-        }
+    
+    const fileInput = event.target;
 
-        if (!file.type.startsWith('image/')) {
-            setMediaFile(file);
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setMediaPreview(reader.result as string);
-            };
-            reader.readAsDataURL(file);
-            return;
-        }
-
-        setIsProcessingImage(true);
-        try {
-            const { dataUri, file: resizedFile } = await resizeImage(file, 1280, 720, 0.8);
-            setMediaFile(resizedFile);
-            setMediaPreview(dataUri);
-        } catch (error) {
-            console.error("Image resize error:", error);
-            toast({
-                variant: 'destructive',
-                title: '이미지 처리 오류',
-                description: '이미지 크기를 조절하는 데 실패했습니다. 다른 파일을 시도해주세요.',
-            });
-            setMediaFile(null);
-            setMediaPreview(null);
-        } finally {
-            setIsProcessingImage(false);
-        }
-    } else {
+    // Reset state first if no file is selected
+    if (!file) {
         setMediaFile(null);
         setMediaPreview(null);
+        if (fileInput) fileInput.value = '';
+        return;
+    }
+
+    // --- Validation ---
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+        toast({
+            variant: 'destructive',
+            title: '파일 크기 초과',
+            description: `미디어 파일의 크기는 ${MAX_FILE_SIZE_MB}MB를 넘을 수 없습니다.`,
+        });
+        if (fileInput) fileInput.value = ''; // Clear the input
+        setMediaFile(null);
+        setMediaPreview(null);
+        return;
+    }
+
+    const isImage = file.type.startsWith('image/');
+    setIsProcessingImage(true);
+
+    try {
+        if (isImage) {
+            // --- Image Resizing Path ---
+            const { dataUri, file: processedFile } = await resizeImage(file, 1280, 720, 0.8);
+            setMediaFile(processedFile);
+            setMediaPreview(dataUri);
+        } else {
+            // --- Non-Image (Video) Path ---
+            const dataUri = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = () => reject(new Error('파일을 읽는 중에 오류가 발생했습니다.'));
+                reader.readAsDataURL(file);
+            });
+            setMediaFile(file);
+            setMediaPreview(dataUri);
+        }
+    } catch (error) {
+        console.error("File processing error:", error);
+        let errorMessage = "파일 처리 중 오류가 발생했습니다. 파일이 손상되었거나 지원하지 않는 형식일 수 있습니다.";
+        if (error instanceof Error) {
+            errorMessage = error.message;
+        }
+        toast({
+            variant: 'destructive',
+            title: '파일 처리 오류',
+            description: errorMessage,
+        });
+        setMediaFile(null);
+        setMediaPreview(null);
+        if (fileInput) fileInput.value = ''; // Clear the input
+    } finally {
+        setIsProcessingImage(false);
     }
   };
 
@@ -307,7 +327,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
         areaName: areaName,
         koreanName: areaConfig.koreanName,
         challengeName: areaConfig.challengeName,
-        evidence: data.evidence || '타자 연습 결과 제출', // Add default evidence for typing test
+        evidence: data.evidence || '미디어 파일 제출',
         mediaDataUri: mediaPreview ?? undefined,
         mediaType: mediaFile?.type ?? undefined,
       });
@@ -500,7 +520,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                             <FormField
                                 control={form.control}
                                 name="media"
-                                render={() => (
+                                render={({ field }) => (
                                 <FormItem>
                                     <FormLabel className="text-xs">
                                         {areaName === 'Information' ? '타자 연습 결과 스크린샷' : '증명 파일 (사진/영상)'}
@@ -539,7 +559,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                             
                             <Button type="submit" className="w-full" disabled={isSubmitting || isChecking || isProcessingImage}>
                                 {isProcessingImage ? <Loader2 className="animate-spin" /> : (isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2"/>)}
-                                {isProcessingImage ? '이미지 처리 중...' : (isSubmitting ? '제출 중...' : '갤러리에 제출하기')}
+                                {isProcessingImage ? '파일 처리 중...' : (isSubmitting ? '제출 중...' : '갤러리에 제출하기')}
                             </Button>
                         </form>
                     </Form>
