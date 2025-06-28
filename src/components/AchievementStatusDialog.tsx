@@ -28,7 +28,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Input } from './ui/input';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, Timestamp, limit } from 'firebase/firestore';
 import { Separator } from './ui/separator';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -66,8 +66,6 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const { challengeConfig } = useChallengeConfig();
   const { toast } = useToast();
 
-  const areaConfig = challengeConfig?.[areaName];
-  
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [submissionsLoading, setSubmissionsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -78,8 +76,10 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const [showLengthWarning, setShowLengthWarning] = useState(false);
   const [submissionToDelete, setSubmissionToDelete] = useState<Submission | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [intervalLock, setIntervalLock] = useState({ locked: false, minutesToWait: 0 });
   const formId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const areaConfig = challengeConfig?.[areaName];
 
   const form = useForm<EvidenceFormValues>({
     resolver: zodResolver(evidenceSchema),
@@ -89,16 +89,19 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const evidenceValue = form.watch('evidence');
 
   useEffect(() => {
-    if (!user || !dialogOpen || !db) return;
+    if (!user || !dialogOpen || !db || !areaConfig) return;
 
     setSubmissionsLoading(true);
-    const q = query(
+    setIntervalLock({ locked: false, minutesToWait: 0 }); // Reset on open
+
+    const historyQuery = query(
         collection(db, "challengeSubmissions"),
         where("userId", "==", user.username),
-        where("areaName", "==", areaName)
+        where("areaName", "==", areaName),
+        orderBy("createdAt", "desc")
     );
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const unsubscribeHistory = onSnapshot(historyQuery, (querySnapshot) => {
         const fetchedSubmissions = querySnapshot.docs.map(doc => {
             const data = doc.data();
             return {
@@ -108,7 +111,6 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                 status: data.status,
             } as Submission;
         });
-        fetchedSubmissions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
         setSubmissions(fetchedSubmissions);
         setSubmissionsLoading(false);
     }, (error) => {
@@ -121,8 +123,42 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
         setSubmissionsLoading(false);
     });
 
-    return () => unsubscribe();
-  }, [dialogOpen, user, areaName, toast]);
+    let unsubscribeInterval: () => void = () => {};
+    if (areaConfig.submissionIntervalMinutes && areaConfig.submissionIntervalMinutes > 0) {
+        const intervalQuery = query(
+            collection(db, "challengeSubmissions"),
+            where("userId", "==", user.username),
+            where("areaName", "==", areaName),
+            where("status", "in", ['approved', 'pending_review', 'pending_deletion']),
+            orderBy("createdAt", "desc"),
+            limit(1)
+        );
+        
+        unsubscribeInterval = onSnapshot(intervalQuery, (snapshot) => {
+            if (!snapshot.empty) {
+                const lastSubmission = snapshot.docs[0].data();
+                const lastSubmissionTime = (lastSubmission.createdAt as Timestamp).toDate();
+                const now = new Date();
+                const minutesSince = (now.getTime() - lastSubmissionTime.getTime()) / (1000 * 60);
+
+                if (minutesSince < areaConfig.submissionIntervalMinutes!) {
+                    const minutesToWait = Math.ceil(areaConfig.submissionIntervalMinutes! - minutesSince);
+                    setIntervalLock({ locked: true, minutesToWait });
+                } else {
+                    setIntervalLock({ locked: false, minutesToWait: 0 });
+                }
+            } else {
+                setIntervalLock({ locked: false, minutesToWait: 0 });
+            }
+        });
+    }
+
+    return () => {
+        unsubscribeHistory();
+        unsubscribeInterval();
+    };
+  }, [dialogOpen, user, areaName, toast, areaConfig, db]);
+
 
   useEffect(() => {
     if (!dialogOpen || !areaConfig) return;
@@ -136,15 +172,13 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     }
     setShowLengthWarning(false);
       
-    if (text.length < 10) {
+    if (text.length === 0) {
       setAiFeedback(null);
       setIsChecking(false);
       return;
     }
 
     setIsChecking(true);
-    setAiFeedback(null);
-
     const handler = setTimeout(async () => {
       try {
         const result = await getTextFeedback({
@@ -156,19 +190,17 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
         setAiFeedback(result?.feedback ?? null);
       } catch (error) {
         console.error("Real-time AI check failed:", error);
-        // Don't show an error toast for feedback failures to avoid annoying the user
       } finally {
         setIsChecking(false);
       }
-    }, 1500); // 1.5-second debounce
+    }, 1500);
 
     return () => {
       clearTimeout(handler);
     };
   }, [evidenceValue, fileName, areaName, areaConfig, dialogOpen]);
   
-  if (!user || !challengeConfig || user.grade === undefined) return null;
-  if (!areaConfig) return null; // Ensure areaConfig exists
+  if (!user || !challengeConfig || user.grade === undefined || !areaConfig) return null;
   
   const { koreanName, challengeName } = areaConfig;
 
@@ -283,6 +315,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
           setFileName(null);
           setAiFeedback(null);
           setShowLengthWarning(false);
+          setIntervalLock({ locked: false, minutesToWait: 0 });
       }
       setDialogOpen(isOpen);
   }
@@ -375,76 +408,84 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
 
                 <Separator />
                 
-                <div>
-                  <h3 className="text-sm font-semibold mb-2">새 활동 공유하기</h3>
-                  <div className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="evidence"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="sr-only">활동 내용</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder={
-                                "여기에 나의 실천 내용을 자세히 적어주세요. (예: 어떤 책을 읽고 무엇을 느꼈는지, 봉사활동을 통해 무엇을 배우고 실천했는지 등)"
-                              }
-                              {...field}
-                              rows={3}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                {intervalLock.locked ? (
+                    <Alert>
+                        <Info className="h-4 w-4" />
+                        <AlertTitle className="font-bold">지금은 도전할 수 없어요!</AlertTitle>
+                        <AlertDescription>
+                          {`이전 활동 제출 후 ${areaConfig.submissionIntervalMinutes}분(교사가 설정한 시간)이 지나야 해요. (${intervalLock.minutesToWait}분 남음)`}
+                        </AlertDescription>
+                    </Alert>
+                ) : (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">새 활동 공유하기</h3>
+                    <fieldset disabled={isSubmitting || isChecking} className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="evidence"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="sr-only">활동 내용</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                placeholder={
+                                  "여기에 나의 실천 내용을 자세히 적어주세요. (예: 어떤 책을 읽고 무엇을 느꼈는지, 봉사활동을 통해 무엇을 배우고 실천했는지 등)"
+                                }
+                                {...field}
+                                rows={3}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <div className="flex items-center justify-center min-h-[4rem]">
-                      {isChecking && (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse p-2">
-                          <BrainCircuit className="h-4 w-4" />
-                          <span>AI가 실시간으로 내용을 분석하고 있습니다...</span>
+                      <div className="flex items-center justify-center min-h-[4rem]">
+                        {isChecking ? (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse p-2">
+                            <BrainCircuit className="h-4 w-4" />
+                            <span>AI가 실시간으로 내용을 분석하고 있습니다...</span>
+                          </div>
+                        ) : (showLengthWarning || aiFeedback) && (
+                          <Alert variant="default" className="p-2 w-full">
+                            <BrainCircuit className="h-4 w-4" />
+                            <AlertTitle className="text-xs font-semibold mb-0.5">
+                              AI 실시간 조언
+                            </AlertTitle>
+                            <AlertDescription className="text-xs">
+                              {aiFeedback}
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <FormLabel htmlFor="media-file-input" className="text-xs">
+                          증명 파일 (사진/영상)
+                          {areaConfig.mediaRequired && <span className="text-destructive ml-1">*필수</span>}
+                        </FormLabel>
+                        <Input
+                          id="media-file-input"
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*,video/*"
+                          onChange={handleFileChange}
+                          className="file:text-primary file:font-semibold text-xs h-9 mt-1"
+                        />
+                        <FormDescription className="text-xs mt-1">
+                          {MAX_FILE_SIZE_MB}MB 이하의 파일을 올려주세요.
+                        </FormDescription>
+                      </div>
+
+                      {fileName && (
+                        <div className="text-sm p-3 bg-secondary rounded-md text-secondary-foreground flex items-center gap-2">
+                           <FileCheck className="h-4 w-4 text-primary" />
+                           <span className="font-medium">{fileName}</span>
                         </div>
                       )}
-                      {!isChecking && (showLengthWarning || aiFeedback) && (
-                        <Alert variant="default" className="p-2 w-full">
-                          <BrainCircuit className="h-4 w-4" />
-                          <AlertTitle className="text-xs font-semibold mb-0.5">
-                            AI 실시간 조언
-                          </AlertTitle>
-                          <AlertDescription className="text-xs">
-                            {aiFeedback}
-                          </AlertDescription>
-                        </Alert>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <FormLabel htmlFor="media-file-input" className="text-xs">
-                        증명 파일 (사진/영상)
-                        {areaConfig.mediaRequired && <span className="text-destructive ml-1">*필수</span>}
-                      </FormLabel>
-                      <Input
-                        id="media-file-input"
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*,video/*"
-                        onChange={handleFileChange}
-                        className="file:text-primary file:font-semibold text-xs h-9 mt-1"
-                        disabled={isSubmitting}
-                      />
-                      <FormDescription className="text-xs mt-1">
-                        {MAX_FILE_SIZE_MB}MB 이하의 파일을 올려주세요.
-                      </FormDescription>
-                    </div>
-
-                    {fileName && (
-                      <div className="text-sm p-3 bg-secondary rounded-md text-secondary-foreground flex items-center gap-2">
-                         <FileCheck className="h-4 w-4 text-primary" />
-                         <span className="font-medium">{fileName}</span>
-                      </div>
-                    )}
+                    </fieldset>
                   </div>
-                </div>
+                )}
               </form>
             </Form>
           </div>
@@ -455,7 +496,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
                       닫기
                   </Button>
               </DialogClose>
-              <Button type="submit" form={formId} className="w-full sm:w-auto" disabled={isSubmitting || isChecking}>
+              <Button type="submit" form={formId} className="w-full sm:w-auto" disabled={isSubmitting || isChecking || intervalLock.locked}>
                   {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2"/>}
                   {isSubmitting ? '제출 중...' : '제출하기'}
               </Button>
