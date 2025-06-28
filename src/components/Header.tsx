@@ -20,8 +20,8 @@ export function Header() {
               className="rounded-full shadow-md w-14 h-14 sm:w-[72px] sm:h-[72px]"
             />
             <div>
-                <p className="text-base sm:text-lg font-semibold text-muted-foreground">2025학년도</p>
-                <h1 className="text-3xl sm:text-4xl font-bold font-headline text-primary">
+                <p className="text-sm sm:text-lg font-semibold text-muted-foreground">2025학년도</p>
+                <h1 className="text-2xl sm:text-4xl font-bold font-headline text-primary">
                     도전! 꿈 성취 학교장 인증제
                 </h1>
             </div>
