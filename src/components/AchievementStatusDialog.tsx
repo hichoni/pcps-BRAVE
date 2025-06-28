@@ -65,6 +65,12 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const { user } = useAuth();
   const { challengeConfig } = useChallengeConfig();
   const { toast } = useToast();
+
+  if (!user || !challengeConfig || user.grade === undefined) return null;
+  
+  const areaConfig = challengeConfig[areaName];
+
+  if (!areaConfig) return null;
   
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [submissionsLoading, setSubmissionsLoading] = useState(true);
@@ -165,13 +171,6 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
       clearTimeout(handler);
     };
   }, [evidenceValue, fileName, areaName, areaConfig, dialogOpen]);
-
-
-  if (!user || !challengeConfig || user.grade === undefined) return null;
-  
-  const areaConfig = challengeConfig[areaName];
-
-  if (!areaConfig) return null;
   
   const { koreanName, challengeName } = areaConfig;
 
