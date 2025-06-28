@@ -62,13 +62,15 @@ interface AchievementStatusDialogProps {
   areaName: AreaName;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialMode: 'history' | 'submit';
 }
 
-export function AchievementStatusDialog({ areaName, open, onOpenChange }: AchievementStatusDialogProps) {
+export function AchievementStatusDialog({ areaName, open, onOpenChange, initialMode }: AchievementStatusDialogProps) {
   const { user } = useAuth();
   const { challengeConfig } = useChallengeConfig();
   const { toast } = useToast();
 
+  const areaConfig = challengeConfig?.[areaName];
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [submissionsLoading, setSubmissionsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -81,7 +83,6 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange }: Achiev
   const [intervalLock, setIntervalLock] = useState({ locked: false, minutesToWait: 0 });
   const formId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const areaConfig = challengeConfig?.[areaName];
 
   const form = useForm<EvidenceFormValues>({
     resolver: zodResolver(evidenceSchema),
@@ -94,7 +95,9 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange }: Achiev
     if (!user || !open || !db || !areaConfig) return;
 
     setSubmissionsLoading(true);
-    setIntervalLock({ locked: false, minutesToWait: 0 }); // Reset on open
+    if (initialMode === 'submit') {
+      setIntervalLock({ locked: false, minutesToWait: 0 }); // Reset on open only if submitting
+    }
 
     const historyQuery = query(
         collection(db, "challengeSubmissions"),
@@ -103,7 +106,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange }: Achiev
     );
 
     const unsubscribeHistory = onSnapshot(historyQuery, (querySnapshot) => {
-        const fetchedSubmissions = querySnapshot.docs.map(doc => {
+        let fetchedSubmissions = querySnapshot.docs.map(doc => {
             const data = doc.data();
             return {
                 id: doc.id,
@@ -117,6 +120,32 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange }: Achiev
 
         setSubmissions(fetchedSubmissions);
         setSubmissionsLoading(false);
+
+        // Interval check logic
+        if (initialMode === 'submit' && areaConfig.submissionIntervalMinutes && areaConfig.submissionIntervalMinutes > 0) {
+            const relevantSubmissions = fetchedSubmissions.filter(sub => 
+                ['approved', 'pending_review', 'pending_deletion'].includes(sub.status)
+            );
+            
+            if (relevantSubmissions.length > 0) {
+                const lastSubmission = relevantSubmissions[0]; // Already sorted by date desc
+
+                if (lastSubmission && lastSubmission.createdAt) {
+                    const lastSubmissionTime = lastSubmission.createdAt;
+                    const now = new Date();
+                    const minutesSince = (now.getTime() - lastSubmissionTime.getTime()) / (1000 * 60);
+    
+                    if (minutesSince < areaConfig.submissionIntervalMinutes) {
+                        const minutesToWait = Math.ceil(areaConfig.submissionIntervalMinutes - minutesSince);
+                        setIntervalLock({ locked: true, minutesToWait });
+                    } else {
+                        setIntervalLock({ locked: false, minutesToWait: 0 });
+                    }
+                }
+            } else {
+                setIntervalLock({ locked: false, minutesToWait: 0 });
+            }
+        }
     }, (error) => {
         console.error("Error fetching submissions for dialog:", error);
         toast({
@@ -127,54 +156,14 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange }: Achiev
         setSubmissionsLoading(false);
     });
 
-    let unsubscribeInterval: () => void = () => {};
-    if (areaConfig.submissionIntervalMinutes && areaConfig.submissionIntervalMinutes > 0) {
-        const intervalQuery = query(
-            collection(db, "challengeSubmissions"),
-            where("userId", "==", user.username),
-            where("areaName", "==", areaName)
-        );
-        
-        unsubscribeInterval = onSnapshot(intervalQuery, (snapshot) => {
-            const allUserSubmissions = snapshot.docs.map(doc => doc.data());
-            const relevantSubmissions = allUserSubmissions.filter(sub => 
-                ['approved', 'pending_review', 'pending_deletion'].includes(sub.status)
-            );
-
-            if (relevantSubmissions.length > 0) {
-                relevantSubmissions.sort((a,b) => (b.createdAt as Timestamp).toMillis() - (a.createdAt as Timestamp).toMillis());
-                const lastSubmission = relevantSubmissions[0];
-
-                if (lastSubmission && lastSubmission.createdAt) {
-                    const lastSubmissionTime = (lastSubmission.createdAt as Timestamp).toDate();
-                    const now = new Date();
-                    const minutesSince = (now.getTime() - lastSubmissionTime.getTime()) / (1000 * 60);
-    
-                    if (minutesSince < areaConfig.submissionIntervalMinutes!) {
-                        const minutesToWait = Math.ceil(areaConfig.submissionIntervalMinutes! - minutesSince);
-                        setIntervalLock({ locked: true, minutesToWait });
-                    } else {
-                        setIntervalLock({ locked: false, minutesToWait: 0 });
-                    }
-                }
-            } else {
-                setIntervalLock({ locked: false, minutesToWait: 0 });
-            }
-        }, (error) => {
-            console.error("Error checking submission interval. Locking will be disabled.", error);
-            setIntervalLock({ locked: false, minutesToWait: 0 });
-        });
-    }
-
     return () => {
         unsubscribeHistory();
-        unsubscribeInterval();
     };
-  }, [open, user, areaName, toast, areaConfig, db]);
+  }, [open, user, areaName, toast, areaConfig, initialMode, db]);
 
 
   useEffect(() => {
-    if (!open || !areaConfig) return;
+    if (!open || !areaConfig || initialMode !== 'submit') return;
 
     const text = evidenceValue.trim();
     const handleTextFeedback = async () => {
@@ -215,7 +204,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange }: Achiev
     return () => {
       clearTimeout(handler);
     };
-  }, [evidenceValue, fileName, areaName, areaConfig, open]);
+  }, [evidenceValue, fileName, areaName, areaConfig, open, initialMode]);
   
   if (!user || !challengeConfig || user.grade === undefined || !areaConfig) return null;
   
@@ -292,6 +281,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange }: Achiev
         fileInputRef.current.value = "";
       }
       setFileName(null);
+      onOpenChange(false);
     } catch (error: unknown) {
       console.error('Evidence Submission Error:', error);
       let errorMessage = "알 수 없는 오류가 발생했습니다.";
@@ -418,6 +408,8 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange }: Achiev
                   </div>
                 </div>
 
+                {initialMode === 'submit' && (
+                <>
                 <Separator />
                 
                 {intervalLock.locked ? (
@@ -498,6 +490,8 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange }: Achiev
                     </fieldset>
                   </div>
                 )}
+                </>
+                )}
               </form>
             </Form>
           </div>
@@ -508,10 +502,12 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange }: Achiev
                       닫기
                   </Button>
               </DialogClose>
-              <Button type="submit" form={formId} className="w-full sm:w-auto" disabled={isSubmitting || isChecking || intervalLock.locked}>
-                  {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2"/>}
-                  {isSubmitting ? '제출 중...' : '제출하기'}
-              </Button>
+              {initialMode === 'submit' && (
+                <Button type="submit" form={formId} className="w-full sm:w-auto" disabled={isSubmitting || isChecking || intervalLock.locked}>
+                    {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2"/>}
+                    {isSubmitting ? '제출 중...' : '제출하기'}
+                </Button>
+              )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

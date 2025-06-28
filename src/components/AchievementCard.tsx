@@ -27,8 +27,14 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
   const { challengeConfig, loading: configLoading } = useChallengeConfig();
   
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<'history' | 'submit'>('submit');
   const [hasApprovedToday, setHasApprovedToday] = useState(false);
   const [isCheckingHistory, setIsCheckingHistory] = useState(true);
+
+  const openDialog = (mode: 'history' | 'submit') => {
+    setDialogMode(mode);
+    setDialogOpen(true);
+  }
 
   useEffect(() => {
     if (!user || !db) {
@@ -158,11 +164,11 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
         <CardFooter className="p-4 pt-0 flex items-center gap-2 w-full">
             { !isTeacherInput && (
                 <>
-                    <Button variant="secondary" className="flex-grow font-semibold" onClick={() => setDialogOpen(true)}>
+                    <Button variant="secondary" className="flex-grow font-semibold" onClick={() => openDialog('history')}>
                         <History className="mr-2 h-4 w-4" />
                         활동 내역
                     </Button>
-                    <Button className="flex-grow font-bold" onClick={() => setDialogOpen(true)} disabled={hasApprovedToday || isCheckingHistory}>
+                    <Button className="flex-grow font-bold" onClick={() => openDialog('submit')} disabled={hasApprovedToday || isCheckingHistory}>
                         {isCheckingHistory 
                           ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           : <ListChecks className="mr-2 h-4 w-4" />
@@ -176,7 +182,7 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
             )}
         </CardFooter>
       </Card>
-      { !isTeacherInput && <AchievementStatusDialog areaName={areaName} open={dialogOpen} onOpenChange={setDialogOpen} /> }
+      { !isTeacherInput && <AchievementStatusDialog areaName={areaName} open={dialogOpen} onOpenChange={setDialogOpen} initialMode={dialogMode} /> }
     </>
   );
 }
