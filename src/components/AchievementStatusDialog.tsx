@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useCallback, useId, useRef } from 'react';
@@ -9,10 +8,8 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
   DialogClose
 } from '@/components/ui/dialog';
@@ -21,14 +18,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { useAuth } from '@/context/AuthContext';
 import { AreaName, SubmissionStatus } from '@/lib/config';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
-import { ListChecks, Send, Loader2, UploadCloud, FileCheck, FileX, History, Trash2, Info, BrainCircuit } from 'lucide-react';
+import { Send, Loader2, UploadCloud, FileCheck, FileX, History, Trash2, Info, BrainCircuit } from 'lucide-react';
 import { submitEvidence } from '@/ai/flows/submit-evidence';
 import { getTextFeedback } from '@/ai/flows/text-feedback';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Input } from './ui/input';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, orderBy, Timestamp, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Separator } from './ui/separator';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -61,7 +58,13 @@ const StatusInfo = {
     pending_deletion: { icon: Trash2, text: '삭제 요청 중', color: 'text-orange-500' },
 }
 
-export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
+interface AchievementStatusDialogProps {
+  areaName: AreaName;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function AchievementStatusDialog({ areaName, open, onOpenChange }: AchievementStatusDialogProps) {
   const { user } = useAuth();
   const { challengeConfig } = useChallengeConfig();
   const { toast } = useToast();
@@ -69,7 +72,6 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [submissionsLoading, setSubmissionsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
@@ -89,7 +91,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
   const evidenceValue = form.watch('evidence');
 
   useEffect(() => {
-    if (!user || !dialogOpen || !db || !areaConfig) return;
+    if (!user || !open || !db || !areaConfig) return;
 
     setSubmissionsLoading(true);
     setIntervalLock({ locked: false, minutesToWait: 0 }); // Reset on open
@@ -127,7 +129,6 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
 
     let unsubscribeInterval: () => void = () => {};
     if (areaConfig.submissionIntervalMinutes && areaConfig.submissionIntervalMinutes > 0) {
-        // Use a simpler query and filter on the client to avoid composite index issues.
         const intervalQuery = query(
             collection(db, "challengeSubmissions"),
             where("userId", "==", user.username),
@@ -169,11 +170,11 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
         unsubscribeHistory();
         unsubscribeInterval();
     };
-  }, [dialogOpen, user, areaName, toast, areaConfig, db]);
+  }, [open, user, areaName, toast, areaConfig, db]);
 
 
   useEffect(() => {
-    if (!dialogOpen || !areaConfig) return;
+    if (!open || !areaConfig) return;
 
     const text = evidenceValue.trim();
     const handleTextFeedback = async () => {
@@ -214,7 +215,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
     return () => {
       clearTimeout(handler);
     };
-  }, [evidenceValue, fileName, areaName, areaConfig, dialogOpen]);
+  }, [evidenceValue, fileName, areaName, areaConfig, open]);
   
   if (!user || !challengeConfig || user.grade === undefined || !areaConfig) return null;
   
@@ -333,7 +334,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
           setShowLengthWarning(false);
           setIntervalLock({ locked: false, minutesToWait: 0 });
       }
-      setDialogOpen(isOpen);
+      onOpenChange(isOpen);
   }
 
   const handleDeleteRequest = async () => {
@@ -364,12 +365,7 @@ export function AchievementStatusDialog({ areaName }: { areaName: AreaName }) {
 
   return (
     <AlertDialog onOpenChange={(open) => { if (!open && submissionToDelete) setSubmissionToDelete(null); }}>
-      <Dialog open={dialogOpen} onOpenChange={onDialogClose}>
-        <DialogTrigger asChild>
-          <Button variant="outline" className="flex-grow font-bold">
-            <ListChecks className="mr-2 h-4 w-4" /> 도전하기
-          </Button>
-        </DialogTrigger>
+      <Dialog open={open} onOpenChange={onDialogClose}>
         <DialogContent className="sm:max-w-lg h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b shrink-0">
             <DialogTitle className="font-headline text-2xl">{`[${koreanName}] ${challengeName}`}</DialogTitle>
