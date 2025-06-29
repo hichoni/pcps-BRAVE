@@ -1,5 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    // These packages are used by Genkit and are not compatible with Webpack.
+    // They are marked as external to prevent them from being bundled.
+    serverComponentsExternalPackages: [
+      '@opentelemetry/api',
+      '@opentelemetry/instrumentation',
+      '@opentelemetry/resources',
+      '@opentelemetry/sdk-node',
+      '@opentelemetry/sdk-trace-base',
+      '@opentelemetry/sdk-trace-node',
+      '@opentelemetry/semantic-conventions',
+      'require-in-the-middle',
+    ],
+  },
   typescript: {
     ignoreBuildErrors: true,
   },
