@@ -14,6 +14,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Video, Camera, Mic, StopCircle, RefreshCcw, Send } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { cn } from '@/lib/utils';
 
 interface VideoRecorderDialogProps {
   open: boolean;
@@ -86,7 +87,7 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
         cleanup();
       }
     };
-  }, [open]);
+  }, [open, recordingState]);
 
 
   const startRecording = () => {
@@ -165,7 +166,7 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
                     autoPlay
                 />
             )}
-             {!hasPermission && (
+             {!hasPermission && recordingState === 'idle' && (
                 <div className="text-white text-center p-4">
                     <Loader2 className="animate-spin mb-2" />
                     <p>카메라 권한을 확인하고 있습니다...</p>
