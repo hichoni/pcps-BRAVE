@@ -5,15 +5,15 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { useAuth } from './AuthContext';
 import { AreaName, AchievementsState, CertificateStatus, CERTIFICATE_THRESHOLDS, User } from '@/lib/config';
 import { db } from '@/lib/firebase';
-import { collection, doc, setDoc, updateDoc, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc, onSnapshot, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { useChallengeConfig } from './ChallengeConfigContext';
 
 type AllAchievementsState = Record<string, AchievementsState>; // Keyed by username
 
 interface AchievementsContextType {
   getAchievements: (username: string) => AchievementsState;
-  setProgress: (username: string, area: AreaName, progress: number | string) => Promise<void>;
-  toggleCertification: (username: string, area: AreaName) => Promise<void>;
+  setProgress: (username: string, area: AreaName, progress: number | string, teacherId?: number) => Promise<void>;
+  toggleCertification: (username: string, area: AreaName, teacherId?: number) => Promise<void>;
   certificateStatus: (username: string) => CertificateStatus;
   loading: boolean;
 }
@@ -139,10 +139,11 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
     return finalState;
   }, [allAchievements, challengeConfig]);
 
-  const setProgress = useCallback(async (username: string, area: AreaName, progress: number | string) => {
+  const setProgress = useCallback(async (username: string, area: AreaName, progress: number | string, teacherId?: number) => {
     if (!db || !challengeConfig || !users) return;
 
     try {
+        const batch = writeBatch(db);
         const achievementDocRef = doc(db, 'achievements', username);
         const areaConfig = challengeConfig[area];
         const student = users.find(u => u.username === username);
@@ -152,7 +153,9 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
         
         const currentAreaState = (currentAchievements && typeof currentAchievements[area] === 'object' && currentAchievements[area] !== null)
           ? currentAchievements[area]
-          : { isCertified: false };
+          : { isCertified: false, progress: areaConfig.goalType === 'numeric' ? 0 : '' };
+        
+        const oldProgress = currentAreaState.progress;
 
         let newIsCertified;
 
@@ -173,7 +176,22 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
             isCertified: newIsCertified,
         };
 
-        await setDoc(achievementDocRef, { [area]: newData }, { merge: true });
+        batch.set(achievementDocRef, { [area]: newData }, { merge: true });
+
+        if (teacherId !== undefined && areaConfig) {
+            const manualUpdateRef = doc(collection(db, 'manualUpdates'));
+            batch.set(manualUpdateRef, {
+                userId: username,
+                areaName: area,
+                updateType: 'progress',
+                oldValue: oldProgress,
+                newValue: progress,
+                teacherId: teacherId,
+                createdAt: serverTimestamp(),
+            });
+        }
+
+        await batch.commit();
 
     } catch(e) {
         console.warn("Failed to update progress in Firestore", e);
@@ -181,19 +199,36 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [challengeConfig, users]);
 
-  const toggleCertification = useCallback(async (username: string, area: AreaName) => {
-    if (!db) return;
+  const toggleCertification = useCallback(async (username: string, area: AreaName, teacherId?: number) => {
+    if (!db || !challengeConfig) return;
     try {
+        const batch = writeBatch(db);
         const achievementDocRef = doc(db, 'achievements', username);
         const docSnap = await getDoc(achievementDocRef);
         const currentIsCertified = docSnap.exists() ? (docSnap.data()?.[area]?.isCertified ?? false) : false;
         const newIsCertified = !currentIsCertified;
         
-        await setDoc(achievementDocRef, { [area]: { isCertified: newIsCertified } }, { merge: true });
+        batch.set(achievementDocRef, { [area]: { isCertified: newIsCertified } }, { merge: true });
+
+        if (teacherId !== undefined && challengeConfig[area]) {
+            const manualUpdateRef = doc(collection(db, 'manualUpdates'));
+            batch.set(manualUpdateRef, {
+                userId: username,
+                areaName: area,
+                updateType: 'certification',
+                oldValue: currentIsCertified,
+                newValue: newIsCertified,
+                teacherId: teacherId,
+                createdAt: serverTimestamp(),
+            });
+        }
+
+        await batch.commit();
     } catch (e) {
         console.warn("Failed to toggle certification in Firestore", e);
+        throw e;
     }
-  }, []);
+  }, [challengeConfig]);
   
   const certificateStatus = useCallback((username: string): CertificateStatus => {
     const userAchievements = getAchievements(username);
@@ -219,5 +254,3 @@ export const useAchievements = () => {
   }
   return context;
 };
-
-    

@@ -19,7 +19,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { useAuth } from '@/context/AuthContext';
 import { AreaName, SubmissionStatus } from '@/lib/config';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
-import { Send, Loader2, UploadCloud, FileCheck, FileX, History, Trash2, Info, BrainCircuit } from 'lucide-react';
+import { Send, Loader2, UploadCloud, FileCheck, FileX, History, Trash2, Info, BrainCircuit, Edit } from 'lucide-react';
 import { submitEvidence } from '@/ai/flows/submit-evidence';
 import { getTextFeedback } from '@/ai/flows/text-feedback';
 import { useToast } from '@/hooks/use-toast';
@@ -35,12 +35,20 @@ import { deleteSubmission } from '@/ai/flows/delete-submission';
 import { uploadFile } from '@/services/client-storage';
 import { resizeImage } from '@/lib/image-utils';
 
-interface Submission {
-  id: string;
-  evidence: string;
-  createdAt: Date;
-  status: SubmissionStatus;
-}
+type HistoryItem = {
+    id: string;
+    createdAt: Date;
+} & (
+    {
+        type: 'submission';
+        evidence: string;
+        status: SubmissionStatus;
+    } |
+    {
+        type: 'manual_update';
+        text: string;
+    }
+);
 
 const evidenceSchema = z.object({
   evidence: z.string().min(1, { message: '간단한 활동 내용을 입력해주세요.' }).max(1000, { message: '1000자 이내로 입력해주세요.'}),
@@ -74,14 +82,14 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
   const { toast } = useToast();
 
   const areaConfig = challengeConfig?.[areaName];
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [submissionsLoading, setSubmissionsLoading] = useState(true);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
   const [showLengthWarning, setShowLengthWarning] = useState(false);
-  const [submissionToDelete, setSubmissionToDelete] = useState<Submission | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<HistoryItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [intervalLock, setIntervalLock] = useState({ locked: false, minutesToWait: 0 });
   const formId = useId();
@@ -100,46 +108,69 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
     if (!user || !open || !db || !areaConfig) {
         // Reset loading state if dialog is closed
         if (!open) {
-          setSubmissionsLoading(true);
+          setHistoryLoading(true);
           setIntervalLock({ locked: false, minutesToWait: 0 });
         }
         return;
     }
 
-    let unsubscribe: (() => void) | undefined;
-
     const fetchHistory = () => {
-        setSubmissionsLoading(true);
-        // Firestore does not allow orderBy on a different field than the range filter.
-        // We fetch all relevant documents and sort them client-side.
-        const q = query(
-          collection(db, "challengeSubmissions"),
-          where("userId", "==", user.username),
-          where("areaName", "==", areaName)
-        );
-        
-        unsubscribe = onSnapshot(q, (snapshot) => {
-          const fetchedSubmissions = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              ...data,
-              createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
-            } as Submission;
-          });
-          // Sort client-side
-          fetchedSubmissions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        setHistoryLoading(true);
 
-          setSubmissions(fetchedSubmissions);
-          setSubmissionsLoading(false);
-        }, (error) => {
+        const submissionsQuery = query(
+            collection(db, "challengeSubmissions"),
+            where("userId", "==", user.username),
+            where("areaName", "==", areaName)
+        );
+
+        const manualUpdatesQuery = query(
+            collection(db, "manualUpdates"),
+            where("userId", "==", user.username),
+            where("areaName", "==", areaName)
+        );
+
+        Promise.all([getDocs(submissionsQuery), getDocs(manualUpdatesQuery)]).then(([submissionsSnapshot, manualUpdatesSnapshot]) => {
+            const submissionItems: HistoryItem[] = submissionsSnapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    type: 'submission',
+                    evidence: data.evidence,
+                    status: data.status,
+                    createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
+                };
+            });
+
+            const manualUpdateItems: HistoryItem[] = manualUpdatesSnapshot.docs.map(doc => {
+                const data = doc.data();
+                let text = '';
+                if (data.updateType === 'progress') {
+                    text = `선생님께서 진행도를 '${data.newValue}${areaConfig.unit}'(으)로 수정했습니다.`;
+                } else if (data.updateType === 'certification') {
+                    text = `선생님께서 인증 상태를 '${data.newValue ? '인증 완료' : '미인증'}'(으)로 변경했습니다.`;
+                }
+
+                return {
+                    id: doc.id,
+                    type: 'manual_update',
+                    text: text,
+                    createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
+                };
+            });
+
+            const combinedHistory = [...submissionItems, ...manualUpdateItems];
+            combinedHistory.sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+            setHistory(combinedHistory);
+            setHistoryLoading(false);
+        }).catch(error => {
             console.error("Error fetching submission history:", error);
             toast({
                 variant: "destructive",
                 title: "오류",
                 description: "활동 목록을 불러오는 데 실패했습니다. 다시 시도해주세요."
             });
-            setSubmissionsLoading(false);
+            setHistoryLoading(false);
         });
     }
 
@@ -193,13 +224,10 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
     if (initialMode === 'history') {
         fetchHistory();
     } else { // 'submit' mode
-        setSubmissionsLoading(false); // No list to load in submit mode
+        setHistoryLoading(false); // No list to load in submit mode
         checkInterval();
     }
 
-    return () => {
-        if (unsubscribe) unsubscribe();
-    };
   }, [open, user, areaName, toast, areaConfig, initialMode]);
 
 
@@ -439,12 +467,12 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
   }
 
   const handleDeleteRequest = async () => {
-    if (!submissionToDelete || !user) return;
+    if (!itemToDelete || itemToDelete.type !== 'submission' || !user) return;
 
     setIsDeleting(true);
     try {
         const result = await deleteSubmission({
-            submissionId: submissionToDelete.id,
+            submissionId: itemToDelete.id,
             userId: String(user.id),
         });
 
@@ -452,7 +480,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
             title: "요청 완료",
             description: result.message
         });
-        setSubmissionToDelete(null);
+        setItemToDelete(null);
     } catch (error: any) {
         toast({
             variant: "destructive",
@@ -469,7 +497,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
     : `[${koreanName}] ${challengeName}`;
 
   return (
-    <AlertDialog onOpenChange={(open) => { if (!open && submissionToDelete) setSubmissionToDelete(null); }}>
+    <AlertDialog onOpenChange={(open) => { if (!open && itemToDelete) setItemToDelete(null); }}>
       <Dialog open={open} onOpenChange={onDialogClose}>
         <DialogContent className="sm:max-w-lg h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b shrink-0">
@@ -481,40 +509,56 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
             <div className="py-4 flex-1 flex flex-col min-h-0 h-full">
               <h3 className="text-sm font-semibold mb-2 shrink-0">내 활동 목록</h3>
               <div className="w-full rounded-md border p-2 space-y-2 flex-grow overflow-y-auto">
-                {submissionsLoading ? (
+                {historyLoading ? (
                   <div className="flex items-center justify-center h-full text-muted-foreground">
                     <Loader2 className="h-5 w-5 animate-spin"/>
                   </div>
-                ) : submissions.length === 0 ? (
+                ) : history.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
                     아직 제출한 활동이 없습니다.
                   </div>
                 ) : (
-                  submissions.map(sub => {
-                    const status = StatusInfo[sub.status];
+                  history.map(item => {
+                    if (item.type === 'manual_update') {
+                        return (
+                            <div key={item.id} className="text-sm p-2 rounded-md flex justify-between items-center bg-blue-500/10 border border-blue-500/20">
+                                <div className="flex-grow min-w-0 flex items-center gap-2">
+                                    <Edit className="h-4 w-4 text-primary shrink-0"/>
+                                    <div>
+                                        <p className="text-primary font-medium">{item.text}</p>
+                                        <p className="text-xs text-muted-foreground/80 mt-1">{format(item.createdAt, "yyyy.MM.dd HH:mm", { locale: ko })}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    }
+
+                    const status = StatusInfo[item.status];
                     if (!status) return null;
                     const Icon = status.icon;
-                    const isPending = sub.status === 'pending_review' || sub.status === 'pending_deletion';
+                    const isPending = item.status === 'pending_review' || item.status === 'pending_deletion';
                     return (
-                      <div key={sub.id} className={cn(
+                      <div key={item.id} className={cn(
                         "text-sm p-2 rounded-md flex justify-between items-center group transition-colors",
-                        sub.status === 'pending_deletion' ? 'bg-orange-500/10 border border-orange-500/20 opacity-80' : 'bg-secondary/50'
+                        item.status === 'pending_deletion' ? 'bg-orange-500/10 border border-orange-500/20 opacity-80' : 'bg-secondary/50'
                       )}>
                         <div className="flex-grow min-w-0">
                             <div className="flex justify-between items-start">
-                                <p className="text-muted-foreground truncate pr-4 flex-grow">{sub.evidence}</p>
+                                <p className="text-muted-foreground truncate pr-4 flex-grow">{item.evidence}</p>
                                 <div className={cn("flex items-center gap-1 font-semibold text-xs shrink-0", status.color)}>
                                     <Icon className="h-3.5 w-3.5"/>
                                     <span>{status.text}</span>
                                 </div>
                             </div>
-                            <p className="text-xs text-muted-foreground/70 mt-1">{format(sub.createdAt, "yyyy.MM.dd HH:mm", { locale: ko })}</p>
+                            <p className="text-xs text-muted-foreground/70 mt-1">{format(item.createdAt, "yyyy.MM.dd HH:mm", { locale: ko })}</p>
                         </div>
-                        <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2" onClick={() => setSubmissionToDelete(sub)} disabled={isPending}>
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
-                        </AlertDialogTrigger>
+                        {item.type === 'submission' && (
+                            <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2" onClick={() => setItemToDelete(item)} disabled={isPending}>
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </AlertDialogTrigger>
+                        )}
                       </div>
                     )
                   })

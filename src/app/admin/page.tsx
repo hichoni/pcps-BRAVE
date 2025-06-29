@@ -111,8 +111,8 @@ export default function AdminPage() {
     const key = `${username}-${area}`;
     if (value !== undefined) {
         const numericValue = parseInt(value, 10);
-        if (!isNaN(numericValue)) {
-            setProgress(username, area, numericValue);
+        if (!isNaN(numericValue) && user) {
+            handleProgressUpdate(username, area, numericValue);
         }
     }
     setEditingProgress(prev => {
@@ -123,16 +123,18 @@ export default function AdminPage() {
   };
 
   const handleProgressUpdate = async (username: string, area: AreaName, value: number | string) => {
+    if (!user) return;
     try {
-        await setProgress(username, area, value);
+        await setProgress(username, area, value, user.id);
     } catch (error) {
         toast({ variant: 'destructive', title: '오류', description: '업데이트에 실패했습니다.' });
     }
   };
 
   const handleToggleCertification = async (username: string, area: AreaName) => {
+    if (!user) return;
     try {
-        await toggleCertification(username, area);
+        await toggleCertification(username, area, user.id);
     } catch (error) {
         toast({ variant: 'destructive', title: '오류', description: '인증 상태 변경에 실패했습니다.' });
     }
@@ -435,5 +437,3 @@ export default function AdminPage() {
     </TooltipProvider>
   );
 }
-
-    
