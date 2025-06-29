@@ -167,12 +167,6 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
   }, [area, open, form]);
 
   useEffect(() => {
-    if (aiVisionEnabled) {
-      form.setValue('mediaInputType', 'upload');
-    }
-  }, [aiVisionEnabled, form]);
-
-  useEffect(() => {
     if (!autoApproveEnabled) {
       form.setValue('aiVisionCheck', false);
     }
@@ -568,7 +562,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
                           render={({ field }) => (
                               <FormItem className="pl-7">
                                   <FormLabel>미디어 입력 방식</FormLabel>
-                                  <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={aiVisionEnabled}>
+                                  <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                                       <FormControl>
                                           <SelectTrigger>
                                               <SelectValue placeholder="입력 방식 선택" />
