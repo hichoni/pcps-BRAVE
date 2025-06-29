@@ -4,7 +4,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'zod';
+import { z } from 'genkit';
 import { adminInstance } from '@/lib/firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
 
@@ -36,7 +36,7 @@ const updateProfileAvatarFlow = ai.defineFlow(
     }
 
     try {
-        const dbAdmin = getFirestore(adminInstance);
+        const dbAdmin = getFirestore();
         const userDocRef = dbAdmin.collection('users').doc(userId);
         // Use set with merge:true for more robust updates.
         // This will create the field if it doesn't exist, or update it if it does.
