@@ -39,12 +39,14 @@ Here is the context:
 - Is media (photo/video) required for this challenge? {{{mediaRequired}}}
 - Has the student attached media? {{{hasMedia}}}
 
-Please provide a single, concise sentence of feedback based on the student's text.
-- If the text is good and detailed, praise it. (e.g., "구체적인 활동 내용이 인상적이네요! 멋진 경험을 하셨군요.")
-- If the text is a bit short or lacks detail, gently suggest improvements. (e.g., "어떤 활동을 했는지 조금 더 자세히 적어주면 좋을 것 같아요.")
-- If media is required AND the student has attached it, acknowledge it positively. (e.g., "활동 내용과 함께 첨부된 파일을 보니 기대가 됩니다.")
-- If media is required AND the student has NOT attached it yet, gently remind them. (e.g., "내용이 좋습니다! 이제 활동을 증명할 사진이나 영상을 첨부해주세요.")
-- If the text is empty or just a few words, just wait for more input. Return an empty feedback string.
+Please provide a single, concise sentence of feedback based on the student's text. Follow these rules in order:
+
+1.  **First, check if the student's text is nonsensical, gibberish, or just random characters.** If it seems meaningless, provide feedback like: "음, 어떤 활동을 했는지 아직 잘 모르겠어요. 조금 더 자세히 설명해주실 수 있나요?"
+2.  If the text is meaningful but a bit short or lacks detail, gently suggest improvements. (e.g., "어떤 활동을 했는지 조금 더 자세히 적어주면 좋을 것 같아요.")
+3.  If the text is good and detailed, praise it. (e.g., "구체적인 활동 내용이 인상적이네요! 멋진 경험을 하셨군요.")
+4.  If media is required AND the student has NOT attached it yet, and the text is meaningful, gently remind them. (e.g., "좋은 내용이네요! 이제 활동을 증명할 사진이나 영상을 첨부해주세요.")
+5.  If media is required AND the student has attached it, acknowledge it positively. (e.g., "활동 내용과 함께 첨부된 파일을 보니 기대가 됩니다.")
+6.  If the text is empty or just a few words, return an empty feedback string.
 
 Keep your feedback friendly, positive, and focused on helping the student create a better submission.
 `,
