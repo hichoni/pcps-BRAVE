@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useMemo } from 'react';
@@ -186,7 +185,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-secondary justify-between">
-      <main className="flex justify-center p-4 pt-12">
+      <main className="flex justify-center p-4 pt-8">
         <Card className="w-full max-w-sm shadow-lg border">
           <CardHeader className="text-center">
             <Image
@@ -198,6 +197,7 @@ export default function LoginPage() {
               className="mx-auto rounded-full shadow-md mb-4"
             />
             <CardTitle className="font-headline text-2xl text-primary">학교장 인증제 로그인</CardTitle>
+            <CardDescription>계정 정보를 입력해주세요.</CardDescription>
           </CardHeader>
           <Tabs defaultValue="student" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
@@ -346,9 +346,10 @@ export default function LoginPage() {
           </Tabs>
         </Card>
       </main>
-      <footer className="p-4 text-center text-xs text-muted-foreground">
-        <p>본 서비스는 풍천풍서초등학교 학생들의 꿈과 도전을 응원하기 위해 제작되었습니다.</p>
-        <p className="mt-1">&copy; 2025 Pungcheon Pungseo Elementary School. All Rights Reserved.</p>
+      <footer className="p-4 pb-6 text-center text-xs text-muted-foreground">
+        <p>
+            본 서비스는 풍천풍서초등학교 학생들의 <strong className="text-primary font-semibold">꿈</strong>과 <strong className="text-primary font-semibold">도전</strong>을 응원하기 위해 제작되었습니다.
+        </p>
       </footer>
     </div>
   );
