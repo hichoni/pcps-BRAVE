@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
@@ -31,16 +32,13 @@ const resolveConfigWithIcons = (storedConfig: Record<AreaName, StoredAreaConfig>
     Object.keys(storedConfig).forEach(area => {
         const config = storedConfig[area];
         if (config) {
-            // To be resilient to config changes, merge the stored config over the default.
-            // This ensures new properties added to the default config are present.
             const defaultConfig = DEFAULT_AREAS_CONFIG[area] || {};
             const mergedConfig = { ...defaultConfig, ...config };
 
             resolvedConfig[area] = {
                 ...mergedConfig,
                 name: area,
-                icon: ICONS[mergedConfig.iconName] || ShieldOff, // Fallback icon
-                iconName: mergedConfig.iconName,
+                icon: ICONS[mergedConfig.iconName] || ShieldOff,
             };
         }
     });
@@ -108,95 +106,55 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
   }, [fetchConfig]);
 
   const updateArea = useCallback(async (areaId: AreaName, newConfig: StoredAreaConfig) => {
-    setChallengeConfig(prevConfig => {
-        if (!prevConfig) return null;
-        
-        const existingAreaConfig = prevConfig[areaId];
-
-        const newResolvedAreaConfig: BaseAreaConfig = {
-            ...existingAreaConfig,
-            ...newConfig,
-            name: areaId,
-            icon: ICONS[newConfig.iconName] || ShieldOff,
-            iconName: newConfig.iconName,
-        };
-        
-        return {
-            ...prevConfig,
-            [areaId]: newResolvedAreaConfig,
-        };
-    });
-
-    if (!db) return;
+    if (!db) throw new Error("데이터베이스 연결이 설정되지 않았습니다.");
     try {
       const configDocRef = doc(db, CONFIG_DOC_PATH);
       await updateDoc(configDocRef, { [areaId]: newConfig });
       await revalidateConfigCache();
+      await fetchConfig(); // Re-fetch the entire config to ensure UI is in sync
     } catch (error) {
-      console.error("Failed to save challenge config to Firestore", error);
-      fetchConfig();
+      console.error("Failed to update challenge area in Firestore", error);
+      // Re-throw to be caught by the calling component
+      throw new Error("도전 영역 정보 업데이트에 실패했습니다.");
     }
   }, [fetchConfig]);
 
   const addArea = useCallback(async (areaId: AreaName, newConfig: StoredAreaConfig) => {
-     setChallengeConfig(prev => {
-        if (!prev) {
-          return resolveConfigWithIcons({ [areaId]: newConfig });
-        }
-        
-        const newResolvedAreaConfig: BaseAreaConfig = {
-          ...newConfig,
-          name: areaId,
-          icon: ICONS[newConfig.iconName] || ShieldOff,
-          iconName: newConfig.iconName,
-        };
-
-        return {
-          ...prev,
-          [areaId]: newResolvedAreaConfig,
-        };
-     });
-    
-    if (!db) return;
+    if (!db) throw new Error("데이터베이스 연결이 설정되지 않았습니다.");
     try {
-        const configDocRef = doc(db, CONFIG_DOC_PATH);
-        await updateDoc(configDocRef, { [areaId]: newConfig });
-        await revalidateConfigCache();
-    } catch(e) {
-        console.error("Failed to add area", e);
-        fetchConfig(); // Revert on failure
+      const configDocRef = doc(db, CONFIG_DOC_PATH);
+      await updateDoc(configDocRef, { [areaId]: newConfig });
+      await revalidateConfigCache();
+      await fetchConfig();
+    } catch (error) {
+      console.error("Failed to add challenge area to Firestore", error);
+      throw new Error("새 도전 영역 추가에 실패했습니다.");
     }
   }, [fetchConfig]);
 
   const deleteArea = useCallback(async (areaId: AreaName) => {
-    setChallengeConfig(prev => {
-        if (!prev) return null;
-        const newConfig = { ...prev };
-        delete newConfig[areaId];
-        return newConfig;
-    });
-
-    if (!db) return;
+    if (!db) throw new Error("데이터베이스 연결이 설정되지 않았습니다.");
     try {
-        const configDocRef = doc(db, CONFIG_DOC_PATH);
-        await updateDoc(configDocRef, { [areaId]: deleteField() });
-        await revalidateConfigCache();
-    } catch(e) {
-        console.error("Failed to delete area", e);
-        fetchConfig(); // Revert on failure
+      const configDocRef = doc(db, CONFIG_DOC_PATH);
+      await updateDoc(configDocRef, { [areaId]: deleteField() });
+      await revalidateConfigCache();
+      await fetchConfig();
+    } catch (error) {
+      console.error("Failed to delete challenge area from Firestore", error);
+      throw new Error("도전 영역 삭제에 실패했습니다.");
     }
   }, [fetchConfig]);
 
   const updateAnnouncement = useCallback(async (newAnnouncement: AnnouncementConfig) => {
-    setAnnouncement(newAnnouncement);
-    if (!db) return;
+    if (!db) throw new Error("데이터베이스 연결이 설정되지 않았습니다.");
     try {
       const announcementDocRef = doc(db, ANNOUNCEMENT_DOC_PATH);
       await setDoc(announcementDocRef, newAnnouncement);
       await revalidateConfigCache();
+      await fetchConfig();
     } catch (error) {
       console.error("Failed to save announcement to Firestore", error);
-      fetchConfig(); // Revert
+      throw new Error("공지사항 저장에 실패했습니다.");
     }
   }, [fetchConfig]);
 
