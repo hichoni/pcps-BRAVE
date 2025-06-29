@@ -166,7 +166,7 @@ function GalleryCard({ submission, user, author, onSubmissionDeleted, onSubmissi
                   </AlertDialogTitle>
                   <AlertDialogDescription>
                     {user.role === 'teacher' 
-                        ? "이 게시글을 삭제하면 되돌릴 수 없습니다. 갤러리에서 영구적으로 사라집니다." 
+                        ? "이 게시글을 삭제하면 되돌릴 수 없습니다. 갤러리에서 영구적으로 사라지며, 학생의 관련 성취도도 함께 조정됩니다." 
                         : "이 게시물의 삭제를 요청합니다. 요청이 승인되면, 게시물과 관련 진행도가 영구적으로 삭제되며 되돌릴 수 없습니다."
                     }
                   </AlertDialogDescription>
@@ -420,7 +420,7 @@ export default function GalleryPage() {
     <div className="container mx-auto px-4 py-8">
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 pb-4 border-b">
         <h1 className="text-2xl sm:text-3xl font-bold font-headline text-primary flex items-center gap-2">
-            <GalleryThumbnails /> 도전 갤러리
+            <GalleryThumbnails /> {user?.role === 'teacher' ? '도전 갤러리 (관리자)' : '도전 갤러리'}
         </h1>
         <Button variant="outline" onClick={() => router.push(user?.role === 'teacher' ? '/admin' : '/dashboard')} className="self-end sm:self-auto">
             <ArrowLeft className="mr-2"/> {user?.role === 'teacher' ? '관리자 페이지로' : '대시보드로'}
