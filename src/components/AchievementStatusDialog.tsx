@@ -290,30 +290,17 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
     }
 
     const isImage = file.type.startsWith('image/');
-    const isVideo = file.type.startsWith('video/');
 
-    let limitBytes = 0;
-    let limitMb = 0;
-    let fileType = '';
-
-    if (isImage) {
-      limitBytes = MAX_IMAGE_SIZE_BYTES;
-      limitMb = MAX_IMAGE_SIZE_MB;
-      fileType = '사진';
-    } else if (isVideo) {
-      limitBytes = MAX_VIDEO_SIZE_BYTES;
-      limitMb = MAX_VIDEO_SIZE_MB;
-      fileType = '영상';
-    } else {
-      toast({ variant: 'destructive', title: '지원하지 않는 파일 형식', description: '사진 또는 영상 파일만 업로드할 수 있습니다.' });
+    if (!isImage) {
+      toast({ variant: 'destructive', title: '지원하지 않는 파일 형식', description: '사진 파일만 업로드할 수 있습니다.' });
       if (fileInputRef.current) fileInputRef.current.value = '';
       setSelectedFile(null);
       setFileName(null);
       return;
     }
 
-    if (file.size > limitBytes) {
-      toast({ variant: 'destructive', title: '파일 크기 초과', description: `${fileType} 파일 크기는 ${limitMb}MB를 넘을 수 없습니다.` });
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      toast({ variant: 'destructive', title: '파일 크기 초과', description: `사진 파일 크기는 ${MAX_IMAGE_SIZE_MB}MB를 넘을 수 없습니다.` });
       if (fileInputRef.current) fileInputRef.current.value = '';
       setSelectedFile(null);
       setFileName(null);
@@ -578,23 +565,23 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
                             {areaConfig.mediaRequired && <span className="text-destructive ml-1">*</span>}
                         </Label>
                         <p className="text-xs text-muted-foreground -mt-1">
-                            파일, URL, 또는 직접 녹화 중 하나를 선택하여 제출해주세요.
+                            사진, URL, 또는 직접 녹화 중 하나를 선택하여 제출해주세요.
                         </p>
                         <div className="space-y-4 rounded-md border p-4">
                              <div>
                                 <FormLabel htmlFor="media-file-input" className="text-sm font-medium">
-                                  파일 업로드 (사진/영상)
+                                  사진 업로드
                                   {areaConfig.aiVisionCheck && <span className="text-blue-600 font-semibold ml-1 text-xs">(AI 자동 분석 대상)</span>}
                                 </FormLabel>
                                 <Input
                                   id="media-file-input"
                                   ref={fileInputRef}
                                   type="file"
-                                  accept="image/*,video/*"
+                                  accept="image/*"
                                   onChange={handleFileChange}
                                   className="file:text-primary file:font-semibold text-xs h-9 mt-1"
                                 />
-                                <FormDescription className="text-xs mt-1">사진 {MAX_IMAGE_SIZE_MB}MB, 영상 {MAX_VIDEO_SIZE_MB}MB 이하</FormDescription>
+                                <FormDescription className="text-xs mt-1">사진 {MAX_IMAGE_SIZE_MB}MB 이하</FormDescription>
                               </div>
 
                               <div className="relative flex items-center">
