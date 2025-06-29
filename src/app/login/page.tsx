@@ -186,7 +186,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-secondary">
-      <main className="flex-grow flex items-center justify-center p-4">
+      <main className="flex-grow flex justify-center p-4 pt-12">
         <Card className="w-full max-w-sm shadow-lg border">
           <CardHeader className="text-center">
             <Image
@@ -198,7 +198,6 @@ export default function LoginPage() {
               className="mx-auto rounded-full shadow-md mb-4"
             />
             <CardTitle className="font-headline text-2xl text-primary">학교장 인증제 로그인</CardTitle>
-            <CardDescription>계정 정보를 입력해주세요.</CardDescription>
           </CardHeader>
           <Tabs defaultValue="student" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
