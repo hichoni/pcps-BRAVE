@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from './ui/button';
-import { LogOut } from 'lucide-react';
+import { LogOut, Pencil } from 'lucide-react';
 import { ProfileSettingsDialog } from './ProfileSettingsDialog';
 import { UserAvatar } from './UserAvatar';
 
@@ -20,9 +20,12 @@ function ProfileButton() {
             <button 
               onClick={() => setIsDialogOpen(true)} 
               title="프로필 설정"
-              className="rounded-full ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="relative group rounded-full ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
                 <UserAvatar user={user} className="h-8 w-8 cursor-pointer" />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <Pencil className="h-4 w-4 text-white" />
+                </div>
             </button>
             <ProfileSettingsDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} />
         </>

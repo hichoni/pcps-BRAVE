@@ -38,7 +38,9 @@ const updateProfileAvatarFlow = ai.defineFlow(
     try {
         const dbAdmin = getFirestore(adminInstance);
         const userDocRef = dbAdmin.collection('users').doc(userId);
-        await userDocRef.update({ profileAvatar: avatar });
+        // Use set with merge:true for more robust updates.
+        // This will create the field if it doesn't exist, or update it if it does.
+        await userDocRef.set({ profileAvatar: avatar }, { merge: true });
         return { success: true };
     } catch (error) {
         console.error("Error updating profile avatar with Admin SDK:", error);
