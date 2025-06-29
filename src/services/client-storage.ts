@@ -6,9 +6,10 @@ import { v4 as uuidv4 } from 'uuid';
  * Uploads a file to Firebase Storage from the client and returns the download URL.
  * @param file The file object to upload.
  * @param userId The ID of the user uploading the file.
+ * @param folder The destination folder in storage.
  * @returns The public download URL of the uploaded file.
  */
-export async function uploadFile(file: File, userId: string): Promise<string> {
+export async function uploadFile(file: File, userId: string, folder: 'evidence' | 'profile'): Promise<string> {
   if (!storage) {
     throw new Error('Firebase Storage가 초기화되지 않았습니다.');
   }
@@ -17,7 +18,7 @@ export async function uploadFile(file: File, userId: string): Promise<string> {
   }
 
   const fileExtension = file.name.split('.').pop() || 'bin';
-  const filePath = `evidence/${userId}/${Date.now()}-${uuidv4()}.${fileExtension}`;
+  const filePath = `${folder}/${userId}/${Date.now()}-${uuidv4()}.${fileExtension}`;
   const storageRef = ref(storage, filePath);
 
   try {

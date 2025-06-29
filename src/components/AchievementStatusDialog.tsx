@@ -361,7 +361,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
           return;
         }
 
-        mediaUrl = await uploadFile(fileToUpload, user.username);
+        mediaUrl = await uploadFile(fileToUpload, user.username, 'evidence');
         mediaType = fileToUpload.type;
       }
       

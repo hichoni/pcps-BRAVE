@@ -1,10 +1,33 @@
+
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from './ui/button';
 import { LogOut } from 'lucide-react';
+import { ProfileSettingsDialog } from './ProfileSettingsDialog';
+import { UserAvatar } from './UserAvatar';
+
+function ProfileButton() {
+    const { user } = useAuth();
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+    if (!user) return null;
+
+    return (
+        <>
+            <button 
+              onClick={() => setIsDialogOpen(true)} 
+              title="프로필 설정"
+              className="rounded-full ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+                <UserAvatar user={user} className="h-8 w-8 cursor-pointer" />
+            </button>
+            <ProfileSettingsDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} />
+        </>
+    );
+}
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -27,12 +50,13 @@ export function Header() {
             </div>
         </div>
         {user && (
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="flex items-center gap-3 self-end sm:self-auto">
             <span className="text-xs sm:text-sm font-semibold text-right">
               {user.role === 'student'
                 ? `${user.grade}학년 ${user.classNum}반 ${user.studentNum}번 ${user.name} 학생`
                 : `${user.name}님`}
             </span>
+            {user.role === 'student' && <ProfileButton />}
             <Button variant="ghost" size="icon" onClick={logout} aria-label="로그아웃">
               <LogOut className="h-5 w-5"/>
             </Button>

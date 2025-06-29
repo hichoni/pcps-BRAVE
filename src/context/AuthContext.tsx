@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { User, MOCK_USERS, AreaName, AchievementsState, DEFAULT_AREAS_CONFIG } from '@/lib/config';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, setDoc, query, where, writeBatch, deleteDoc, updateDoc, addDoc, getDoc, limit } from 'firebase/firestore';
+import { updateProfileAvatar } from '@/ai/flows/update-profile-avatar';
 
 
 interface LoginCredentials {
@@ -26,6 +27,7 @@ interface AuthContextType {
   login: (credentials: LoginCredentials) => Promise<User | null>;
   logout: () => void;
   updatePin: (newPin: string) => Promise<void>;
+  updateProfileAvatar: (avatar: string) => Promise<void>;
   resetPin: (username: string) => Promise<void>;
   deleteUser: (username:string) => Promise<void>;
   addUser: (studentData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>) => Promise<{ success: boolean; message: string }>;
@@ -188,6 +190,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user]);
 
+  const updateProfileAvatar = useCallback(async (avatar: string) => {
+    if (!user) throw new Error("사용자 정보가 없습니다. 다시 로그인해주세요.");
+    if (!db) throw new Error("데이터베이스에 연결되지 않았습니다. 설정을 확인해주세요.");
+
+    try {
+        await updateProfileAvatar({ userId: String(user.id), avatar });
+        
+        const updatedUser = { ...user, profileAvatar: avatar };
+        setUser(updatedUser);
+        setUsers(prevUsers => prevUsers.map(u => (u.id === user.id ? updatedUser : u)));
+        sessionStorage.setItem('user', JSON.stringify(updatedUser));
+    } catch (error) {
+        console.error("프로필 아바타 업데이트 실패:", error);
+        throw new Error("프로필 사진 업데이트에 실패했습니다. 다시 시도해주세요.");
+    }
+  }, [user]);
+
   const resetPin = useCallback(async (username: string) => {
     if (!db) throw new Error("데이터베이스에 연결되지 않았습니다. 설정을 확인해주세요.");
 
@@ -279,6 +298,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       classNum,
       studentNum,
       name,
+      profileAvatar: '',
     };
     
     try {
@@ -405,6 +425,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           classNum,
           studentNum,
           name,
+          profileAvatar: '',
         };
         newUsers.push(newUser);
         usersInThisOperation.push(newUser);
@@ -497,7 +518,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   return (
-    <AuthContext.Provider value={{ user, users, loading, usersLoading, login, logout, updatePin, resetPin, deleteUser, addUser, updateUser, bulkAddUsers, bulkDeleteUsers }}>
+    <AuthContext.Provider value={{ user, users, loading, usersLoading, login, logout, updatePin, updateProfileAvatar, resetPin, deleteUser, addUser, updateUser, bulkAddUsers, bulkDeleteUsers }}>
       {children}
     </AuthContext.Provider>
   );
