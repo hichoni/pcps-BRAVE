@@ -27,6 +27,8 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const mimeTypeRef = useRef<string>('video/webm');
 
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -38,6 +40,23 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
       setStream(null);
     }
   }, [stream]);
+
+  // Effect to clean up everything when the dialog is closed
+  useEffect(() => {
+    if (!open) {
+      stopStream();
+      if (recordedVideoUrl) {
+        URL.revokeObjectURL(recordedVideoUrl);
+        setRecordedVideoUrl(null);
+      }
+      if (recordingTimeoutRef.current) {
+        clearTimeout(recordingTimeoutRef.current);
+      }
+      mediaRecorderRef.current = null;
+      recordedChunksRef.current = [];
+      setRecordingState('idle');
+    }
+  }, [open, stopStream, recordedVideoUrl]);
 
   // Effect to get and set up the camera stream
   useEffect(() => {
@@ -53,8 +72,10 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
           }
           setStream(newStream);
           if (videoRef.current) {
-            videoRef.current.srcObject = newStream;
-            videoRef.current.play().catch(e => console.error("Video play failed:", e));
+            if (!videoRef.current.srcObject) {
+              videoRef.current.srcObject = newStream;
+              videoRef.current.play().catch(e => console.error("Video play failed:", e));
+            }
           }
         } catch (error) {
           console.error('Error accessing camera/mic:', error);
@@ -76,19 +97,14 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
     }
   }, [open, recordingState, onOpenChange, toast]);
 
-  // Effect to clean up everything when the dialog is closed
-  useEffect(() => {
-    if (!open) {
-      stopStream();
-      if (recordedVideoUrl) {
-        URL.revokeObjectURL(recordedVideoUrl);
-        setRecordedVideoUrl(null);
-      }
-      mediaRecorderRef.current = null;
-      recordedChunksRef.current = [];
-      setRecordingState('idle');
+  const stopRecording = useCallback(() => {
+    if (recordingTimeoutRef.current) {
+      clearTimeout(recordingTimeoutRef.current);
     }
-  }, [open, stopStream, recordedVideoUrl]);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+  }, []);
   
   const startRecording = useCallback(() => {
     if (!stream) return;
@@ -96,6 +112,7 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
     recordedChunksRef.current = [];
     const options = { mimeType: 'video/webm' };
     let recorder: MediaRecorder;
+
     try {
         recorder = new MediaRecorder(stream, options);
     } catch (e) {
@@ -111,6 +128,8 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
             return;
         }
     }
+    
+    mimeTypeRef.current = recorder.mimeType;
     mediaRecorderRef.current = recorder;
 
     recorder.addEventListener('dataavailable', (event) => {
@@ -120,7 +139,7 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
     });
 
     recorder.addEventListener('stop', () => {
-      const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+      const blob = new Blob(recordedChunksRef.current, { type: mimeTypeRef.current });
       const url = URL.createObjectURL(blob);
       setRecordedVideoUrl(url);
       setRecordingState('preview');
@@ -129,13 +148,10 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
 
     recorder.start();
     setRecordingState('recording');
-  }, [stream, stopStream, toast]);
-
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
-    }
-  }, []);
+    
+    // Set a timeout to stop recording after 5 minutes
+    recordingTimeoutRef.current = setTimeout(stopRecording, 5 * 60 * 1000);
+  }, [stream, stopStream, toast, stopRecording]);
   
   const handleRetake = () => {
     if (recordedVideoUrl) {
@@ -145,12 +161,21 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
     setRecordingState('idle');
   };
 
-  const handleUseVideo = () => {
+  const handleUseVideo = useCallback(() => {
     if (!recordedVideoUrl) return;
-    const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
-    const file = new File([blob], `recorded-video-${Date.now()}.webm`, { type: 'video/webm' });
+
+    const getFileExtension = (mimeType: string) => {
+      const parts = mimeType.split(';')[0].split('/');
+      if (parts[0] !== 'video') return 'webm';
+      return parts[1] || 'webm';
+    }
+
+    const extension = getFileExtension(mimeTypeRef.current);
+    
+    const blob = new Blob(recordedChunksRef.current, { type: mimeTypeRef.current });
+    const file = new File([blob], `recorded-video-${Date.now()}.${extension}`, { type: mimeTypeRef.current });
     onVideoRecorded(file);
-  };
+  }, [recordedVideoUrl, onVideoRecorded]);
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -158,7 +183,7 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
         <DialogHeader>
           <DialogTitle>영상 바로 찍기</DialogTitle>
           <DialogDescription>
-            활동 내용을 영상으로 녹화하여 바로 제출합니다.
+            최대 5분까지 녹화할 수 있습니다.
           </DialogDescription>
         </DialogHeader>
         
