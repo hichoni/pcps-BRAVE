@@ -177,6 +177,8 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
       .filter(o => o.isCertifying && o.value)
       .map(o => o.value);
 
+    // This is the object that will be stored in Firestore.
+    // It must not contain any `undefined` fields.
     const newConfigData: StoredAreaConfig = {
       koreanName: data.koreanName,
       challengeName: data.challengeName,
@@ -186,16 +188,28 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
       unit: data.unit,
       goal: data.goalType === 'numeric' ? data.goal : {},
       options: data.goalType === 'objective' ? data.options.map(o => o.value).filter(Boolean) : [],
-      autoCertifyOn: autoCertifyOn.length > 0 ? autoCertifyOn : undefined,
-      externalUrl: data.externalUrl || undefined,
-      mediaRequired: data.mediaRequired,
-      autoApprove: data.autoApprove,
-      showInGallery: data.showInGallery,
-      aiVisionCheck: data.aiVisionCheck,
-      aiVisionPrompt: data.aiVisionPrompt,
-      submissionIntervalMinutes: data.submissionIntervalMinutes,
-      goalDescription: data.goalDescription || undefined,
+      mediaRequired: data.mediaRequired ?? false,
+      autoApprove: data.autoApprove ?? false,
+      showInGallery: data.showInGallery ?? true,
+      aiVisionCheck: data.aiVisionCheck ?? false,
     };
+
+    if (autoCertifyOn.length > 0) {
+        newConfigData.autoCertifyOn = autoCertifyOn;
+    }
+    if (data.externalUrl) {
+        newConfigData.externalUrl = data.externalUrl;
+    }
+    if (data.aiVisionPrompt) {
+        newConfigData.aiVisionPrompt = data.aiVisionPrompt;
+    }
+    // Check for 0 as well, as that's a valid value meaning "no interval".
+    if (data.submissionIntervalMinutes !== undefined && data.submissionIntervalMinutes >= 0) {
+        newConfigData.submissionIntervalMinutes = data.submissionIntervalMinutes;
+    }
+    if (data.goalDescription) {
+        newConfigData.goalDescription = data.goalDescription;
+    }
     
     try {
         if (isEditMode) {
