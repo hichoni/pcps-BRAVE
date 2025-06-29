@@ -12,7 +12,7 @@ import { Card } from '@/components/ui/card';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { KeyRound, ShieldAlert, GalleryThumbnails, Info } from 'lucide-react';
+import { KeyRound, ShieldAlert, GalleryThumbnails, Info, Bug } from 'lucide-react';
 import { ChangePinDialog } from '@/components/ChangePinDialog';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -48,7 +48,8 @@ export default function Dashboard() {
       {loading && (
         <div className="mt-8">
           <Skeleton className="h-20 w-full mb-8" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+            <Skeleton className="h-40 w-full" />
             <Skeleton className="h-40 w-full" />
             <Skeleton className="h-40 w-full" />
           </div>
@@ -87,7 +88,7 @@ export default function Dashboard() {
               </Alert>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
                 <CertificateStatus />
               
                 <Link href="/gallery" passHref className="h-full">
@@ -98,6 +99,17 @@ export default function Dashboard() {
                       <GalleryThumbnails className="w-12 h-12 text-muted-foreground group-hover:text-primary transition-colors duration-300"/>
                       <p className="font-headline text-base sm:text-lg mt-3 text-primary font-semibold">도전 갤러리 가기</p>
                       <p className="text-muted-foreground text-xs">다른 친구들의 도전을 구경해보세요!</p>
+                  </Card>
+                </Link>
+
+                <Link href="/feedback" passHref className="h-full">
+                  <Card className={cn(
+                      "h-full flex flex-col items-center justify-center p-4 text-center shadow-lg border bg-card",
+                      "hover:shadow-xl hover:border-primary/50 transition-all duration-300 cursor-pointer group"
+                  )}>
+                      <Bug className="w-12 h-12 text-muted-foreground group-hover:text-primary transition-colors duration-300"/>
+                      <p className="font-headline text-base sm:text-lg mt-3 text-primary font-semibold">오류 신고 / 건의하기</p>
+                      <p className="text-muted-foreground text-xs">불편한 점이나 아이디어를 알려주세요.</p>
                   </Card>
                 </Link>
             </div>

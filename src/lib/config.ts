@@ -272,3 +272,34 @@ export interface ReviewDeletionRequestOutput {
     success: boolean;
     message: string;
 }
+
+// --- Types for Feedback Flow ---
+export const FEEDBACK_TYPES = ['bug', 'suggestion', 'etc'] as const;
+export type FeedbackType = (typeof FEEDBACK_TYPES)[number];
+
+export const FEEDBACK_STATUSES = ['new', 'viewed', 'resolved'] as const;
+export type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number];
+
+export interface Feedback {
+    id: string;
+    userId: string;
+    userName: string;
+    userRole: Role;
+    type: FeedbackType;
+    content: string;
+    status: FeedbackStatus;
+    createdAt: Date;
+}
+
+export interface SubmitFeedbackInput {
+    userId: string;
+    userName: string;
+    userRole: Role;
+    type: FeedbackType;
+    content: string;
+}
+
+export interface SubmitFeedbackOutput {
+    success: boolean;
+    id: string;
+}

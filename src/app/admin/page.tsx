@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Loader2, Users, Undo, LogOut, Settings, Plus, Minus, Check, Trash2, PlusCircle, Upload, Search, Edit, MailCheck, GalleryThumbnails } from 'lucide-react';
+import { Loader2, Users, Undo, LogOut, Settings, Plus, Minus, Check, Trash2, PlusCircle, Upload, Search, Edit, MailCheck, GalleryThumbnails, Bug } from 'lucide-react';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
 import { EditStudentDialog } from '@/components/EditStudentDialog';
 import { BulkAddStudentsDialog } from '@/components/BulkAddStudentsDialog';
@@ -199,6 +199,12 @@ export default function AdminPage() {
             <Link href="/gallery">
                 <GalleryThumbnails className="h-4 w-4 sm:mr-2"/>
                 <span className="hidden sm:inline">갤러리 관리</span>
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/feedback">
+                <Bug className="h-4 w-4 sm:mr-2"/>
+                <span className="hidden sm:inline">오류/건의함</span>
             </Link>
           </Button>
           <Button asChild variant="outline" size="sm" className="relative">
