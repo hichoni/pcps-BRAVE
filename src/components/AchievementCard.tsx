@@ -29,6 +29,7 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<'history' | 'submit'>('submit');
   const [hasApprovedToday, setHasApprovedToday] = useState(false);
+  const [hasPending, setHasPending] = useState(false);
   const [isCheckingHistory, setIsCheckingHistory] = useState(true);
 
   const openDialog = (mode: 'history' | 'submit') => {
@@ -46,16 +47,28 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
       collection(db, "challengeSubmissions"),
       where("userId", "==", user.username),
       where("areaName", "==", areaName),
-      where("status", "==", "approved")
+      where("status", "in", ["approved", "pending_review", "pending_deletion"])
     );
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const today = new Date();
-      const approvedToday = snapshot.docs.some(doc => {
+      let approvedToday = false;
+      let pending = false;
+      
+      snapshot.docs.forEach(doc => {
         const data = doc.data();
-        const createdAt = (data.createdAt as Timestamp)?.toDate();
-        return createdAt && isSameDay(createdAt, today);
+        if (data.status === 'approved') {
+          const createdAt = (data.createdAt as Timestamp)?.toDate();
+          if (createdAt && isSameDay(createdAt, today)) {
+            approvedToday = true;
+          }
+        } else if (data.status === 'pending_review' || data.status === 'pending_deletion') {
+          pending = true;
+        }
       });
+      
       setHasApprovedToday(approvedToday);
+      setHasPending(pending);
       setIsCheckingHistory(false);
     }, (error) => {
         console.error("Error checking submission history:", error);
@@ -117,6 +130,7 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
 
   const getButtonText = () => {
     if (isCheckingHistory) return '확인 중';
+    if (hasPending) return '검토 중';
     if (hasApprovedToday) return '오늘 도전 완료';
     if (isCertified) return '계속 도전하기';
     return '도전하기';
@@ -177,7 +191,7 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
                             : "bg-primary text-primary-foreground hover:bg-primary/90"
                     )}
                     onClick={() => openDialog('submit')}
-                    disabled={hasApprovedToday || isCheckingHistory}>
+                    disabled={hasPending || hasApprovedToday || isCheckingHistory}>
                     {isCheckingHistory 
                       ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       : <ListChecks className="mr-2 h-4 w-4" />
