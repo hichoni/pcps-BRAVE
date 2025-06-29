@@ -53,6 +53,7 @@ export const STATUS_CONFIG: Record<CertificateStatus, { label: string; icon: Luc
 };
 
 export type GoalType = 'numeric' | 'objective';
+export type MediaType = 'photo' | 'video' | 'url';
 
 export type AreaConfig = {
   name: string;
@@ -67,7 +68,8 @@ export type AreaConfig = {
   options?: string[];             // For 'objective' type
   unit: string;                  // Unit for 'numeric', or a descriptive noun for 'objective'
   externalUrl?: string;
-  mediaRequired?: boolean;
+  isMediaRequired?: boolean;
+  allowedMediaTypes?: MediaType[];
   autoApprove?: boolean;
   goalDescription?: string;
   showInGallery?: boolean;
@@ -79,7 +81,8 @@ export type AreaConfig = {
 
 export type StoredAreaConfig = Omit<AreaConfig, 'icon' | 'name'> & { 
   externalUrl?: string;
-  mediaRequired?: boolean;
+  isMediaRequired?: boolean;
+  allowedMediaTypes?: MediaType[];
   autoApprove?: boolean;
   goalDescription?: string;
   placeholderText?: string;
@@ -125,6 +128,8 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     aiVisionCheck: false,
     aiVisionPrompt: '',
     submissionIntervalMinutes: 1440, // 1 day
+    isMediaRequired: false,
+    allowedMediaTypes: ['photo', 'video', 'url'],
   },
   Volunteering: {
     koreanName: '봉사',
@@ -135,7 +140,8 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goalType: 'numeric',
     goal: { '4': 10, '5': 10, '6': 10 },
     unit: '시간',
-    mediaRequired: true,
+    isMediaRequired: true,
+    allowedMediaTypes: ['photo', 'video', 'url'],
     autoApprove: false, // Requires photo review
     showInGallery: true,
     aiVisionCheck: false,
@@ -169,7 +175,8 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goalType: 'numeric',
     goal: { '4': 1, '5': 1, '6': 1 },
     unit: '회 참여',
-    mediaRequired: true,
+    isMediaRequired: true,
+    allowedMediaTypes: ['photo', 'video', 'url'],
     autoApprove: false, // Requires review
     externalUrl: '',
     showInGallery: true,
@@ -186,7 +193,8 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goalType: 'numeric',
     goal: { '4': 10, '5': 15, '6': 20 },
     unit: '회',
-    mediaRequired: true,
+    isMediaRequired: true,
+    allowedMediaTypes: ['photo'],
     autoApprove: true,
     showInGallery: true,
     aiVisionCheck: true,
@@ -320,5 +328,3 @@ export interface UpdateFeedbackOutput {
     success: boolean;
     message: string;
 }
-
-    

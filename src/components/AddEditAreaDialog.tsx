@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, PlusCircle, Trash2, Save, Info } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from './ui/form';
-import { ICONS, AreaName, StoredAreaConfig } from '@/lib/config';
+import { ICONS, AreaName, StoredAreaConfig, MediaType } from '@/lib/config';
 import { Checkbox } from './ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { cn } from '@/lib/utils';
@@ -44,7 +44,12 @@ const formSchema = z.object({
     isCertifying: z.boolean().optional(),
   })),
   externalUrl: z.string().url({ message: "올바른 URL 형식을 입력해주세요." }).optional().or(z.literal('')),
-  mediaRequired: z.boolean().optional(),
+  isMediaRequired: z.boolean().optional(),
+  allowedMediaTypes: z.object({
+    photo: z.boolean(),
+    video: z.boolean(),
+    url: z.boolean(),
+  }),
   autoApprove: z.boolean().optional(),
   showInGallery: z.boolean().optional(),
   aiVisionCheck: z.boolean().optional(),
@@ -61,7 +66,16 @@ const formSchema = z.object({
         return data.options.length > 0;
     }
     return true;
-}, { message: '객관식 선택형은 최소 1개 이상의 옵션이 필요합니다.', path: ['options'] });
+}, { message: '객관식 선택형은 최소 1개 이상의 옵션이 필요합니다.', path: ['options'] })
+.refine(data => {
+    if (data.isMediaRequired) {
+        return data.allowedMediaTypes.photo || data.allowedMediaTypes.video || data.allowedMediaTypes.url;
+    }
+    return true;
+}, {
+    message: '미디어가 필수인 경우, 하나 이상의 제출 방식을 허용해야 합니다.',
+    path: ['isMediaRequired'],
+});
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -71,6 +85,28 @@ interface AddEditAreaDialogProps {
   area: { id: AreaName, config: StoredAreaConfig } | null;
 }
 
+const defaultFormValues: FormValues = {
+  id: '',
+  koreanName: '',
+  challengeName: '',
+  iconName: '',
+  requirements: '',
+  placeholderText: '',
+  goalType: 'numeric',
+  unit: '',
+  goal: { '4': 0, '5': 0, '6': 0 },
+  options: [{ value: '', isCertifying: false }],
+  externalUrl: '',
+  isMediaRequired: false,
+  allowedMediaTypes: { photo: true, video: true, url: true },
+  autoApprove: false,
+  showInGallery: true,
+  aiVisionCheck: false,
+  aiVisionPrompt: '',
+  submissionIntervalMinutes: 0,
+  goalDescription: '',
+};
+
 export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialogProps) {
   const { challengeConfig, addArea, updateArea } = useChallengeConfig();
   const { toast } = useToast();
@@ -78,26 +114,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      id: '',
-      koreanName: '',
-      challengeName: '',
-      iconName: '',
-      requirements: '',
-      placeholderText: '',
-      goalType: 'numeric',
-      unit: '',
-      goal: { '4': 0, '5': 0, '6': 0 },
-      options: [],
-      externalUrl: '',
-      mediaRequired: false,
-      autoApprove: false,
-      showInGallery: true,
-      aiVisionCheck: false,
-      aiVisionPrompt: '',
-      submissionIntervalMinutes: 0,
-      goalDescription: '',
-    },
+    defaultValues: defaultFormValues,
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -108,11 +125,16 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
   const goalType = form.watch('goalType');
   const autoApproveEnabled = form.watch('autoApprove');
   const aiVisionEnabled = form.watch('aiVisionCheck');
+  const isPhotoAllowed = form.watch('allowedMediaTypes.photo');
+  const watchAllowedMedia = useWatch({ control: form.control, name: 'allowedMediaTypes' });
+  const noMediaTypeSelected = !watchAllowedMedia.photo && !watchAllowedMedia.video && !watchAllowedMedia.url;
+  
   const isEditMode = !!area;
 
   useEffect(() => {
     if (open) {
       if (area) {
+        const mediaTypes = area.config.allowedMediaTypes || ['photo', 'video', 'url'];
         form.reset({
           id: area.id,
           koreanName: area.config.koreanName,
@@ -128,7 +150,12 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
               isCertifying: area.config.autoCertifyOn?.includes(o) ?? false,
           })) || [],
           externalUrl: area.config.externalUrl || '',
-          mediaRequired: area.config.mediaRequired || false,
+          isMediaRequired: area.config.isMediaRequired || false,
+          allowedMediaTypes: {
+            photo: mediaTypes.includes('photo'),
+            video: mediaTypes.includes('video'),
+            url: mediaTypes.includes('url'),
+          },
           autoApprove: area.config.autoApprove || false,
           showInGallery: area.config.showInGallery ?? true,
           aiVisionCheck: area.config.aiVisionCheck ?? false,
@@ -137,26 +164,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
           goalDescription: area.config.goalDescription || '',
         });
       } else {
-        form.reset({
-          id: '',
-          koreanName: '',
-          challengeName: '',
-          iconName: '',
-          requirements: '',
-          placeholderText: '',
-          goalType: 'numeric',
-          unit: '',
-          goal: { '4': 0, '5': 0, '6': 0 },
-          options: [{ value: '', isCertifying: false }],
-          externalUrl: '',
-          mediaRequired: false,
-          autoApprove: false,
-          showInGallery: true,
-          aiVisionCheck: false,
-          aiVisionPrompt: '',
-          submissionIntervalMinutes: 0,
-          goalDescription: '',
-        });
+        form.reset(defaultFormValues);
       }
     }
   }, [area, open, form]);
@@ -180,6 +188,10 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
     const autoCertifyOn = data.options
       .filter(o => o.isCertifying && o.value)
       .map(o => o.value);
+    
+    const allowedMediaTypes = Object.entries(data.allowedMediaTypes)
+        .filter(([, value]) => value)
+        .map(([key]) => key as MediaType);
 
     const newConfigData: StoredAreaConfig = {
       koreanName: data.koreanName,
@@ -190,7 +202,8 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
       unit: data.unit,
       goal: data.goalType === 'numeric' ? data.goal : {},
       options: data.goalType === 'objective' ? data.options.map(o => o.value).filter(Boolean) : [],
-      mediaRequired: data.mediaRequired ?? false,
+      isMediaRequired: data.isMediaRequired ?? false,
+      allowedMediaTypes: allowedMediaTypes,
       autoApprove: data.autoApprove ?? false,
       showInGallery: data.showInGallery ?? true,
       aiVisionCheck: data.aiVisionCheck ?? false,
@@ -482,7 +495,77 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
               />
               
               <div className="p-4 border rounded-md space-y-4">
-                  <h4 className="text-sm font-semibold text-foreground">세부 설정</h4>
+                  <h4 className="text-sm font-semibold text-foreground">증명 자료 설정</h4>
+                   <FormItem>
+                      <FormLabel>허용할 제출 방식</FormLabel>
+                      <FormDescription className="text-xs">
+                          학생이 활동을 증명하기 위해 사용할 수 있는 방법을 선택합니다.
+                      </FormDescription>
+                      <div className="flex flex-col sm:flex-row gap-x-6 gap-y-2 pt-2">
+                          <FormField
+                              control={form.control}
+                              name="allowedMediaTypes.photo"
+                              render={({ field }) => (
+                                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                  <FormControl>
+                                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                                  </FormControl>
+                                  <FormLabel className="font-normal">사진 업로드</FormLabel>
+                                  </FormItem>
+                              )}
+                          />
+                          <FormField
+                              control={form.control}
+                              name="allowedMediaTypes.video"
+                              render={({ field }) => (
+                                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                  <FormControl>
+                                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                                  </FormControl>
+                                  <FormLabel className="font-normal">영상 직접 녹화</FormLabel>
+                                  </FormItem>
+                              )}
+                          />
+                          <FormField
+                              control={form.control}
+                              name="allowedMediaTypes.url"
+                              render={({ field }) => (
+                                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                  <FormControl>
+                                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                                  </FormControl>
+                                  <FormLabel className="font-normal">외부 URL 입력</FormLabel>
+                                  </FormItem>
+                              )}
+                          />
+                      </div>
+                  </FormItem>
+
+                   <FormField
+                      control={form.control}
+                      name="isMediaRequired"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                           <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              disabled={noMediaTypeSelected}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className={cn(noMediaTypeSelected && "text-muted-foreground")}>
+                              위 방식 중 하나 이상 제출 필수
+                            </FormLabel>
+                             <FormMessage />
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+              </div>
+
+              <div className="p-4 border rounded-md space-y-4">
+                  <h4 className="text-sm font-semibold text-foreground">자동화 및 공개 설정</h4>
                   {goalType === 'numeric' &&
                   <>
                   <FormField
@@ -531,27 +614,6 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
                   />
                   <FormField
                     control={form.control}
-                    name="mediaRequired"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                         <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>
-                            미디어(사진/영상/URL) 제출 필수
-                          </FormLabel>
-                          <FormDescription className="text-xs">학생이 활동 내용을 제출할 때 사진, 영상, 또는 URL 중 하나를 필수로 제출하게 만듭니다.</FormDescription>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
                     name="autoApprove"
                     render={({ field }) => (
                       <FormItem className="flex flex-row items-center space-x-3 space-y-0">
@@ -579,21 +641,21 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
                           <Checkbox
                             checked={field.value}
                             onCheckedChange={field.onChange}
-                            disabled={!autoApproveEnabled}
+                            disabled={!autoApproveEnabled || !isPhotoAllowed}
                           />
                         </FormControl>
                         <div className="space-y-1 leading-none">
-                          <FormLabel className={cn(!autoApproveEnabled && "text-muted-foreground")}>
-                            AI Vision으로 사진/영상 분석
+                          <FormLabel className={cn((!autoApproveEnabled || !isPhotoAllowed) && "text-muted-foreground")}>
+                            AI Vision으로 사진 분석
                           </FormLabel>
-                           <FormDescription className={cn("text-xs", !autoApproveEnabled && "text-muted-foreground/50")}>
-                            AI가 제출된 미디어를 직접 보고 내용을 판단합니다. (파일 업로드만 지원)
+                           <FormDescription className={cn("text-xs", (!autoApproveEnabled || !isPhotoAllowed) && "text-muted-foreground/50")}>
+                            AI가 제출된 사진을 직접 보고 내용을 판단합니다. (사진 업로드 방식만 지원)
                            </FormDescription>
                         </div>
                       </FormItem>
                     )}
                   />
-                  {aiVisionEnabled && autoApproveEnabled && (
+                  {aiVisionEnabled && autoApproveEnabled && isPhotoAllowed && (
                      <FormField
                         control={form.control}
                         name="aiVisionPrompt"
@@ -635,5 +697,3 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
     </Dialog>
   );
 }
-
-    

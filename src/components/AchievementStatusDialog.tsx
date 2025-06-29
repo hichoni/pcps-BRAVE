@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback, useId, useRef } from 'react';
@@ -253,7 +254,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
           text: evidenceValue,
           requirements: areaConfig.requirements,
           hasMedia: hasMedia,
-          mediaRequired: !!areaConfig.mediaRequired,
+          mediaRequired: !!areaConfig.isMediaRequired,
         });
         setAiFeedback(result?.feedback ?? null);
       } catch (error) {
@@ -342,8 +343,8 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
         return;
       }
       
-      if (areaConfig.mediaRequired && !fileToUpload && !urlFromInput) {
-          toast({ variant: 'destructive', title: '미디어 누락', description: '이 영역은 미디어(파일 또는 URL) 제출이 필수입니다.' });
+      if (areaConfig.isMediaRequired && !fileToUpload && !urlFromInput) {
+          toast({ variant: 'destructive', title: '미디어 누락', description: '이 영역은 미디어 제출이 필수입니다.' });
           setIsSubmitting(false);
           return;
       }
@@ -440,6 +441,11 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
   const dialogTitle = initialMode === 'history' 
     ? `[${koreanName}] 활동 내역` 
     : `[${koreanName}] ${challengeName}`;
+
+  const allowPhoto = areaConfig.allowedMediaTypes?.includes('photo') ?? true;
+  const allowVideo = areaConfig.allowedMediaTypes?.includes('video') ?? true;
+  const allowUrl = areaConfig.allowedMediaTypes?.includes('url') ?? true;
+  const mediaAllowed = allowPhoto || allowVideo || allowUrl;
 
   return (
     <>
@@ -559,67 +565,79 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
                         )}
                       </div>
                       
-                      <div className="space-y-2">
-                        <Label>
-                            증명 자료
-                            {areaConfig.mediaRequired && <span className="text-destructive ml-1">*</span>}
-                        </Label>
-                        <p className="text-xs text-muted-foreground -mt-1">
-                            사진, URL, 또는 직접 녹화 중 하나를 선택하여 제출해주세요.
-                        </p>
-                        <div className="space-y-4 rounded-md border p-4">
-                             <div>
-                                <FormLabel htmlFor="media-file-input" className="text-sm font-medium">
-                                  사진 업로드
-                                  {areaConfig.aiVisionCheck && <span className="text-blue-600 font-semibold ml-1 text-xs">(AI 자동 분석 대상)</span>}
-                                </FormLabel>
-                                <Input
-                                  id="media-file-input"
-                                  ref={fileInputRef}
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={handleFileChange}
-                                  className="file:text-primary file:font-semibold text-xs h-9 mt-1"
+                      {mediaAllowed && (
+                        <div className="space-y-2">
+                          <Label>
+                              증명 자료
+                              {areaConfig.isMediaRequired && <span className="text-destructive ml-1">*</span>}
+                          </Label>
+                          <p className="text-xs text-muted-foreground -mt-1">
+                              교사가 허용한 방법으로 활동을 증명해주세요.
+                          </p>
+                          <div className="space-y-4 rounded-md border p-4">
+                              {allowPhoto && (
+                                <div>
+                                  <FormLabel htmlFor="media-file-input" className="text-sm font-medium">
+                                    사진 업로드
+                                    {areaConfig.aiVisionCheck && <span className="text-blue-600 font-semibold ml-1 text-xs">(AI 자동 분석 대상)</span>}
+                                  </FormLabel>
+                                  <Input
+                                    id="media-file-input"
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleFileChange}
+                                    className="file:text-primary file:font-semibold text-xs h-9 mt-1"
+                                  />
+                                  <FormDescription className="text-xs mt-1">사진 {MAX_IMAGE_SIZE_MB}MB 이하</FormDescription>
+                                </div>
+                              )}
+
+                               {allowPhoto && (allowVideo || allowUrl) && (
+                                 <div className="relative flex items-center">
+                                    <Separator className="flex-1" />
+                                    <span className="mx-2 text-xs text-muted-foreground">또는</span>
+                                    <Separator className="flex-1" />
+                                  </div>
+                               )}
+
+                               {allowVideo && (
+                                 <Button type="button" variant="outline" className="w-full" onClick={() => setIsRecordingDialogOpen(true)}>
+                                    <Video className="mr-2" /> 영상 바로 찍기
+                                 </Button>
+                               )}
+
+                               {allowVideo && allowUrl && (
+                                <div className="relative flex items-center">
+                                  <Separator className="flex-1" />
+                                  <span className="mx-2 text-xs text-muted-foreground">또는</span>
+                                  <Separator className="flex-1" />
+                                </div>
+                               )}
+
+                               {allowUrl && (
+                                <FormField
+                                  control={form.control}
+                                  name="mediaUrl"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel className="text-sm font-medium">
+                                        외부 URL 붙여넣기 (유튜브 등)
+                                      </FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="https://..." {...field} />
+                                      </FormControl>
+                                      <FormDescription className="text-xs mt-1">
+                                          URL로 제출하면 선생님의 확인이 필요해요.
+                                      </FormDescription>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
                                 />
-                                <FormDescription className="text-xs mt-1">사진 {MAX_IMAGE_SIZE_MB}MB 이하</FormDescription>
-                              </div>
-
-                              <div className="relative flex items-center">
-                                <Separator className="flex-1" />
-                                <span className="mx-2 text-xs text-muted-foreground">또는</span>
-                                <Separator className="flex-1" />
-                              </div>
-
-                               <Button type="button" variant="outline" className="w-full" onClick={() => setIsRecordingDialogOpen(true)}>
-                                  <Video className="mr-2" /> 영상 바로 찍기
-                               </Button>
-
-                               <div className="relative flex items-center">
-                                <Separator className="flex-1" />
-                                <span className="mx-2 text-xs text-muted-foreground">또는</span>
-                                <Separator className="flex-1" />
-                              </div>
-
-                              <FormField
-                                control={form.control}
-                                name="mediaUrl"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="text-sm font-medium">
-                                      외부 URL 붙여넣기 (유튜브 등)
-                                    </FormLabel>
-                                    <FormControl>
-                                      <Input placeholder="https://..." {...field} />
-                                    </FormControl>
-                                    <FormDescription className="text-xs mt-1">
-                                        URL로 제출하면 선생님의 확인이 필요해요.
-                                    </FormDescription>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
+                               )}
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {fileName && (
                         <div className="text-sm p-3 bg-secondary rounded-md text-secondary-foreground flex items-center gap-2">

@@ -36,7 +36,7 @@ Your goal is to be helpful and encouraging, NOT to give a final pass/fail grade.
 Here is the context:
 - Challenge Requirements: "{{{requirements}}}"
 - Student's written evidence: "{{{text}}}"
-- Is media (photo/video) required for this challenge? {{{mediaRequired}}}
+- Is media (photo/video/URL) required for this challenge? {{{mediaRequired}}}
 - Has the student attached media? {{{hasMedia}}}
 
 Please provide a single, concise sentence of feedback based on the student's text. Follow these rules in order:
@@ -67,5 +67,3 @@ const textFeedbackFlow = ai.defineFlow(
     return result.output ?? null;
   }
 );
-
-    
