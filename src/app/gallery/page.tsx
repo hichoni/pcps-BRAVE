@@ -23,8 +23,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EditSubmissionDialog } from '@/components/EditSubmissionDialog';
-import { SubmissionStatus } from '@/lib/config';
+import { SubmissionStatus, CertificateStatus, STATUS_CONFIG } from '@/lib/config';
 import { Badge } from '@/components/ui/badge';
+import { useAchievements } from '@/context/AchievementsContext';
 
 
 interface Submission {
@@ -53,7 +54,7 @@ const maskName = (name: string) => {
   return name;
 };
 
-function GalleryCard({ submission, user, onSubmissionDeleted, onSubmissionUpdated }: { submission: Submission; user: User | null, onSubmissionDeleted: (id: string) => void, onSubmissionUpdated: (updatedSubmission: {id: string; evidence: string}) => void }) {
+function GalleryCard({ submission, user, onSubmissionDeleted, onSubmissionUpdated, statusInfo }: { submission: Submission; user: User | null, onSubmissionDeleted: (id: string) => void, onSubmissionUpdated: (updatedSubmission: {id: string; evidence: string}) => void, statusInfo: typeof STATUS_CONFIG[keyof typeof STATUS_CONFIG] }) {
   const { challengeConfig } = useChallengeConfig();
   const { toast } = useToast();
   const AreaIcon = challengeConfig?.[submission.areaName]?.icon || UserIcon;
@@ -126,7 +127,13 @@ function GalleryCard({ submission, user, onSubmissionDeleted, onSubmissionUpdate
             <AvatarFallback>{submission.userName.charAt(0)}</AvatarFallback>
          </Avatar>
          <div className="flex-grow">
-            <CardTitle className="text-base font-bold">{maskName(submission.userName)} 학생</CardTitle>
+            <CardTitle className="text-base font-bold flex items-center gap-2">
+              <span>{maskName(submission.userName)} 학생</span>
+              <div title={statusInfo.label} className={cn("flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full", statusInfo.badgeClassName)}>
+                  <statusInfo.icon className="w-3.5 h-3.5" />
+                  <span>{statusInfo.label}</span>
+              </div>
+            </CardTitle>
             <CardDescription className="flex items-center gap-1 text-xs pt-1">
                 <CalendarIcon className="w-3 h-3"/>
                 {submission.createdAt ? formatDistanceToNow(submission.createdAt, { addSuffix: true, locale: ko }) : '방금 전'}
@@ -171,7 +178,7 @@ function GalleryCard({ submission, user, onSubmissionDeleted, onSubmissionUpdate
       <CardContent className="flex-grow space-y-4">
         <div className="p-3 bg-secondary/50 rounded-md">
             <div className="flex items-center gap-2 text-sm font-semibold text-primary">
-                <AreaIcon className="w-4 h-4" />
+                <AreaIcon className="w-4 w-4" />
                 <span>{submission.koreanName} - {submission.challengeName}</span>
             </div>
         </div>
@@ -228,6 +235,7 @@ function GalleryCard({ submission, user, onSubmissionDeleted, onSubmissionUpdate
 export default function GalleryPage() {
   const { user, users, loading: authLoading, usersLoading } = useAuth();
   const { challengeConfig, loading: configLoading } = useChallengeConfig();
+  const { certificateStatus, loading: achievementsLoading } = useAchievements();
   const router = useRouter();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
@@ -381,7 +389,7 @@ export default function GalleryPage() {
   }, [submissions, user, userMap, gradeFilter, classFilter, searchQuery]);
 
 
-  if (authLoading || usersLoading || configLoading || !user) {
+  if (authLoading || usersLoading || configLoading || achievementsLoading || !user) {
     return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
   
@@ -456,7 +464,10 @@ export default function GalleryPage() {
       ) : (
         <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {filteredSubmissions.map(sub => <GalleryCard key={sub.id} submission={sub} user={user} onSubmissionDeleted={handleSubmissionDeleted} onSubmissionUpdated={handleSubmissionUpdated}/>)}
+              {filteredSubmissions.map(sub => {
+                const statusInfo = STATUS_CONFIG[certificateStatus(sub.userId)];
+                return <GalleryCard key={sub.id} submission={sub} user={user} onSubmissionDeleted={handleSubmissionDeleted} onSubmissionUpdated={handleSubmissionUpdated} statusInfo={statusInfo} />
+              })}
             </div>
             {hasMore && (
                 <div className="mt-12 text-center">

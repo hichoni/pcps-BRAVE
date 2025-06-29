@@ -44,11 +44,11 @@ export const CERTIFICATE_THRESHOLDS = {
 
 export type CertificateStatus = 'Gold' | 'Silver' | 'Bronze' | 'Unranked';
 
-export const STATUS_CONFIG: Record<CertificateStatus, { label: string; icon: LucideIcon; color: string }> = {
-  Gold: { label: '금장', icon: Award, color: 'text-yellow-400' },
-  Silver: { label: '은장', icon: Medal, color: 'text-gray-400' },
-  Bronze: { label: '동장', icon: Gem, color: 'text-orange-400' },
-  Unranked: { label: '미해당', icon: ShieldOff, color: 'text-muted-foreground' },
+export const STATUS_CONFIG: Record<CertificateStatus, { label: string; icon: LucideIcon; color: string; badgeClassName: string; }> = {
+  Gold: { label: '금장', icon: Award, color: 'text-yellow-500', badgeClassName: 'bg-yellow-400/20 text-yellow-600' },
+  Silver: { label: '은장', icon: Medal, color: 'text-gray-500', badgeClassName: 'bg-gray-400/20 text-gray-600' },
+  Bronze: { label: '동장', icon: Gem, color: 'text-orange-500', badgeClassName: 'bg-orange-400/20 text-orange-600' },
+  Unranked: { label: '미인증', icon: ShieldOff, color: 'text-muted-foreground', badgeClassName: 'bg-muted text-muted-foreground' },
 };
 
 export type GoalType = 'numeric' | 'objective';
