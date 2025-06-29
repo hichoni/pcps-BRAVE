@@ -5,8 +5,9 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { db } from '@/lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { adminInstance } from '@/lib/firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
+
 
 const UpdateProfileAvatarInputSchema = z.object({
   userId: z.string().describe("The user document ID (as a string)."),
@@ -30,16 +31,18 @@ const updateProfileAvatarFlow = ai.defineFlow(
     outputSchema: UpdateProfileAvatarOutputSchema,
   },
   async ({ userId, avatar }) => {
-    if (!db) {
-      throw new Error("데이터베이스에 연결할 수 없습니다.");
+    if (!adminInstance.apps.length) {
+      throw new Error("Firebase Admin SDK가 초기화되지 않았습니다. 서버 설정을 확인해주세요.");
     }
+
     try {
-        const userDocRef = doc(db, 'users', userId);
-        await updateDoc(userDocRef, { profileAvatar: avatar });
+        const dbAdmin = getFirestore(adminInstance);
+        const userDocRef = dbAdmin.collection('users').doc(userId);
+        await userDocRef.update({ profileAvatar: avatar });
         return { success: true };
     } catch (error) {
-        console.error("Error updating profile avatar in Firestore:", error);
-        throw new Error("프로필 사진 업데이트에 실패했습니다.");
+        console.error("Error updating profile avatar with Admin SDK:", error);
+        throw new Error("프로필 사진 업데이트에 실패했습니다. 관리자에게 문의해주세요.");
     }
   }
 );

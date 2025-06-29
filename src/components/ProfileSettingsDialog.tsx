@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef } from 'react';
@@ -8,19 +9,19 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
-  DialogClose,
-  DialogDescription
+  DialogClose
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, UploadCloud, FileCheck, CheckCircle2 } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, UploadCloud, FileCheck, CheckCircle2 } from 'lucide-react';
 import { AVATAR_OPTIONS } from './PredefinedAvatars';
 import { cn } from '@/lib/utils';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { uploadFile } from '@/services/client-storage';
 import { resizeImage } from '@/lib/image-utils';
+import { Separator } from './ui/separator';
 
 interface ProfileSettingsDialogProps {
   open: boolean;
@@ -114,7 +115,7 @@ export function ProfileSettingsDialog({ open, onOpenChange }: ProfileSettingsDia
 
   return (
     <Dialog open={open} onOpenChange={handleDialogClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>프로필 설정</DialogTitle>
           <DialogDescription>
@@ -122,64 +123,74 @@ export function ProfileSettingsDialog({ open, onOpenChange }: ProfileSettingsDia
           </DialogDescription>
         </DialogHeader>
         
-        <Tabs defaultValue="icon" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="icon">아이콘 선택</TabsTrigger>
-              <TabsTrigger value="upload">사진 올리기</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="icon" className="py-4">
-                <div className="grid grid-cols-4 gap-4">
-                    {AVATAR_OPTIONS.map((option) => (
-                        <button
-                          key={option.key}
-                          onClick={() => handleIconSelect(option.key)}
-                          disabled={loading}
-                          className={cn(
-                            "aspect-square rounded-full flex items-center justify-center p-2 relative ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                            selectedIconKey === option.key ? 'bg-primary text-primary-foreground' : 'bg-secondary hover:bg-secondary/80'
-                          )}
-                        >
-                            <option.component />
-                            {selectedIconKey === option.key && (
-                                <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-0.5">
-                                    <CheckCircle2 className="h-5 w-5 text-primary"/>
-                                </div>
-                            )}
-                        </button>
-                    ))}
-                </div>
-            </TabsContent>
-            
-            <TabsContent value="upload" className="py-4 space-y-4">
-                <div>
-                  <Label htmlFor="photo-upload">프로필 사진 파일</Label>
-                  <Input
-                    id="photo-upload"
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    disabled={loading}
-                    className="file:text-primary file:font-semibold text-xs h-10 mt-1"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {MAX_IMAGE_SIZE_MB}MB 이하의 이미지 파일을 올려주세요. (정사각형으로 잘릴 수 있습니다)
-                  </p>
-                </div>
-                {fileName && (
-                    <div className="text-sm p-3 bg-secondary rounded-md text-secondary-foreground flex items-center gap-2">
-                        <FileCheck className="h-4 w-4 text-primary" />
-                        <span className="font-medium">{fileName}</span>
+        <div className="py-4 space-y-6 max-h-[60vh] overflow-y-auto px-1">
+          {/* Icon Selection Part */}
+          <div>
+            <h3 className="text-sm font-semibold text-foreground mb-3 px-1">아이콘으로 변경</h3>
+            <div className="grid grid-cols-5 gap-3">
+              {AVATAR_OPTIONS.map((option) => (
+                <button
+                  key={option.key}
+                  onClick={() => handleIconSelect(option.key)}
+                  disabled={loading}
+                  title={option.name}
+                  className={cn(
+                    "aspect-square rounded-lg flex items-center justify-center p-2 relative ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    "text-muted-foreground bg-secondary hover:bg-secondary/80",
+                    selectedIconKey === option.key && 'bg-primary text-primary-foreground'
+                  )}
+                >
+                  <option.component />
+                  {selectedIconKey === option.key && (
+                    <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-0.5">
+                      <CheckCircle2 className="h-5 w-5 text-primary"/>
                     </div>
-                )}
-                <Button onClick={handleUploadSubmit} disabled={loading || !selectedFile} className="w-full">
-                    {loading ? <Loader2 className="animate-spin" /> : <UploadCloud className="mr-2"/>}
-                    사진으로 변경하기
-                </Button>
-            </TabsContent>
-        </Tabs>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Separator />
+          
+          {/* Photo Upload Part */}
+          <div>
+            <h3 className="text-sm font-semibold text-foreground mb-3 px-1">내 사진으로 변경</h3>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="photo-upload" className="sr-only">프로필 사진 파일</Label>
+                <Input
+                  id="photo-upload"
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  disabled={loading}
+                  className="file:text-primary file:font-semibold text-xs h-10"
+                />
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  {MAX_IMAGE_SIZE_MB}MB 이하의 이미지 파일을 올려주세요. (정사각형으로 잘릴 수 있습니다)
+                </p>
+              </div>
+              {fileName && (
+                <div className="text-sm p-3 bg-secondary rounded-md text-secondary-foreground flex items-center gap-2">
+                  <FileCheck className="h-4 w-4 text-primary" />
+                  <span className="font-medium">{fileName}</span>
+                </div>
+              )}
+              <Button onClick={handleUploadSubmit} disabled={loading || !selectedFile} className="w-full">
+                {loading && selectedFile ? <Loader2 className="animate-spin" /> : <UploadCloud className="mr-2"/>}
+                사진으로 변경하기
+              </Button>
+            </div>
+          </div>
+        </div>
         
+        <DialogFooter className="pt-4 border-t">
+            <DialogClose asChild>
+                <Button variant="outline" className="w-full">닫기</Button>
+            </DialogClose>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
