@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, PlusCircle, Trash2, Save, Info } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from './ui/form';
-import { ICONS, AreaName, StoredAreaConfig, MediaInputType } from '@/lib/config';
+import { ICONS, AreaName, StoredAreaConfig } from '@/lib/config';
 import { Checkbox } from './ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { cn } from '@/lib/utils';
@@ -45,7 +45,6 @@ const formSchema = z.object({
   })),
   externalUrl: z.string().url({ message: "올바른 URL 형식을 입력해주세요." }).optional().or(z.literal('')),
   mediaRequired: z.boolean().optional(),
-  mediaInputType: z.enum(['upload', 'url']).optional(),
   autoApprove: z.boolean().optional(),
   showInGallery: z.boolean().optional(),
   aiVisionCheck: z.boolean().optional(),
@@ -92,7 +91,6 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
       options: [],
       externalUrl: '',
       mediaRequired: false,
-      mediaInputType: 'upload',
       autoApprove: false,
       showInGallery: true,
       aiVisionCheck: false,
@@ -108,7 +106,6 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
   });
 
   const goalType = form.watch('goalType');
-  const mediaRequiredEnabled = form.watch('mediaRequired');
   const autoApproveEnabled = form.watch('autoApprove');
   const aiVisionEnabled = form.watch('aiVisionCheck');
   const isEditMode = !!area;
@@ -132,7 +129,6 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
           })) || [],
           externalUrl: area.config.externalUrl || '',
           mediaRequired: area.config.mediaRequired || false,
-          mediaInputType: area.config.mediaInputType || 'upload',
           autoApprove: area.config.autoApprove || false,
           showInGallery: area.config.showInGallery ?? true,
           aiVisionCheck: area.config.aiVisionCheck ?? false,
@@ -154,7 +150,6 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
           options: [{ value: '', isCertifying: false }],
           externalUrl: '',
           mediaRequired: false,
-          mediaInputType: 'upload',
           autoApprove: false,
           showInGallery: true,
           aiVisionCheck: false,
@@ -196,7 +191,6 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
       goal: data.goalType === 'numeric' ? data.goal : {},
       options: data.goalType === 'objective' ? data.options.map(o => o.value).filter(Boolean) : [],
       mediaRequired: data.mediaRequired ?? false,
-      mediaInputType: data.mediaInputType ?? 'upload',
       autoApprove: data.autoApprove ?? false,
       showInGallery: data.showInGallery ?? true,
       aiVisionCheck: data.aiVisionCheck ?? false,
@@ -548,39 +542,14 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
                         </FormControl>
                         <div className="space-y-1 leading-none">
                           <FormLabel>
-                            미디어(사진/영상) 제출 필수
+                            미디어(사진/영상/URL) 제출 필수
                           </FormLabel>
-                          <FormDescription className="text-xs">학생이 활동 내용을 제출할 때 사진이나 영상 첨부를 필수로 만듭니다.</FormDescription>
+                          <FormDescription className="text-xs">학생이 활동 내용을 제출할 때 사진, 영상, 또는 URL 중 하나를 필수로 제출하게 만듭니다.</FormDescription>
                         </div>
                       </FormItem>
                     )}
                   />
-                  {mediaRequiredEnabled && (
-                      <FormField
-                          control={form.control}
-                          name="mediaInputType"
-                          render={({ field }) => (
-                              <FormItem className="pl-7">
-                                  <FormLabel>미디어 입력 방식</FormLabel>
-                                  <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                                      <FormControl>
-                                          <SelectTrigger>
-                                              <SelectValue placeholder="입력 방식 선택" />
-                                          </SelectTrigger>
-                                      </FormControl>
-                                      <SelectContent>
-                                          <SelectItem value="upload">파일 업로드</SelectItem>
-                                          <SelectItem value="url">URL 입력</SelectItem>
-                                      </SelectContent>
-                                  </Select>
-                                  <FormDescription className="text-xs">
-                                    AI Vision 기능을 사용하려면 '파일 업로드' 방식만 선택할 수 있습니다.
-                                  </FormDescription>
-                                  <FormMessage />
-                              </FormItem>
-                          )}
-                      />
-                  )}
+                  
                   <FormField
                     control={form.control}
                     name="autoApprove"
@@ -618,7 +587,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
                             AI Vision으로 사진/영상 분석
                           </FormLabel>
                            <FormDescription className={cn("text-xs", !autoApproveEnabled && "text-muted-foreground/50")}>
-                            AI가 제출된 미디어를 직접 보고 내용을 판단합니다. (파일 업로드 방식만 지원)
+                            AI가 제출된 미디어를 직접 보고 내용을 판단합니다. (파일 업로드만 지원)
                            </FormDescription>
                         </div>
                       </FormItem>
@@ -666,3 +635,5 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
     </Dialog>
   );
 }
+
+    
