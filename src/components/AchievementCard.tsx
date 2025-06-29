@@ -95,9 +95,9 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
             <div className="text-right">
                 <p className="text-2xl font-bold text-accent">
                     {currentProgress}
-                    <span className="text-base font-normal text-muted-foreground ml-1">{areaConfig.unit}</span>
+                    <span className="text-base font-normal text-foreground/80 ml-1">{areaConfig.unit}</span>
                 </p>
-                <p className="text-xs text-muted-foreground">목표: {goal}{areaConfig.unit}</p>
+                <p className="text-xs text-foreground/80">목표: {goal}{areaConfig.unit}</p>
             </div>
         );
     }
@@ -105,10 +105,10 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
         const hasProgress = !!progress;
         return (
              <div className="text-right">
-                 <p className={cn("text-2xl font-bold", hasProgress ? "text-accent" : "text-muted-foreground")}>
+                 <p className={cn("text-2xl font-bold", hasProgress ? "text-accent" : "text-foreground/80")}>
                     {hasProgress ? progress : '미설정'}
                  </p>
-                 <p className="text-xs text-muted-foreground">{areaConfig.unit}</p>
+                 <p className="text-xs text-foreground/80">{areaConfig.unit}</p>
             </div>
         );
     }
@@ -124,8 +124,11 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
         <CardContent className="p-4">
             <div className="flex justify-between items-start gap-4">
                 <div className="flex items-start gap-4">
-                    <div className={cn("flex-shrink-0 h-14 w-14 rounded-lg flex items-center justify-center bg-accent/20", isCertified && "bg-accent")}>
-                        <AreaIcon className={cn("w-8 h-8 text-accent", isCertified && "text-accent-foreground")} />
+                    <div className={cn(
+                      "flex-shrink-0 h-14 w-14 rounded-lg flex items-center justify-center bg-accent/10", 
+                      isCertified && "bg-accent"
+                    )}>
+                        <AreaIcon className={cn("w-8 h-8", isCertified ? "text-accent-foreground" : "text-accent")} />
                     </div>
                     <div>
                         <h3 className="font-bold text-lg text-foreground">{areaConfig.koreanName}</h3>
