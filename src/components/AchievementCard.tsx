@@ -168,7 +168,16 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
                     <History className="mr-2 h-4 w-4" />
                     활동 내역
                 </Button>
-                <Button size="sm" className="flex-grow font-bold bg-accent text-accent-foreground hover:bg-accent/90" onClick={() => openDialog('submit')} disabled={hasApprovedToday || isCheckingHistory}>
+                <Button
+                    size="sm"
+                    className={cn(
+                        "flex-grow font-bold",
+                        isCertified
+                            ? "bg-accent text-accent-foreground hover:bg-accent/90"
+                            : "bg-primary text-primary-foreground hover:bg-primary/90"
+                    )}
+                    onClick={() => openDialog('submit')}
+                    disabled={hasApprovedToday || isCheckingHistory}>
                     {isCheckingHistory 
                       ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       : <ListChecks className="mr-2 h-4 w-4" />
