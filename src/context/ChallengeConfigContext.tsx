@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
@@ -6,6 +5,7 @@ import { AreaName, DEFAULT_AREAS_CONFIG, ICONS, AreaConfig as BaseAreaConfig, St
 import { ShieldOff } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, updateDoc, deleteField } from 'firebase/firestore';
+import { revalidateConfigCache } from '@/app/actions';
 
 export type ChallengeConfig = Record<AreaName, BaseAreaConfig>;
 
@@ -108,19 +108,17 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
   }, [fetchConfig]);
 
   const updateArea = useCallback(async (areaId: AreaName, newConfig: StoredAreaConfig) => {
-    // Optimistically update the UI state.
     setChallengeConfig(prevConfig => {
         if (!prevConfig) return null;
         
         const existingAreaConfig = prevConfig[areaId];
 
-        // Create the new resolved config object by merging the old state
-        // with the new data from the form.
         const newResolvedAreaConfig: BaseAreaConfig = {
             ...existingAreaConfig,
             ...newConfig,
-            name: areaId, // Ensure name is correct
-            icon: ICONS[newConfig.iconName] || ShieldOff, // Re-resolve the icon
+            name: areaId,
+            icon: ICONS[newConfig.iconName] || ShieldOff,
+            iconName: newConfig.iconName,
         };
         
         return {
@@ -132,11 +130,10 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
     if (!db) return;
     try {
       const configDocRef = doc(db, CONFIG_DOC_PATH);
-      // Persist only the storable part of the config to Firestore.
       await updateDoc(configDocRef, { [areaId]: newConfig });
+      await revalidateConfigCache();
     } catch (error) {
       console.error("Failed to save challenge config to Firestore", error);
-      // If the database update fails, refetch the original state to revert the optimistic UI update.
       fetchConfig();
     }
   }, [fetchConfig]);
@@ -164,6 +161,7 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
     try {
         const configDocRef = doc(db, CONFIG_DOC_PATH);
         await updateDoc(configDocRef, { [areaId]: newConfig });
+        await revalidateConfigCache();
     } catch(e) {
         console.error("Failed to add area", e);
         fetchConfig(); // Revert on failure
@@ -182,6 +180,7 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
     try {
         const configDocRef = doc(db, CONFIG_DOC_PATH);
         await updateDoc(configDocRef, { [areaId]: deleteField() });
+        await revalidateConfigCache();
     } catch(e) {
         console.error("Failed to delete area", e);
         fetchConfig(); // Revert on failure
@@ -194,6 +193,7 @@ export const ChallengeConfigProvider = ({ children }: { children: ReactNode }) =
     try {
       const announcementDocRef = doc(db, ANNOUNCEMENT_DOC_PATH);
       await setDoc(announcementDocRef, newAnnouncement);
+      await revalidateConfigCache();
     } catch (error) {
       console.error("Failed to save announcement to Firestore", error);
       fetchConfig(); // Revert
