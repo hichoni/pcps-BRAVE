@@ -4,10 +4,9 @@ import { useState, useEffect } from 'react';
 import { useAchievements } from '@/context/AchievementsContext';
 import { useAuth } from '@/context/AuthContext';
 import { AreaName } from '@/lib/config';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { AchievementStatusDialog } from './AchievementStatusDialog';
-import { Badge } from './ui/badge';
-import { XCircle, Trophy, History, ListChecks, Loader2 } from 'lucide-react';
+import { Trophy, History, ListChecks, Loader2 } from 'lucide-react';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
 import { Skeleton } from './ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -16,6 +15,7 @@ import { Button } from './ui/button';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import { isSameDay } from 'date-fns';
+import { Progress } from './ui/progress';
 
 interface AchievementCardProps {
   areaName: AreaName;
@@ -68,11 +68,7 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
   if (!user || configLoading || !challengeConfig) {
     return (
         <div className="flex flex-col space-y-3">
-          <Skeleton className="h-[220px] w-full rounded-xl" />
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-4/5" />
-            <Skeleton className="h-4 w-3/5" />
-          </div>
+          <Skeleton className="h-[150px] w-full rounded-xl" />
         </div>
       )
   }
@@ -87,100 +83,93 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
   
   const AreaIcon = areaConfig.icon;
   const isTeacherInput = areaConfig.goalType === 'objective';
+  
+  const gradeKey = user.grade === 0 ? '6' : String(user.grade ?? '4');
+  const goal = areaConfig.goal[gradeKey] ?? 0;
+  const currentProgress = (progress as number) || 0;
+  const progressPercent = goal > 0 ? (currentProgress / goal) * 100 : 0;
 
-  const renderProgress = () => {
-    const goalText = areaConfig.goalDescription;
-
+  const renderProgressInfo = () => {
     if (areaConfig.goalType === 'numeric') {
-        const gradeKey = user.grade === 0 ? '6' : String(user.grade ?? '4');
-        const goal = areaConfig.goal[gradeKey] ?? 0;
-        const currentProgress = (progress as number) || 0;
-        const unit = areaConfig.unit;
-        const defaultGoalText = `목표: ${goal}${unit}`;
-
         return (
-            <div className="p-3 bg-secondary/50 rounded-lg text-center space-y-1">
-                <p className="text-xs text-muted-foreground font-medium">{goalText || defaultGoalText}</p>
-                <p className="font-bold text-xl text-primary">
-                    {currentProgress}{unit}
+            <div className="text-right">
+                <p className="text-2xl font-bold text-accent">
+                    {currentProgress}
+                    <span className="text-base font-normal text-muted-foreground ml-1">{areaConfig.unit}</span>
                 </p>
+                <p className="text-xs text-muted-foreground">목표: {goal}{areaConfig.unit}</p>
             </div>
         );
     }
     if (areaConfig.goalType === 'objective') {
         const hasProgress = !!progress;
-        const defaultGoalText = '교사 확인';
-
         return (
-             <div className="p-3 bg-secondary/50 rounded-lg text-center space-y-1">
-                 <p className="text-xs text-muted-foreground font-medium">{goalText || defaultGoalText}</p>
-                 <div className="font-bold text-xl text-primary flex items-center justify-center gap-2 h-7">
-                    {hasProgress ? (
-                        <>
-                            <Trophy className="w-5 h-5"/>
-                            <span>{progress}</span>
-                        </>
-                    ) : (
-                        <span className="text-sm font-normal text-muted-foreground">미인증</span>
-                    )}
-                </div>
+             <div className="text-right">
+                 <p className={cn("text-2xl font-bold", hasProgress ? "text-accent" : "text-muted-foreground")}>
+                    {hasProgress ? progress : '미설정'}
+                 </p>
+                 <p className="text-xs text-muted-foreground">{areaConfig.unit}</p>
             </div>
         );
     }
     return null;
-  }
+  };
 
   return (
     <>
       <Card className={cn(
-        "flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300 border",
-        isCertified && "bg-gradient-to-br from-yellow-50 via-amber-50 to-yellow-100 border-amber-400 shadow-amber-500/20"
+        "w-full overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 border",
+        isCertified && "border-accent shadow-accent/20"
       )}>
-        <CardHeader className="p-4 pb-2">
-          <div className="flex justify-between items-start">
-            <div className="flex items-center gap-3 mb-2">
-              <AreaIcon className={cn("w-8 h-8", isCertified ? "text-amber-500" : "text-primary")} />
-              <CardTitle className={cn("font-headline text-lg sm:text-xl", isCertified && "text-amber-700")}>{areaConfig.koreanName}</CardTitle>
+        <CardContent className="p-4">
+            <div className="flex justify-between items-start gap-4">
+                <div className="flex items-start gap-4">
+                    <div className={cn("flex-shrink-0 h-14 w-14 rounded-lg flex items-center justify-center bg-accent/20", isCertified && "bg-accent")}>
+                        <AreaIcon className={cn("w-8 h-8 text-accent", isCertified && "text-accent-foreground")} />
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-lg text-foreground">{areaConfig.koreanName}</h3>
+                        <p className="text-xs text-muted-foreground">{areaConfig.challengeName}</p>
+                    </div>
+                </div>
+                <div className="flex-shrink-0">
+                    {renderProgressInfo()}
+                </div>
             </div>
-            {isCertified ? (
-              <Badge variant="default" className="shrink-0 bg-amber-400 text-amber-900 hover:bg-amber-400/90 shadow">
-                <Trophy className="mr-1 h-4 w-4" />
-                인증 완료!
-              </Badge>
-            ) : (
-              <Badge variant="secondary" className="shrink-0">
-                <XCircle className="mr-1 h-4 w-4" />
-                미인증
-              </Badge>
+
+            {areaConfig.goalType === 'numeric' && !isCertified && (
+                <div className="mt-4">
+                    <Progress value={progressPercent} className="h-2" />
+                </div>
             )}
-          </div>
-          <CardDescription className="text-xs sm:text-sm pt-1 !mt-0">
-            {areaConfig.challengeName}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-4 pt-2">
-          {renderProgress()}
+            
+            {isCertified && (
+                <div className="mt-4 flex items-center justify-center gap-2 text-sm font-semibold text-accent p-2 bg-accent/10 rounded-md">
+                    <Trophy className="w-4 h-4"/>
+                    <span>인증 완료! 축하합니다!</span>
+                </div>
+            )}
+
         </CardContent>
-        <CardFooter className="p-4 pt-2 mt-auto flex items-center gap-2 w-full">
-            { !isTeacherInput && (
-                <>
-                    <Button variant="secondary" className="flex-grow font-semibold" onClick={() => openDialog('history')}>
-                        <History className="mr-2 h-4 w-4" />
-                        활동 내역
-                    </Button>
-                    <Button className="flex-grow font-bold" onClick={() => openDialog('submit')} disabled={hasApprovedToday || isCheckingHistory}>
-                        {isCheckingHistory 
-                          ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          : <ListChecks className="mr-2 h-4 w-4" />
-                        }
-                        {isCheckingHistory ? '확인 중' : (hasApprovedToday ? '오늘 도전 완료' : '도전하기')}
-                    </Button>
-                </>
-            )}
-            {areaConfig.externalUrl && (
-              <ExternalUrlDialog url={areaConfig.externalUrl} areaName={areaConfig.koreanName} />
-            )}
-        </CardFooter>
+        
+        {!isTeacherInput && (
+            <CardFooter className="bg-muted/50 p-2 px-4 flex items-center gap-2 w-full border-t">
+                 <Button variant="ghost" size="sm" className="flex-grow text-muted-foreground font-semibold" onClick={() => openDialog('history')}>
+                    <History className="mr-2 h-4 w-4" />
+                    활동 내역
+                </Button>
+                <Button size="sm" className="flex-grow font-bold bg-accent text-accent-foreground hover:bg-accent/90" onClick={() => openDialog('submit')} disabled={hasApprovedToday || isCheckingHistory}>
+                    {isCheckingHistory 
+                      ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      : <ListChecks className="mr-2 h-4 w-4" />
+                    }
+                    {isCheckingHistory ? '확인 중' : (hasApprovedToday ? '오늘 도전 완료' : '도전하기')}
+                </Button>
+                {areaConfig.externalUrl && (
+                    <ExternalUrlDialog url={areaConfig.externalUrl} areaName={areaConfig.koreanName} />
+                )}
+            </CardFooter>
+        )}
       </Card>
       { !isTeacherInput && <AchievementStatusDialog areaName={areaName} open={dialogOpen} onOpenChange={setDialogOpen} initialMode={dialogMode} /> }
     </>
