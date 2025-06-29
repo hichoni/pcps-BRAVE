@@ -184,8 +184,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-secondary justify-between">
-      <main className="flex justify-center p-4 pt-8">
+    <div className="flex flex-col min-h-screen bg-secondary">
+      <main className="flex-grow flex items-center justify-center p-4">
         <Card className="w-full max-w-sm shadow-lg border">
           <CardHeader className="text-center">
             <Image
@@ -344,13 +344,19 @@ export default function LoginPage() {
               </form>
             </TabsContent>
           </Tabs>
+
+          <div className="px-6 pb-6 text-center text-xs text-muted-foreground">
+            <div className="border-t pt-4 mt-2">
+              <p>
+                본 서비스는 <strong className="text-primary font-semibold">풍천풍서초등학교 학생들</strong>의 <strong className="text-primary font-semibold">꿈</strong>과 <strong className="text-primary font-semibold">도전</strong>을 응원하기 위해 제작되었습니다.
+              </p>
+              <p className="mt-2 text-foreground/50">
+                  © 2025 Pungcheon Pungseo Elementary School. All Rights Reserved.
+              </p>
+            </div>
+          </div>
         </Card>
       </main>
-      <footer className="p-4 pb-6 text-center text-xs text-muted-foreground">
-        <p>
-            본 서비스는 풍천풍서초등학교 학생들의 <strong className="text-primary font-semibold">꿈</strong>과 <strong className="text-primary font-semibold">도전</strong>을 응원하기 위해 제작되었습니다.
-        </p>
-      </footer>
     </div>
   );
 }
