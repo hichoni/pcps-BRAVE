@@ -4,6 +4,7 @@
  * @fileOverview A flow to submit student's challenge evidence to Firestore.
  * It now includes an AI check to automatically update progress if the evidence is sufficient,
  * and uses AI vision for specific challenges like typing tests.
+ * External URL submissions are always sent for manual review.
  */
 
 import { ai } from '@/ai/genkit';
@@ -12,7 +13,7 @@ import { db } from '@/lib/firebase';
 import { adminStorage } from '@/lib/firebase-admin';
 import { collection, addDoc, serverTimestamp, doc, getDoc, runTransaction, query, where, orderBy, limit, getDocs, Timestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { checkCertification } from './certification-checker';
-import { analyzeMediaEvidence } from './analyze-typing-test'; // Now a generic media analyzer
+import { analyzeMediaEvidence } from './analyze-typing-test';
 import { generateEncouragement } from './generate-encouragement';
 import { type SubmitEvidenceInput as PublicSubmitEvidenceInput, type SubmitEvidenceOutput, SUBMISSION_STATUSES, type SubmissionStatus, type User, type CertificationCheckOutput } from '@/lib/config';
 
@@ -145,9 +146,12 @@ const submitEvidenceFlow = ai.defineFlow(
       let aiReasoning: string;
       let updateMessage: string;
 
-      if (areaConfig.autoApprove) {
+      const isExternalUrl = input.mediaUrl && !input.mediaUrl.includes('firebasestorage.googleapis.com');
+
+      if (areaConfig.autoApprove && !isExternalUrl) {
+          // AI auto-approval logic for file uploads and text-only submissions
           let aiResult: CertificationCheckOutput | null = null;
-          if (areaConfig.aiVisionCheck && input.mediaUrl && areaConfig.mediaType) {
+          if (areaConfig.aiVisionCheck && input.mediaUrl) {
               
             if (!adminStorage) {
                 throw new Error("AI Vision 검증 오류: 서버 저장소(Admin Storage)가 설정되지 않았습니다. 관리자에게 문의하여 service-account.json 파일이 올바르게 구성되었는지 확인해주세요.");
@@ -257,12 +261,18 @@ const submitEvidenceFlow = ai.defineFlow(
           }
 
       } else {
+          // Manual review logic for external URLs or when autoApprove is off
           submissionStatus = 'pending_review';
-          aiReasoning = 'AI 자동 인증이 비활성화된 영역입니다. 선생님의 확인이 필요합니다.';
+          if (isExternalUrl) {
+            aiReasoning = 'URL이 포함된 제출물은 안전을 위해 선생님의 확인이 필요합니다.';
+            updateMessage = '제출 완료! 링크는 선생님이 확인하신 후, 진행도에 반영될 거예요.';
+          } else {
+            aiReasoning = 'AI 자동 인증이 비활성화된 영역입니다. 선생님의 확인이 필요합니다.';
+            updateMessage = '제출 완료! 선생님이 확인하신 후, 진행도에 반영될 거예요.';
+          }
           docData.status = submissionStatus;
           
           await setDoc(newSubmissionRef, docData);
-          updateMessage = '제출 완료! 선생님이 확인하신 후, 진행도에 반영될 거예요.';
       }
 
       return { 
