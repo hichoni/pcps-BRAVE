@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -34,7 +34,7 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
   const [hasPermission, setHasPermission] = useState(false);
   const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
 
-  const cleanup = () => {
+  const cleanup = useCallback(() => {
     if (videoRef.current?.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach(track => track.stop());
@@ -49,9 +49,9 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
     }
     recordedChunksRef.current = [];
     setRecordingState('idle');
-  };
+  }, [recordedVideoUrl]);
   
-  const setupStream = async () => {
+  const setupStream = useCallback(async () => {
       if (!navigator.mediaDevices?.getUserMedia) {
         toast({ variant: 'destructive', title: '카메라 기능 미지원', description: '사용 중인 브라우저에서 카메라 녹화 기능을 지원하지 않습니다.' });
         return;
@@ -74,20 +74,19 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
         });
         onOpenChange(false);
       }
-    };
+    }, [toast, onOpenChange]);
   
   useEffect(() => {
-    if (open && recordingState === 'idle') {
+    if (open) {
       setupStream();
     }
     
-    // Cleanup on unmount or close
+    // This cleanup function runs when the component unmounts or `open` becomes false.
+    // This prevents the stream from being killed during internal state changes (like starting to record).
     return () => {
-      if (open) {
-        cleanup();
-      }
+      cleanup();
     };
-  }, [open, recordingState]);
+  }, [open, cleanup, setupStream]);
 
 
   const startRecording = () => {
@@ -95,7 +94,6 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
     
     recordedChunksRef.current = [];
     const stream = videoRef.current.srcObject as MediaStream;
-    // Attempt to use a common format if possible
     const options = { mimeType: 'video/webm; codecs=vp9' };
     try {
         mediaRecorderRef.current = new MediaRecorder(stream, options);
@@ -128,8 +126,11 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
   };
   
   const handleRetake = () => {
-    cleanup();
-    setupStream();
+    if (recordedVideoUrl) URL.revokeObjectURL(recordedVideoUrl);
+    setRecordedVideoUrl(null);
+    recordedChunksRef.current = [];
+    setRecordingState('idle');
+    setupStream(); // Re-setup the stream for a new take
   };
 
   const handleUseVideo = () => {
@@ -137,11 +138,11 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
     const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
     const file = new File([blob], `recorded-video-${Date.now()}.webm`, { type: 'video/webm' });
     onVideoRecorded(file);
-    cleanup();
+    onOpenChange(false);
   };
   
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) cleanup(); onOpenChange(isOpen); }}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>영상 바로 찍기</DialogTitle>
