@@ -18,13 +18,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { useAuth } from '@/context/AuthContext';
 import { AreaName, SubmissionStatus } from '@/lib/config';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
-import { Send, Loader2, UploadCloud, FileCheck, FileX, History, Trash2, Info, BrainCircuit, Edit } from 'lucide-react';
+import { Send, Loader2, UploadCloud, FileCheck, FileX, History, Trash2, Info, BrainCircuit, Edit, Video } from 'lucide-react';
 import { submitEvidence } from '@/ai/flows/submit-evidence';
 import { getTextFeedback } from '@/ai/flows/text-feedback';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Input } from './ui/input';
-import { Label } from './ui/label';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp, orderBy, limit, getDocs } from 'firebase/firestore';
 import { format } from 'date-fns';
@@ -35,6 +34,8 @@ import { deleteSubmission } from '@/ai/flows/delete-submission';
 import { uploadFile } from '@/services/client-storage';
 import { resizeImage } from '@/lib/image-utils';
 import { Separator } from './ui/separator';
+import { VideoRecorderDialog } from './VideoRecorderDialog';
+import { Label } from './ui/label';
 
 type HistoryItem = {
     id: string;
@@ -95,6 +96,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
   const [itemToDelete, setItemToDelete] = useState<HistoryItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [intervalLock, setIntervalLock] = useState({ locked: false, minutesToWait: 0 });
+  const [isRecordingDialogOpen, setIsRecordingDialogOpen] = useState(false);
   const formId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -321,6 +323,21 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
     setFileName(file.name);
   };
 
+  const handleVideoRecorded = (file: File) => {
+    if (file.size > MAX_VIDEO_SIZE_BYTES) {
+        toast({
+            variant: 'destructive',
+            title: '영상 파일 크기 초과',
+            description: `녹화된 영상의 크기가 ${MAX_VIDEO_SIZE_MB}MB를 초과하여 사용할 수 없습니다. 더 짧게 녹화해주세요.`,
+            duration: 9000,
+        });
+        return;
+    }
+    setSelectedFile(file);
+    setFileName(file.name);
+    setIsRecordingDialogOpen(false);
+  }
+
   const handleFormSubmit = async (data: EvidenceFormValues) => {
     if (!user || !user.name) return;
     setIsSubmitting(true);
@@ -438,6 +455,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
     : `[${koreanName}] ${challengeName}`;
 
   return (
+    <>
     <AlertDialog onOpenChange={(open) => { if (!open && itemToDelete) setItemToDelete(null); }}>
       <Dialog open={open} onOpenChange={onDialogClose}>
         <DialogContent className="sm:max-w-lg h-[90vh] flex flex-col p-0">
@@ -560,7 +578,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
                             {areaConfig.mediaRequired && <span className="text-destructive ml-1">*</span>}
                         </Label>
                         <p className="text-xs text-muted-foreground -mt-1">
-                            파일 또는 URL 중 하나를 선택하여 제출해주세요.
+                            파일, URL, 또는 직접 녹화 중 하나를 선택하여 제출해주세요.
                         </p>
                         <div className="space-y-4 rounded-md border p-4">
                              <div>
@@ -580,6 +598,16 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
                               </div>
 
                               <div className="relative flex items-center">
+                                <Separator className="flex-1" />
+                                <span className="mx-2 text-xs text-muted-foreground">또는</span>
+                                <Separator className="flex-1" />
+                              </div>
+
+                               <Button type="button" variant="outline" className="w-full" onClick={() => setIsRecordingDialogOpen(true)}>
+                                  <Video className="mr-2" /> 영상 바로 찍기
+                               </Button>
+
+                               <div className="relative flex items-center">
                                 <Separator className="flex-1" />
                                 <span className="mx-2 text-xs text-muted-foreground">또는</span>
                                 <Separator className="flex-1" />
@@ -651,5 +679,12 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    <VideoRecorderDialog
+        open={isRecordingDialogOpen}
+        onOpenChange={setIsRecordingDialogOpen}
+        onVideoRecorded={handleVideoRecorded}
+    />
+    </>
   );
 }
