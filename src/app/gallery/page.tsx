@@ -120,16 +120,6 @@ function GalleryCard({ submission, user, author, onSubmissionDeleted, onSubmissi
   return (
     <>
     <Card className="flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300 border relative">
-      {user?.role === 'teacher' && (
-          <div className="absolute top-2 right-2 flex flex-col items-end gap-1 text-xs z-10 bg-background/80 p-1 rounded-bl-md">
-              <Badge variant={submission.status === 'approved' ? 'default' : 'destructive'} className="capitalize">
-                {submission.status.replace('_', ' ')}
-              </Badge>
-              <Badge variant={submission.showInGallery ? 'secondary' : 'outline'}>
-                  {submission.showInGallery ? '갤러리 표시' : '숨김'}
-              </Badge>
-          </div>
-      )}
       <CardHeader className="flex flex-row items-start gap-4 space-y-0 pb-3">
          <UserAvatar user={author} />
          <div className="flex-grow">
@@ -146,41 +136,53 @@ function GalleryCard({ submission, user, author, onSubmissionDeleted, onSubmissi
                 {submission.createdAt ? formatDistanceToNow(submission.createdAt, { addSuffix: true, locale: ko }) : '방금 전'}
             </CardDescription>
          </div>
-         {canManage && (
-           <div className="flex items-center gap-1">
-            {user.role === 'teacher' && (
-                 <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => setIsEditing(true)}>
-                    <Edit className="h-4 w-4" />
-                </Button>
+         <div className="flex flex-col items-end gap-2">
+             {user?.role === 'teacher' && (
+                <div className="flex items-center gap-1">
+                    <Badge variant={submission.status === 'approved' ? 'default' : 'destructive'} className="capitalize text-xs">
+                        {submission.status.replace('_', ' ')}
+                    </Badge>
+                    <Badge variant={submission.showInGallery ? 'secondary' : 'outline'} className="text-xs">
+                        {submission.showInGallery ? '갤러리 표시' : '숨김'}
+                    </Badge>
+                </div>
             )}
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" disabled={isDeleting || isPending}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>
-                    {user.role === 'teacher' ? "정말로 삭제하시겠습니까?" : "정말로 삭제를 요청하시겠습니까?"}
-                  </AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {user.role === 'teacher' 
-                        ? "이 게시글을 삭제하면 되돌릴 수 없습니다. 갤러리에서 영구적으로 사라지며, 학생의 관련 성취도도 함께 조정됩니다." 
-                        : "이 게시물의 삭제를 요청합니다. 요청이 승인되면, 게시물과 관련 진행도가 영구적으로 삭제되며 되돌릴 수 없습니다."
-                    }
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel disabled={isDeleting}>취소</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : (user.role === 'teacher' ? '삭제' : '삭제 요청')}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-           </div>
-         )}
+            {canManage && (
+                <div className="flex items-center -mr-2">
+                    {user.role === 'teacher' && (
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => setIsEditing(true)}>
+                            <Edit className="h-4 w-4" />
+                        </Button>
+                    )}
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" disabled={isDeleting || isPending}>
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                            <AlertDialogTitle>
+                                {user.role === 'teacher' ? "정말로 삭제하시겠습니까?" : "정말로 삭제를 요청하시겠습니까?"}
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                                {user.role === 'teacher' 
+                                    ? "이 게시글을 삭제하면 되돌릴 수 없습니다. 갤러리에서 영구적으로 사라지며, 학생의 관련 성취도도 함께 조정됩니다." 
+                                    : "이 게시물의 삭제를 요청합니다. 요청이 승인되면, 게시물과 관련 진행도가 영구적으로 삭제되며 되돌릴 수 없습니다."
+                                }
+                            </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isDeleting}>취소</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : (user.role === 'teacher' ? '삭제' : '삭제 요청')}
+                            </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </div>
+            )}
+         </div>
       </CardHeader>
       <CardContent className="flex-grow space-y-4">
         <div className="p-3 bg-secondary/50 rounded-md">
