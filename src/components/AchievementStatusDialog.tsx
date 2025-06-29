@@ -589,7 +589,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
                             <FormControl>
                               <Textarea
                                 placeholder={
-                                  "여기에 나의 실천 내용을 자세히 적어주세요. (예: 어떤 책을 읽고 무엇을 느꼈는지, 봉사활동을 통해 무엇을 배우고 실천했는지 등)"
+                                  areaConfig.placeholderText || "여기에 나의 실천 내용을 자세히 적어주세요. (예: 어떤 책을 읽고 무엇을 느꼈는지, 봉사활동을 통해 무엇을 배우고 실천했는지 등)"
                                 }
                                 {...field}
                                 rows={3}

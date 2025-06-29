@@ -61,6 +61,7 @@ export type AreaConfig = {
   koreanName: string;
   challengeName: string;
   requirements: string;
+  placeholderText?: string;
   goalType: GoalType;
   goal: Record<string, number>; // For 'numeric' type
   options?: string[];             // For 'objective' type
@@ -81,6 +82,7 @@ export type StoredAreaConfig = Omit<AreaConfig, 'icon' | 'name'> & {
   mediaRequired?: boolean;
   autoApprove?: boolean;
   goalDescription?: string;
+  placeholderText?: string;
   showInGallery?: boolean;
   aiVisionCheck?: boolean;
   aiVisionPrompt?: string;
@@ -112,6 +114,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     challengeName: '독서 마라톤 ✨',
     iconName: 'BookOpen',
     requirements: '지정된 필독서 중 1권 이상을 읽고 독후감을 제출하여 증명해야 합니다.',
+    placeholderText: '어떤 책을 읽고 무엇을 느꼈는지, 인상 깊었던 구절은 무엇이었는지 자유롭게 적어주세요.',
     goalType: 'numeric',
     goal: { '4': 5, '5': 5, '6': 5 },
     unit: '권',
@@ -127,6 +130,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     challengeName: '탄소 줄임 실천 ♥',
     iconName: 'HeartHandshake',
     requirements: '최소 10시간 이상의 봉사활동을 완료하고 활동 사진을 제출해야 합니다.',
+    placeholderText: '언제, 어디서, 어떤 봉사활동을 했는지 구체적으로 작성해주세요. 활동을 통해 배우거나 느낀 점도 함께 적어주면 더욱 좋습니다.',
     goalType: 'numeric',
     goal: { '4': 10, '5': 10, '6': 10 },
     unit: '시간',
@@ -142,6 +146,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     challengeName: '건강 체력 인증',
     iconName: 'Bike',
     requirements: "PAPS측정 결과가 2개 요인에 1등급, 3개 요인에 2등급 이상, 또는 종합 4, 5등급인 학생이 종합 3등급 이상을 달성한 경우 인증됩니다.",
+    placeholderText: '',
     goalType: 'objective',
     goal: {},
     options: ['1등급', '2등급', '3등급', '4등급', '5등급'],
@@ -159,6 +164,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     challengeName: '풍풍 쇼케이스 💥',
     iconName: 'Palette',
     requirements: '풍풍 쇼케이스 또는 교내외 예술 관련 대회/공연에 참여하고 활동 사진을 제출해야 합니다.',
+    placeholderText: '언제, 어떤 대회/공연에 참여했는지 알려주세요. 작품이나 공연을 준비하며 느꼈던 점이나 특별한 경험이 있었다면 함께 공유해주세요.',
     goalType: 'numeric',
     goal: { '4': 1, '5': 1, '6': 1 },
     unit: '회 참여',
@@ -175,6 +181,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     challengeName: 'AI 타자 연습 인증 ⌨️',
     iconName: 'Keyboard',
     requirements: "타자 연습 결과(200타 이상)를 스크린샷으로 제출하세요. AI가 자동으로 인식하여 1회 연습으로 인정해줍니다.",
+    placeholderText: '타자 연습 결과 화면을 캡처하여 올려주세요. 꾸준히 연습해서 타자 실력을 높여보아요! 오늘 몇 타를 기록했는지 간단히 적어주어도 좋습니다.',
     goalType: 'numeric',
     goal: { '4': 10, '5': 15, '6': 20 },
     unit: '회',

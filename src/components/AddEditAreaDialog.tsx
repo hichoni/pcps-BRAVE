@@ -30,6 +30,7 @@ const formSchema = z.object({
   challengeName: z.string().min(1, '도전 과제 이름은 필수입니다.'),
   iconName: z.string().min(1, '아이콘을 선택해주세요.'),
   requirements: z.string().min(1, '인증 기준 설명은 필수입니다.'),
+  placeholderText: z.string().optional(),
   goalType: z.enum(['numeric', 'objective']),
   goalDescription: z.string().optional(),
   unit: z.string().min(1, '단위는 필수입니다.'),
@@ -83,6 +84,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
       challengeName: '',
       iconName: '',
       requirements: '',
+      placeholderText: '',
       goalType: 'numeric',
       unit: '',
       goal: { '4': 0, '5': 0, '6': 0 },
@@ -117,6 +119,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
           challengeName: area.config.challengeName,
           iconName: area.config.iconName,
           requirements: area.config.requirements,
+          placeholderText: area.config.placeholderText || '',
           goalType: area.config.goalType,
           unit: area.config.unit,
           goal: area.config.goal,
@@ -140,6 +143,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
           challengeName: '',
           iconName: '',
           requirements: '',
+          placeholderText: '',
           goalType: 'numeric',
           unit: '',
           goal: { '4': 0, '5': 0, '6': 0 },
@@ -202,6 +206,9 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
     }
     if (data.aiVisionPrompt) {
         newConfigData.aiVisionPrompt = data.aiVisionPrompt;
+    }
+    if (data.placeholderText) {
+        newConfigData.placeholderText = data.placeholderText;
     }
     // Check for 0 as well, as that's a valid value meaning "no interval".
     if (data.submissionIntervalMinutes !== undefined && data.submissionIntervalMinutes >= 0) {
@@ -313,6 +320,22 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
                           <FormControl>
                               <Textarea placeholder="학생에게 보여질 인증 기준을 설명해주세요." {...field} />
                           </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                  )}
+              />
+              <FormField
+                  control={form.control}
+                  name="placeholderText"
+                  render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>입력창 예시 문구 (Placeholder)</FormLabel>
+                          <FormControl>
+                              <Textarea placeholder="학생의 활동 공유 입력창에 표시될 예시 문구를 입력해주세요." {...field} value={field.value ?? ''} />
+                          </FormControl>
+                          <FormDescription className="text-xs">
+                              학생들이 어떤 내용을 적어야 할지 쉽게 이해하도록 안내하는 문구입니다.
+                          </FormDescription>
                           <FormMessage />
                       </FormItem>
                   )}
