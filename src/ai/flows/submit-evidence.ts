@@ -89,19 +89,24 @@ const submitEvidenceFlow = ai.defineFlow(
         // Submission interval check
         if (areaConfig.submissionIntervalMinutes && areaConfig.submissionIntervalMinutes > 0) {
             const submissionsCollection = collection(db, 'challengeSubmissions');
-            // This query is more efficient and reliable. It finds the most recent, non-rejected submission.
+            // This query fetches all potentially relevant submissions, and we sort them in code.
+            // This avoids needing a composite index in Firestore.
             const q = query(
                 submissionsCollection,
                 where("userId", "==", input.userId),
                 where("areaName", "==", input.areaName),
-                where("status", "in", ['approved', 'pending_review', 'pending_deletion']),
-                orderBy("createdAt", "desc"),
-                limit(1)
+                where("status", "in", ['approved', 'pending_review', 'pending_deletion'])
             );
 
             const querySnapshot = await getDocs(q);
             if (!querySnapshot.empty) {
-                const lastValidSubmission = querySnapshot.docs[0].data();
+                const sortedDocs = querySnapshot.docs.sort((a, b) => {
+                    const timeA = (a.data().createdAt as Timestamp)?.toMillis() || 0;
+                    const timeB = (b.data().createdAt as Timestamp)?.toMillis() || 0;
+                    return timeB - timeA; // Sort descending
+                });
+
+                const lastValidSubmission = sortedDocs[0].data();
                 if (lastValidSubmission && lastValidSubmission.createdAt) {
                     const lastSubmissionTime = (lastValidSubmission.createdAt as Timestamp).toDate();
                     const now = new Date();
