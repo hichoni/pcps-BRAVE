@@ -289,6 +289,9 @@ export interface Feedback {
     content: string;
     status: FeedbackStatus;
     createdAt: Date;
+    reply?: string;
+    repliedBy?: string;
+    repliedAt?: Date;
 }
 
 export interface SubmitFeedbackInput {
@@ -303,3 +306,18 @@ export interface SubmitFeedbackOutput {
     success: boolean;
     id: string;
 }
+
+export interface UpdateFeedbackInput {
+    feedbackId: string;
+    status: FeedbackStatus;
+    reply: string;
+    teacherId: string;
+    teacherName: string;
+}
+
+export interface UpdateFeedbackOutput {
+    success: boolean;
+    message: string;
+}
+
+    

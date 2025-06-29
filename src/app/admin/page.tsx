@@ -67,6 +67,36 @@ function PendingReviewsBadge() {
     )
 }
 
+function NewFeedbackBadge() {
+    const [count, setCount] = useState(0);
+
+    useEffect(() => {
+        if (!db) return;
+
+        const q = query(
+            collection(db, "feedback"), 
+            where("status", "==", "new")
+        );
+        
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setCount(snapshot.size);
+        }, (error) => {
+            console.error("Error fetching new feedback count:", error);
+            setCount(0);
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    if (count === 0) return null;
+
+    return (
+        <Badge className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center bg-destructive text-destructive-foreground animate-pulse">
+            {count}
+        </Badge>
+    )
+}
+
 
 export default function AdminPage() {
   const { user, users, loading: authLoading, logout, resetPin, deleteUser } = useAuth();
@@ -201,10 +231,11 @@ export default function AdminPage() {
                 <span className="hidden sm:inline">갤러리 관리</span>
             </Link>
           </Button>
-          <Button asChild variant="outline" size="sm">
+          <Button asChild variant="outline" size="sm" className="relative">
             <Link href="/feedback">
                 <Bug className="h-4 w-4 sm:mr-2"/>
                 <span className="hidden sm:inline">오류/건의함</span>
+                <NewFeedbackBadge />
             </Link>
           </Button>
           <Button asChild variant="outline" size="sm" className="relative">
@@ -443,3 +474,5 @@ export default function AdminPage() {
     </TooltipProvider>
   );
 }
+
+    
