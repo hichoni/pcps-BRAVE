@@ -107,7 +107,6 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
     }
 
     let unsubscribe: (() => void) | undefined;
-    let unsubscribeInterval: (() => void) | undefined;
 
     const fetchHistory = () => {
         setSubmissionsLoading(true);
@@ -150,24 +149,31 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
                 collection(db, "challengeSubmissions"),
                 where("userId", "==", user.username),
                 where("areaName", "==", areaName),
-                where("status", "in", ['approved', 'pending_review', 'pending_deletion']),
-                orderBy("createdAt", "desc"),
-                limit(1)
+                where("status", "in", ['approved', 'pending_review', 'pending_deletion'])
             );
 
-            // Use getDocs for a one-time check as this shouldn't change while dialog is open.
             getDocs(submissionsQuery).then(querySnapshot => {
                 if (!querySnapshot.empty) {
-                    const lastValidSubmission = querySnapshot.docs[0].data();
-                    const lastSubmissionTime = (lastValidSubmission.createdAt as Timestamp).toDate();
-                    const now = new Date();
-                    const minutesSinceLastSubmission = (now.getTime() - lastSubmissionTime.getTime()) / (1000 * 60);
-
-                    if (minutesSinceLastSubmission < areaConfig.submissionIntervalMinutes) {
-                        const minutesToWait = Math.ceil(areaConfig.submissionIntervalMinutes - minutesSinceLastSubmission);
-                        setIntervalLock({ locked: true, minutesToWait });
+                    const sortedDocs = querySnapshot.docs.sort((a, b) => {
+                        const timeA = (a.data().createdAt as Timestamp)?.toMillis() || 0;
+                        const timeB = (b.data().createdAt as Timestamp)?.toMillis() || 0;
+                        return timeB - timeA;
+                    });
+                    
+                    const lastValidSubmission = sortedDocs[0].data();
+                    if (lastValidSubmission && lastValidSubmission.createdAt) {
+                        const lastSubmissionTime = (lastValidSubmission.createdAt as Timestamp).toDate();
+                        const now = new Date();
+                        const minutesSinceLastSubmission = (now.getTime() - lastSubmissionTime.getTime()) / (1000 * 60);
+    
+                        if (minutesSinceLastSubmission < areaConfig.submissionIntervalMinutes) {
+                            const minutesToWait = Math.ceil(areaConfig.submissionIntervalMinutes - minutesSinceLastSubmission);
+                            setIntervalLock({ locked: true, minutesToWait });
+                        } else {
+                             setIntervalLock({ locked: false, minutesToWait: 0 });
+                        }
                     } else {
-                         setIntervalLock({ locked: false, minutesToWait: 0 });
+                        setIntervalLock({ locked: false, minutesToWait: 0 });
                     }
                 } else {
                      setIntervalLock({ locked: false, minutesToWait: 0 });
