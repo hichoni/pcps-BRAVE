@@ -18,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AVATAR_OPTIONS } from './PredefinedAvatars';
 import { cn } from '@/lib/utils';
 import { Input } from './ui/input';
-import { FormDescription, FormLabel } from './ui/form';
+import { Label } from './ui/label';
 import { uploadFile } from '@/services/client-storage';
 import { resizeImage } from '@/lib/image-utils';
 
@@ -153,7 +153,7 @@ export function ProfileSettingsDialog({ open, onOpenChange }: ProfileSettingsDia
             
             <TabsContent value="upload" className="py-4 space-y-4">
                 <div>
-                  <FormLabel htmlFor="photo-upload">프로필 사진 파일</FormLabel>
+                  <Label htmlFor="photo-upload">프로필 사진 파일</Label>
                   <Input
                     id="photo-upload"
                     ref={fileInputRef}
@@ -163,9 +163,9 @@ export function ProfileSettingsDialog({ open, onOpenChange }: ProfileSettingsDia
                     disabled={loading}
                     className="file:text-primary file:font-semibold text-xs h-10 mt-1"
                   />
-                  <FormDescription className="text-xs mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {MAX_IMAGE_SIZE_MB}MB 이하의 이미지 파일을 올려주세요. (정사각형으로 잘릴 수 있습니다)
-                  </FormDescription>
+                  </p>
                 </div>
                 {fileName && (
                     <div className="text-sm p-3 bg-secondary rounded-md text-secondary-foreground flex items-center gap-2">
