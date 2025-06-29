@@ -337,12 +337,6 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
         setIsSubmitting(false);
         return;
       }
-
-      if (areaConfig.aiVisionCheck && !fileToUpload) {
-          toast({ variant: 'destructive', title: '파일 누락', description: '이 영역은 AI 분석을 위해 파일 제출이 필수입니다.' });
-          setIsSubmitting(false);
-          return;
-      }
       
       if (areaConfig.mediaRequired && !fileToUpload && !urlFromInput) {
           toast({ variant: 'destructive', title: '미디어 누락', description: '이 영역은 미디어(파일 또는 URL) 제출이 필수입니다.' });
@@ -560,29 +554,19 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
                         )}
                       </div>
                       
-                      <div>
-                        {areaConfig.aiVisionCheck ? (
-                            <div>
-                                <FormLabel htmlFor="media-file-input" className="text-xs">
-                                  증명 파일 (AI 분석 필수)
-                                  <span className="text-destructive ml-1">*필수</span>
-                                </FormLabel>
-                                <Input
-                                  id="media-file-input"
-                                  ref={fileInputRef}
-                                  type="file"
-                                  accept="image/*,video/*"
-                                  onChange={handleFileChange}
-                                  className="file:text-primary file:font-semibold text-xs h-9 mt-1"
-                                />
-                                <FormDescription className="text-xs mt-1">사진 {MAX_IMAGE_SIZE_MB}MB, 영상 {MAX_VIDEO_SIZE_MB}MB 이하</FormDescription>
-                            </div>
-                        ) : (
-                          <div className="space-y-4">
-                              <div>
-                                <FormLabel htmlFor="media-file-input" className="text-xs">
-                                  증명 파일 (사진/영상)
-                                  {areaConfig.mediaRequired && <span className="text-destructive ml-1">*필수</span>}
+                      <div className="space-y-2">
+                        <Label>
+                            증명 자료
+                            {areaConfig.mediaRequired && <span className="text-destructive ml-1">*</span>}
+                        </Label>
+                        <p className="text-xs text-muted-foreground -mt-1">
+                            파일 또는 URL 중 하나를 선택하여 제출해주세요.
+                        </p>
+                        <div className="space-y-4 rounded-md border p-4">
+                             <div>
+                                <FormLabel htmlFor="media-file-input" className="text-sm font-medium">
+                                  파일 업로드 (사진/영상)
+                                  {areaConfig.aiVisionCheck && <span className="text-blue-600 font-semibold ml-1 text-xs">(AI 자동 분석 대상)</span>}
                                 </FormLabel>
                                 <Input
                                   id="media-file-input"
@@ -606,17 +590,20 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
                                 name="mediaUrl"
                                 render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel className="text-xs">
-                                      증명 자료 URL (유튜브 등)
+                                    <FormLabel className="text-sm font-medium">
+                                      외부 URL 붙여넣기 (유튜브 등)
                                     </FormLabel>
                                     <FormControl>
                                       <Input placeholder="https://..." {...field} />
                                     </FormControl>
+                                    <FormDescription className="text-xs mt-1">
+                                        URL로 제출하면 선생님의 확인이 필요해요.
+                                    </FormDescription>
+                                    <FormMessage />
                                   </FormItem>
                                 )}
                               />
-                          </div>
-                        )}
+                        </div>
                       </div>
 
                       {fileName && (
@@ -666,5 +653,3 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
     </AlertDialog>
   );
 }
-
-    
