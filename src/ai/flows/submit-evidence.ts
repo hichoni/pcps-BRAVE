@@ -9,8 +9,8 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { db } from '@/lib/firebase';
+import { adminStorage } from '@/lib/firebase-admin';
 import { collection, addDoc, serverTimestamp, doc, getDoc, runTransaction, query, where, orderBy, limit, getDocs, Timestamp, setDoc, writeBatch } from 'firebase/firestore';
-import { v4 as uuidv4 } from 'uuid';
 import { checkCertification } from './certification-checker';
 import { analyzeMediaEvidence } from './analyze-typing-test'; // Now a generic media analyzer
 import { generateEncouragement } from './generate-encouragement';
@@ -141,19 +141,32 @@ const submitEvidenceFlow = ai.defineFlow(
       if (areaConfig.autoApprove) {
           let aiResult: CertificationCheckOutput | null = null;
           if (areaConfig.aiVisionCheck && input.mediaUrl && areaConfig.aiVisionPrompt) {
-              // Fetch the image from the URL, convert it to a data URI for the vision model
-              const response = await fetch(input.mediaUrl);
-              if (!response.ok) {
-                throw new Error(`미디어 파일을 불러오는 데 실패했습니다: ${response.statusText}`);
-              }
-              const imageBuffer = await response.arrayBuffer();
-              const mediaType = response.headers.get('content-type') || input.mediaType || 'image/jpeg';
-              const photoDataUri = `data:${mediaType};base64,${Buffer.from(imageBuffer).toString('base64')}`;
+              
+            if (!adminStorage) {
+                throw new Error("AI Vision 검증 오류: 서버 저장소(Admin Storage)가 설정되지 않았습니다. 관리자에게 문의하여 service-account.json 파일이 올바르게 구성되었는지 확인해주세요.");
+            }
+            try {
+                const url = new URL(input.mediaUrl);
+                const filePath = decodeURIComponent(url.pathname.split('/o/')[1].split('?')[0]);
+                
+                const file = adminStorage.bucket().file(filePath);
+                const [fileBuffer] = await file.download();
+                
+                const [metadata] = await file.getMetadata();
+                const mediaType = metadata.contentType || input.mediaType || 'image/jpeg';
+                
+                const photoDataUri = `data:${mediaType};base64,${fileBuffer.toString('base64')}`;
+                
+                aiResult = await analyzeMediaEvidence({
+                    photoDataUri: photoDataUri,
+                    prompt: areaConfig.aiVisionPrompt,
+                });
 
-              aiResult = await analyzeMediaEvidence({
-                  photoDataUri: photoDataUri,
-                  prompt: areaConfig.aiVisionPrompt,
-              });
+            } catch(e: any) {
+                console.error("Error during AI Vision processing with Admin SDK:", e);
+                throw new Error(`AI Vision 분석 중 오류가 발생했습니다: ${e.message}`);
+            }
+
           } else {
               aiResult = await checkCertification({
                   areaName: input.koreanName,
