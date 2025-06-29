@@ -147,9 +147,10 @@ const submitEvidenceFlow = ai.defineFlow(
       let updateMessage: string;
 
       const isExternalUrl = input.mediaUrl && !input.mediaUrl.includes('firebasestorage.googleapis.com');
+      const isVideo = input.mediaType?.startsWith('video/') ?? false;
 
-      if (areaConfig.autoApprove && !isExternalUrl) {
-          // AI auto-approval logic for file uploads and text-only submissions
+      if (areaConfig.autoApprove && !isExternalUrl && !isVideo) {
+          // AI auto-approval logic for file uploads (IMAGES ONLY) and text-only submissions
           let aiResult: CertificationCheckOutput | null = null;
           if (areaConfig.aiVisionCheck && input.mediaUrl) {
               
@@ -261,11 +262,14 @@ const submitEvidenceFlow = ai.defineFlow(
           }
 
       } else {
-          // Manual review logic for external URLs or when autoApprove is off
+          // Manual review logic for videos, external URLs, or when autoApprove is off
           submissionStatus = 'pending_review';
           if (isExternalUrl) {
             aiReasoning = 'URL이 포함된 제출물은 안전을 위해 선생님의 확인이 필요합니다.';
             updateMessage = '제출 완료! 링크는 선생님이 확인하신 후, 진행도에 반영될 거예요.';
+          } else if (isVideo) {
+            aiReasoning = '영상 자료는 선생님의 직접 확인이 필요합니다.';
+            updateMessage = '영상 제출 완료! 선생님이 확인하신 후, 진행도에 반영될 거예요.';
           } else {
             aiReasoning = 'AI 자동 인증이 비활성화된 영역입니다. 선생님의 확인이 필요합니다.';
             updateMessage = '제출 완료! 선생님이 확인하신 후, 진행도에 반영될 거예요.';
@@ -296,3 +300,5 @@ const submitEvidenceFlow = ai.defineFlow(
     }
   }
 );
+
+    
