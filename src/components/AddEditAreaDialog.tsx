@@ -580,7 +580,7 @@ export function AddEditAreaDialog({ open, onOpenChange, area }: AddEditAreaDialo
                                       </SelectContent>
                                   </Select>
                                   <FormDescription className="text-xs">
-                                      AI Vision 사용 시 '파일 업로드'만 가능합니다. 영상은 'URL 입력'을 권장합니다.
+                                    AI Vision 기능을 사용하려면 '파일 업로드' 방식만 선택할 수 있습니다.
                                   </FormDescription>
                                   <FormMessage />
                               </FormItem>
