@@ -11,7 +11,8 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Camera, StopCircle, RefreshCcw, Send } from 'lucide-react';
+import { Loader2, Camera, StopCircle, RefreshCcw, Send, VideoOff } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface VideoRecorderDialogProps {
   open: boolean;
@@ -19,7 +20,8 @@ interface VideoRecorderDialogProps {
   onVideoRecorded: (file: File) => void;
 }
 
-type RecordingState = 'idle' | 'recording' | 'preview';
+type RecordingState = 'idle' | 'recording' | 'preview' | 'initializing' | 'denied';
+const RECORDING_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
 export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: VideoRecorderDialogProps) {
   const { toast } = useToast();
@@ -28,91 +30,94 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
   const recordedChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  const [recordingState, setRecordingState] = useState<RecordingState>('idle');
-  const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
-  const [isInitializing, setIsInitializing] = useState(false);
 
-  const cleanupStream = useCallback(() => {
+  const [recordingState, setRecordingState] = useState<RecordingState>('initializing');
+
+  // Unified cleanup function
+  const cleanup = useCallback(() => {
+    // Stop all tracks in the stream
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
-  }, []);
-
-  const cleanupRecorder = useCallback(() => {
+    // Stop media recorder if it's running
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
     }
     mediaRecorderRef.current = null;
-    
+    // Clear timeout
     if (recordingTimeoutRef.current) {
       clearTimeout(recordingTimeoutRef.current);
       recordingTimeoutRef.current = null;
     }
-  }, []);
-  
-  const resetState = useCallback(() => {
-    cleanupRecorder();
-    cleanupStream();
-
-    if (recordedVideoUrl) {
-      URL.revokeObjectURL(recordedVideoUrl);
-      setRecordedVideoUrl(null);
-    }
+    // Clear recorded data
     recordedChunksRef.current = [];
-    setRecordingState('idle');
-    setIsInitializing(false);
-  }, [cleanupRecorder, cleanupStream, recordedVideoUrl]);
-  
-  const initializeCamera = useCallback(async () => {
-    if (streamRef.current) {
-      return;
+    // Revoke object URL from preview
+    if (videoRef.current && videoRef.current.src.startsWith('blob:')) {
+      URL.revokeObjectURL(videoRef.current.src);
     }
+  }, []);
 
-    resetState();
-    setIsInitializing(true);
+  const initializeCamera = useCallback(async () => {
+    cleanup(); // Clean up any previous state
+    setRecordingState('initializing');
+    
+    if (!navigator.mediaDevices?.getUserMedia) {
+        toast({
+            variant: 'destructive',
+            title: '카메라 미지원',
+            description: '이 브라우저에서는 카메라 기능을 지원하지 않습니다.',
+        });
+        setRecordingState('denied');
+        return;
+    }
     
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: true });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // Muted is essential for preventing feedback loops when playing back audio from the mic
-        videoRef.current.muted = true; 
-        videoRef.current.play().catch(e => console.error("Error playing video stream:", e));
+        videoRef.current.muted = true;
+        videoRef.current.controls = false;
+        // The `playsInline` attribute is critical for iOS Safari. It's set in the JSX.
+        // The `play()` call must be initiated to get the stream flowing.
+        await videoRef.current.play();
       }
-      setIsInitializing(false);
-    } catch (error) {
+      setRecordingState('idle');
+    } catch (error: any) {
       console.error('Error accessing camera/mic:', error);
+      let description = '영상 녹화를 사용하려면 브라우저 설정에서 카메라와 마이크 권한을 허용해주세요.';
+      if (error.name === 'NotAllowedError') {
+        description = '카메라와 마이크 접근 권한이 거부되었습니다. 브라우저 설정에서 권한을 재설정해주세요.';
+      } else if (error.name === 'NotFoundError') {
+        description = '사용 가능한 카메라나 마이크 장치를 찾을 수 없습니다. 장치가 연결되어 있는지 확인해주세요.';
+      }
       toast({
         variant: 'destructive',
-        title: '카메라/마이크 접근 거부됨',
-        description: '영상 녹화를 사용하려면 브라우저 설정에서 카메라와 마이크 권한을 허용해주세요.',
+        title: '카메라/마이크 접근 오류',
+        description,
         duration: 9000,
       });
-      setIsInitializing(false);
-      onOpenChange(false);
+      setRecordingState('denied');
     }
-  }, [onOpenChange, resetState, toast]);
+  }, [cleanup, toast]);
 
+  // Handle dialog open/close
   useEffect(() => {
     if (open) {
       initializeCamera();
     } else {
-      resetState();
+      cleanup();
     }
     
     // Final cleanup when component unmounts
-    return () => {
-      resetState();
-    }
-  }, [open, initializeCamera, resetState]);
+    return () => cleanup();
+  }, [open, initializeCamera, cleanup]);
 
   
   const startRecording = useCallback(() => {
     if (!streamRef.current) {
-      toast({ variant: 'destructive', title: '오류', description: '카메라 스트림을 사용할 수 없습니다.' });
+      toast({ variant: 'destructive', title: '오류', description: '카메라를 사용할 수 없습니다. 다시 시도해주세요.' });
       return;
     }
     
@@ -120,43 +125,47 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
     recordedChunksRef.current = [];
     
     try {
-      const options = { mimeType: 'video/webm; codecs=vp9' };
-      const recorder = MediaRecorder.isTypeSupported(options.mimeType) 
-        ? new MediaRecorder(streamRef.current, options)
-        : new MediaRecorder(streamRef.current);
-        
+      // Check for supported MIME types
+      const options = [
+        { mimeType: 'video/webm; codecs=vp9' },
+        { mimeType: 'video/webm; codecs=vp8' },
+        { mimeType: 'video/mp4' }, // Often supported on Safari
+        { mimeType: 'video/webm' },
+      ].find(opt => MediaRecorder.isTypeSupported(opt.mimeType));
+
+      const recorder = new MediaRecorder(streamRef.current, options);
       mediaRecorderRef.current = recorder;
 
-      recorder.addEventListener('dataavailable', (event) => {
+      recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           recordedChunksRef.current.push(event.data);
         }
-      });
+      };
 
-      recorder.addEventListener('stop', () => {
+      recorder.onstop = () => {
         const mimeType = mediaRecorderRef.current?.mimeType || 'video/webm';
         const blob = new Blob(recordedChunksRef.current, { type: mimeType });
         const url = URL.createObjectURL(blob);
         
-        setRecordedVideoUrl(url);
-        setRecordingState('preview');
+        cleanup(); // Important: stop camera tracks *before* showing preview
 
         if (videoRef.current) {
             videoRef.current.srcObject = null;
             videoRef.current.src = url;
             videoRef.current.muted = false;
-            videoRef.current.play().catch(e => console.log("Preview playback error", e));
+            videoRef.current.controls = true;
+            videoRef.current.play().catch(e => console.error("Preview playback error", e));
         }
 
-        cleanupStream();
-      });
+        setRecordingState('preview');
+      };
 
       recorder.start();
       recordingTimeoutRef.current = setTimeout(() => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-            mediaRecorderRef.current.stop();
+            stopRecording();
         }
-      }, 5 * 60 * 1000); // 5 minutes
+      }, RECORDING_DURATION_MS);
 
     } catch (e) {
       console.error("Recording start failed", e);
@@ -167,7 +176,7 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
       });
       setRecordingState('idle');
     }
-  }, [toast, cleanupStream]);
+  }, [toast, cleanup, stopRecording]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -179,12 +188,11 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
   }, []);
   
   const handleRetake = () => {
-    resetState();
     initializeCamera();
   };
 
   const handleUseVideo = useCallback(() => {
-    if (!recordedVideoUrl) return;
+    if (!videoRef.current?.src) return;
 
     const mimeType = mediaRecorderRef.current?.mimeType || 'video/webm';
     const getFileExtension = (type: string) => {
@@ -196,7 +204,29 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
     const blob = new Blob(recordedChunksRef.current, { type: mimeType });
     const file = new File([blob], `recorded-video-${Date.now()}.${extension}`, { type: mimeType });
     onVideoRecorded(file);
-  }, [recordedVideoUrl, onVideoRecorded]);
+  }, [onVideoRecorded]);
+
+  const renderContent = () => {
+      switch (recordingState) {
+          case 'initializing':
+              return (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-center p-4 bg-black/50">
+                    <Loader2 className="animate-spin mb-2 h-6 w-6" />
+                    <p>카메라를 시작하고 있습니다...</p>
+                </div>
+              );
+          case 'denied':
+              return (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-center p-4 bg-black/50">
+                    <VideoOff className="mb-2 h-8 w-8" />
+                    <p className="font-semibold">카메라 접근 불가</p>
+                    <p className="text-sm">브라우저 설정에서 권한을 확인해주세요.</p>
+                </div>
+              );
+          default:
+              return null;
+      }
+  }
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -213,19 +243,13 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
               ref={videoRef}
               className="w-full h-full object-cover" 
               playsInline
-              controls={recordingState === 'preview'}
             />
-          {isInitializing && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-center p-4 bg-black/50">
-                  <Loader2 className="animate-spin mb-2 h-6 w-6" />
-                  <p>카메라를 시작하고 있습니다...</p>
-              </div>
-          )}
+            {renderContent()}
         </div>
         
         <DialogFooter>
           {recordingState === 'idle' && (
-            <Button onClick={startRecording} disabled={isInitializing} className="w-full">
+            <Button onClick={startRecording} className="w-full">
               <Camera className="mr-2" /> 녹화 시작
             </Button>
           )}
