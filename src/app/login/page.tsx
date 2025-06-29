@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo } from 'react';
@@ -184,17 +185,17 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-secondary">
-      <main className="flex-grow flex items-center justify-center p-4">
+    <div className="flex items-center justify-center min-h-screen p-4 bg-secondary">
+      <main>
         <Card className="w-full max-w-sm shadow-lg border">
-          <CardHeader className="text-center">
+          <CardHeader className="text-center pt-6 pb-4">
             <Image
               src="/icon-main.png?v=2"
               alt="풍천풍서초등학교 로고"
               width={80}
               height={80}
               priority
-              className="mx-auto rounded-full shadow-md mb-4"
+              className="mx-auto rounded-full shadow-md mb-2"
             />
             <CardTitle className="font-headline text-2xl text-primary">학교장 인증제 로그인</CardTitle>
             <CardDescription>계정 정보를 입력해주세요.</CardDescription>
@@ -344,14 +345,13 @@ export default function LoginPage() {
               </form>
             </TabsContent>
           </Tabs>
-
           <div className="px-6 pb-6 text-center text-xs text-muted-foreground">
             <div className="border-t pt-4 mt-2">
               <p>
-                본 서비스는 <strong className="text-primary font-semibold">풍천풍서초등학교 학생들</strong>의 <strong className="text-primary font-semibold">꿈</strong>과 <strong className="text-primary font-semibold">도전</strong>을 응원하기 위해 제작되었습니다.
+                본 서비스는 <strong className="text-primary font-semibold">풍천풍서초등학교 학생들</strong>의 <strong className="text-primary font-semibold">꿈</strong>과 <strong className="text-primary font-semibold">도전</strong>을<br />응원하기 위해 제작되었습니다.
               </p>
               <p className="mt-2 text-foreground/50">
-                  © 2025 Pungcheon Pungseo Elementary School. All Rights Reserved.
+                  © 2025 Pungcheon Pungseo Elementary School.<br/>All Rights Reserved.
               </p>
             </div>
           </div>
