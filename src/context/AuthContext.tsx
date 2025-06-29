@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { User, MOCK_USERS, AreaName, AchievementsState, DEFAULT_AREAS_CONFIG } from '@/lib/config';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, setDoc, query, where, writeBatch, deleteDoc, updateDoc, addDoc, getDoc, limit } from 'firebase/firestore';
-import { updateProfileAvatar } from '@/ai/flows/update-profile-avatar';
+import { updateProfileAvatar as updateProfileAvatarFlow } from '@/ai/flows/update-profile-avatar';
 
 
 interface LoginCredentials {
@@ -195,7 +195,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!db) throw new Error("데이터베이스에 연결되지 않았습니다. 설정을 확인해주세요.");
 
     try {
-        await updateProfileAvatar({ userId: String(user.id), avatar });
+        await updateProfileAvatarFlow({ userId: String(user.id), avatar });
         
         const updatedUser = { ...user, profileAvatar: avatar };
         setUser(updatedUser);
