@@ -93,7 +93,7 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
     if (areaConfig.goalType === 'numeric') {
         return (
             <div className="text-right">
-                <p className="text-2xl font-bold text-accent">
+                <p className={cn("text-2xl font-bold", isCertified ? "text-accent" : "text-primary")}>
                     {currentProgress}
                     <span className="text-base font-normal text-foreground/80 ml-1">{areaConfig.unit}</span>
                 </p>
@@ -105,7 +105,7 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
         const hasProgress = !!progress;
         return (
              <div className="text-right">
-                 <p className={cn("text-2xl font-bold", hasProgress ? "text-accent" : "text-foreground/80")}>
+                 <p className={cn("text-2xl font-bold", isCertified ? "text-accent" : (hasProgress ? "text-primary" : "text-foreground/80"))}>
                     {hasProgress ? progress : '미설정'}
                  </p>
                  <p className="text-xs text-foreground/80">{areaConfig.unit}</p>
@@ -113,6 +113,13 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
         );
     }
     return null;
+  };
+
+  const getButtonText = () => {
+    if (isCheckingHistory) return '확인 중';
+    if (hasApprovedToday) return '오늘 도전 완료';
+    if (isCertified) return '계속 도전하기';
+    return '도전하기';
   };
 
   return (
@@ -125,10 +132,10 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
             <div className="flex justify-between items-start gap-4">
                 <div className="flex items-start gap-4">
                     <div className={cn(
-                      "flex-shrink-0 h-14 w-14 rounded-lg flex items-center justify-center bg-accent/10", 
-                      isCertified && "bg-accent"
+                      "flex-shrink-0 h-14 w-14 rounded-lg flex items-center justify-center", 
+                      isCertified ? "bg-accent" : "bg-primary/10"
                     )}>
-                        <AreaIcon className={cn("w-8 h-8", isCertified ? "text-accent-foreground" : "text-accent")} />
+                        <AreaIcon className={cn("w-8 h-8", isCertified ? "text-accent-foreground" : "text-primary")} />
                     </div>
                     <div>
                         <h3 className="font-bold text-lg text-foreground">{areaConfig.koreanName}</h3>
@@ -166,7 +173,7 @@ export function AchievementCard({ areaName }: AchievementCardProps) {
                       ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       : <ListChecks className="mr-2 h-4 w-4" />
                     }
-                    {isCheckingHistory ? '확인 중' : (hasApprovedToday ? '오늘 도전 완료' : '도전하기')}
+                    {getButtonText()}
                 </Button>
                 {areaConfig.externalUrl && (
                     <ExternalUrlDialog url={areaConfig.externalUrl} areaName={areaConfig.koreanName} />
