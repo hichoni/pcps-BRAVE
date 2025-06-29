@@ -1,5 +1,5 @@
 
-import { BookOpen, HeartHandshake, Bike, Palette, Laptop, Award, Medal, Gem, ShieldOff, BrainCircuit, ExternalLink, UploadCloud, FileCheck, FileX, History, Keyboard } from 'lucide-react';
+import { BookOpen, HeartHandshake, Bike, Palette, Laptop, Award, Medal, Gem, ShieldOff, BrainCircuit, ExternalLink, UploadCloud, FileCheck, FileX, History, Keyboard, Link } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export type AreaName = string;
@@ -53,6 +53,7 @@ export const STATUS_CONFIG: Record<CertificateStatus, { label: string; icon: Luc
 };
 
 export type GoalType = 'numeric' | 'objective';
+export type MediaInputType = 'upload' | 'url';
 
 export type AreaConfig = {
   name: string;
@@ -68,6 +69,7 @@ export type AreaConfig = {
   unit: string;                  // Unit for 'numeric', or a descriptive noun for 'objective'
   externalUrl?: string;
   mediaRequired?: boolean;
+  mediaInputType?: MediaInputType;
   autoApprove?: boolean;
   goalDescription?: string;
   showInGallery?: boolean;
@@ -80,6 +82,7 @@ export type AreaConfig = {
 export type StoredAreaConfig = Omit<AreaConfig, 'icon' | 'name'> & { 
   externalUrl?: string;
   mediaRequired?: boolean;
+  mediaInputType?: MediaInputType;
   autoApprove?: boolean;
   goalDescription?: string;
   placeholderText?: string;
@@ -106,6 +109,7 @@ export const ICONS: Record<string, LucideIcon> = {
     FileCheck,
     FileX,
     History,
+    Link,
 };
 
 export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
@@ -135,6 +139,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goal: { '4': 10, '5': 10, '6': 10 },
     unit: '시간',
     mediaRequired: true,
+    mediaInputType: 'upload',
     autoApprove: false, // Requires photo review
     showInGallery: true,
     aiVisionCheck: false,
@@ -163,13 +168,14 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     koreanName: '예술',
     challengeName: '풍풍 쇼케이스 💥',
     iconName: 'Palette',
-    requirements: '풍풍 쇼케이스 또는 교내외 예술 관련 대회/공연에 참여하고 활동 사진을 제출해야 합니다.',
+    requirements: '풍풍 쇼케이스 또는 교내외 예술 관련 대회/공연에 참여하고 활동 증명 자료(사진 또는 영상 URL)를 제출해야 합니다.',
     placeholderText: '언제, 어떤 대회/공연에 참여했는지 알려주세요. 작품이나 공연을 준비하며 느꼈던 점이나 특별한 경험이 있었다면 함께 공유해주세요.',
     goalType: 'numeric',
     goal: { '4': 1, '5': 1, '6': 1 },
     unit: '회 참여',
     mediaRequired: true,
-    autoApprove: false, // Requires photo/video review
+    mediaInputType: 'url',
+    autoApprove: false, // Requires review
     externalUrl: '',
     showInGallery: true,
     aiVisionCheck: false,
@@ -186,6 +192,7 @@ export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
     goal: { '4': 10, '5': 15, '6': 20 },
     unit: '회',
     mediaRequired: true,
+    mediaInputType: 'upload',
     autoApprove: true,
     showInGallery: true,
     aiVisionCheck: true,
@@ -319,5 +326,3 @@ export interface UpdateFeedbackOutput {
     success: boolean;
     message: string;
 }
-
-    

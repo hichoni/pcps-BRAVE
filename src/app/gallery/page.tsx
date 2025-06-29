@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { useAuth, User } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, orderBy, query, Timestamp, limit, startAfter, QueryDocumentSnapshot, where } from 'firebase/firestore';
-import { Loader2, ArrowLeft, User as UserIcon, Calendar as CalendarIcon, GalleryThumbnails, Trash2, Heart, Search, Edit } from 'lucide-react';
+import { Loader2, ArrowLeft, User as UserIcon, Calendar as CalendarIcon, GalleryThumbnails, Trash2, Heart, Search, Edit, Link as LinkIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserAvatar } from '@/components/UserAvatar';
@@ -54,10 +54,18 @@ const maskName = (name: string) => {
   return name;
 };
 
+const getYoutubeId = (url: string | undefined): string | null => {
+    if (!url) return null;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+};
+
 function GalleryCard({ submission, user, author, onSubmissionDeleted, onSubmissionUpdated, statusInfo }: { submission: Submission; user: User | null; author: User | null, onSubmissionDeleted: (id: string) => void, onSubmissionUpdated: (updatedSubmission: {id: string; evidence: string}) => void, statusInfo: typeof STATUS_CONFIG[keyof typeof STATUS_CONFIG] }) {
   const { challengeConfig } = useChallengeConfig();
   const { toast } = useToast();
   const AreaIcon = challengeConfig?.[submission.areaName]?.icon || UserIcon;
+  const youtubeId = getYoutubeId(submission.mediaUrl);
 
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
@@ -182,26 +190,42 @@ function GalleryCard({ submission, user, author, onSubmissionDeleted, onSubmissi
             </div>
         </div>
 
-        {submission.mediaUrl && submission.mediaType && (
-            <div className="my-2 rounded-lg border overflow-hidden">
-                {submission.mediaType.startsWith('image/') && (
-                    <Image 
-                        src={submission.mediaUrl}
-                        alt={`${submission.koreanName} 활동 증명`}
-                        width={400}
-                        height={300}
-                        className="w-full h-auto object-cover aspect-video"
-                    />
-                )}
-                {submission.mediaType.startsWith('video/') && (
-                    <video 
-                        src={submission.mediaUrl}
-                        controls
-                        className="w-full aspect-video"
-                    />
-                )}
+        {youtubeId ? (
+            <div className="my-2 rounded-lg border overflow-hidden aspect-video">
+                <iframe
+                    className="w-full h-full"
+                    src={`https://www.youtube.com/embed/${youtubeId}`}
+                    title="YouTube video player"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                ></iframe>
             </div>
-        )}
+        ) : submission.mediaUrl && submission.mediaType?.startsWith('image/') ? (
+            <div className="my-2 rounded-lg border overflow-hidden">
+                <Image 
+                    src={submission.mediaUrl}
+                    alt={`${submission.koreanName} 활동 증명`}
+                    width={400}
+                    height={300}
+                    className="w-full h-auto object-cover aspect-video"
+                />
+            </div>
+        ) : submission.mediaUrl && submission.mediaType?.startsWith('video/') ? (
+            <div className="my-2 rounded-lg border overflow-hidden">
+                <video 
+                    src={submission.mediaUrl}
+                    controls
+                    className="w-full aspect-video"
+                />
+            </div>
+        ) : submission.mediaUrl ? (
+             <a href={submission.mediaUrl} target="_blank" rel="noopener noreferrer" className="block my-2">
+                <div className="p-3 bg-background rounded-md border flex items-center justify-center gap-2 text-sm hover:bg-secondary">
+                   <LinkIcon className="w-4 h-4" />
+                   <span>미디어 링크 보기</span>
+                </div>
+             </a>
+        ) : null}
 
         <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">
             {submission.evidence}

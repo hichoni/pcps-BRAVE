@@ -136,7 +136,9 @@ const submitEvidenceFlow = ai.defineFlow(
 
       if (input.mediaUrl) {
           docData.mediaUrl = input.mediaUrl;
-          docData.mediaType = input.mediaType;
+          if (input.mediaType) {
+              docData.mediaType = input.mediaType;
+          }
       }
 
       let submissionStatus: SubmissionStatus;
@@ -145,7 +147,7 @@ const submitEvidenceFlow = ai.defineFlow(
 
       if (areaConfig.autoApprove) {
           let aiResult: CertificationCheckOutput | null = null;
-          if (areaConfig.aiVisionCheck && input.mediaUrl && areaConfig.aiVisionPrompt) {
+          if (areaConfig.aiVisionCheck && input.mediaUrl && areaConfig.mediaType) {
               
             if (!adminStorage) {
                 throw new Error("AI Vision 검증 오류: 서버 저장소(Admin Storage)가 설정되지 않았습니다. 관리자에게 문의하여 service-account.json 파일이 올바르게 구성되었는지 확인해주세요.");

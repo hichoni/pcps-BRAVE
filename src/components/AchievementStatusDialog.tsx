@@ -52,6 +52,7 @@ type HistoryItem = {
 
 const evidenceSchema = z.object({
   evidence: z.string().min(1, { message: '간단한 활동 내용을 입력해주세요.' }).max(1000, { message: '1000자 이내로 입력해주세요.'}),
+  mediaUrl: z.string().url({ message: '올바른 URL 형식을 입력해주세요.' }).optional().or(z.literal('')),
 });
 
 type EvidenceFormValues = z.infer<typeof evidenceSchema>;
@@ -85,6 +86,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
@@ -97,7 +99,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
 
   const form = useForm<EvidenceFormValues>({
     resolver: zodResolver(evidenceSchema),
-    defaultValues: { evidence: '' },
+    defaultValues: { evidence: '', mediaUrl: '' },
   });
 
   const evidenceValue = form.watch('evidence');
@@ -233,25 +235,22 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
 
   // Effect for AI real-time feedback
   useEffect(() => {
-    // Exit if the dialog is closed, or not in submit mode, or config is missing
     if (!open || !areaConfig || initialMode !== 'submit') {
       return;
     }
 
     const text = evidenceValue.trim();
+    const mediaInputType = areaConfig.mediaInputType || 'upload';
+    const hasMedia = mediaInputType === 'upload' ? !!fileName : !!form.getValues('mediaUrl');
 
-    // Debounce the API call
     const handler = setTimeout(async () => {
-      // Don't run for very short text to save resources
-      if (text.length < 10) {
-        return;
-      }
+      if (text.length < 10) return;
       setIsChecking(true);
       try {
         const result = await getTextFeedback({
           text: evidenceValue,
           requirements: areaConfig.requirements,
-          hasMedia: !!fileName,
+          hasMedia: hasMedia,
           mediaRequired: !!areaConfig.mediaRequired,
         });
         setAiFeedback(result?.feedback ?? null);
@@ -261,9 +260,8 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
       } finally {
         setIsChecking(false);
       }
-    }, 1500); // 1.5-second delay
+    }, 1500);
     
-    // Immediate feedback for short text length
     if (text.length === 0) {
       setAiFeedback(null);
       setShowLengthWarning(false);
@@ -274,18 +272,17 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
       setShowLengthWarning(false);
     }
 
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [evidenceValue, fileName, areaConfig, open, initialMode]);
+    return () => clearTimeout(handler);
+  }, [evidenceValue, fileName, areaConfig, open, initialMode, form]);
   
   if (!user || !challengeConfig || user.grade === undefined || !areaConfig) return null;
   
-  const { koreanName, challengeName } = areaConfig;
+  const { koreanName, challengeName, mediaInputType = 'upload' } = areaConfig;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {
+      setSelectedFile(null);
       setFileName(null);
       return;
     }
@@ -306,91 +303,62 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
       limitMb = MAX_VIDEO_SIZE_MB;
       fileType = '영상';
     } else {
-      toast({
-        variant: 'destructive',
-        title: '지원하지 않는 파일 형식',
-        description: '사진 또는 영상 파일만 업로드할 수 있습니다.',
-      });
+      toast({ variant: 'destructive', title: '지원하지 않는 파일 형식', description: '사진 또는 영상 파일만 업로드할 수 있습니다.' });
       if (fileInputRef.current) fileInputRef.current.value = '';
+      setSelectedFile(null);
       setFileName(null);
       return;
     }
 
     if (file.size > limitBytes) {
-      toast({
-        variant: 'destructive',
-        title: '파일 크기 초과',
-        description: `${fileType} 파일 크기는 ${limitMb}MB를 넘을 수 없습니다.`,
-      });
+      toast({ variant: 'destructive', title: '파일 크기 초과', description: `${fileType} 파일 크기는 ${limitMb}MB를 넘을 수 없습니다.` });
       if (fileInputRef.current) fileInputRef.current.value = '';
+      setSelectedFile(null);
       setFileName(null);
       return;
     }
+    setSelectedFile(file);
     setFileName(file.name);
   };
 
   const handleFormSubmit = async (data: EvidenceFormValues) => {
     if (!user || !user.name) return;
-
-    let fileToUpload = fileInputRef.current?.files?.[0];
-
-    if (areaConfig.mediaRequired && !fileToUpload) {
-        toast({
-            variant: 'destructive',
-            title: '파일 누락',
-            description: '이 영역은 사진이나 영상 제출이 필수입니다.',
-        });
-        return;
-    }
-
     setIsSubmitting(true);
+
     try {
-      let mediaUrl: string | undefined = undefined;
-      let mediaType: string | undefined = undefined;
+      let finalMediaUrl: string | undefined = undefined;
+      let finalMediaType: string | undefined = undefined;
 
-      if (fileToUpload) {
-        const isImage = fileToUpload.type.startsWith('image/');
-        const isVideo = fileToUpload.type.startsWith('video/');
-
-        if (isImage) {
-          try {
-            fileToUpload = await resizeImage(fileToUpload, 1024); // Max width 1024px
-          } catch (resizeError) {
-            console.error("Image resize failed, uploading original:", resizeError);
-            toast({
-              variant: 'default',
-              title: '이미지 리사이징 실패',
-              description: '원본 이미지로 업로드를 시도합니다.',
-            });
-          }
-        }
-
-        let limitBytes = 0;
-        let limitMb = 0;
-        let fileType = '';
-
-        if (isImage) {
-          limitBytes = MAX_IMAGE_SIZE_BYTES;
-          limitMb = MAX_IMAGE_SIZE_MB;
-          fileType = '사진';
-        } else if (isVideo) {
-          limitBytes = MAX_VIDEO_SIZE_BYTES;
-          limitMb = MAX_VIDEO_SIZE_MB;
-          fileType = '영상';
-        }
-
-        if (limitBytes > 0 && fileToUpload.size > limitBytes) {
-          toast({
-            variant: 'destructive',
-            title: '파일 크기 초과',
-            description: `처리 후 ${fileType} 파일 크기가 ${limitMb}MB를 초과하여 업로드할 수 없습니다.`,
-          });
+      if (mediaInputType === 'upload') {
+        const fileToUpload = selectedFile;
+        if (areaConfig.mediaRequired && !fileToUpload) {
+          toast({ variant: 'destructive', title: '파일 누락', description: '이 영역은 파일 제출이 필수입니다.' });
           setIsSubmitting(false);
           return;
         }
 
-        mediaUrl = await uploadFile(fileToUpload, user.username, 'evidence');
-        mediaType = fileToUpload.type;
+        if (fileToUpload) {
+          const isImage = fileToUpload.type.startsWith('image/');
+          let processedFile = fileToUpload;
+          if (isImage) {
+            try {
+              processedFile = await resizeImage(fileToUpload, 1024);
+            } catch (resizeError) {
+              console.error("Image resize failed, uploading original:", resizeError);
+            }
+          }
+          finalMediaUrl = await uploadFile(processedFile, user.username, 'evidence');
+          finalMediaType = processedFile.type;
+        }
+      } else { // 'url' mode
+        const urlValue = data.mediaUrl?.trim();
+        if (areaConfig.mediaRequired && !urlValue) {
+          toast({ variant: 'destructive', title: 'URL 누락', description: '이 영역은 URL 제출이 필수입니다.' });
+          setIsSubmitting(false);
+          return;
+        }
+        finalMediaUrl = urlValue;
+        finalMediaType = undefined; // We don't know the type from a URL
       }
       
       const result = await submitEvidence({
@@ -399,9 +367,9 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
         areaName: areaName,
         koreanName: areaConfig.koreanName,
         challengeName: areaConfig.challengeName,
-        evidence: data.evidence || '미디어 파일 제출',
-        mediaUrl: mediaUrl,
-        mediaType: mediaType,
+        evidence: data.evidence || '미디어 자료 제출',
+        mediaUrl: finalMediaUrl,
+        mediaType: finalMediaType,
       });
       
       toast({
@@ -416,36 +384,21 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
       });
 
       form.reset();
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      setSelectedFile(null);
       setFileName(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       onOpenChange(false);
+
     } catch (error: unknown) {
       console.error('Evidence Submission Error:', error);
       let errorMessage = "알 수 없는 오류가 발생했습니다.";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string') {
-        errorMessage = error.message;
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      }
+      if (error instanceof Error) errorMessage = error.message;
+      else if (typeof error === 'string') errorMessage = error;
       
       if (errorMessage.startsWith('제출 간격 제한:')) {
-        toast({
-          variant: 'default',
-          title: '제출 간격 제한',
-          description: errorMessage.replace('제출 간격 제한: ', ''),
-          duration: 9000,
-        });
+        toast({ variant: 'default', title: '제출 간격 제한', description: errorMessage.replace('제출 간격 제한: ', ''), duration: 9000 });
       } else {
-        toast({
-          variant: 'destructive',
-          title: '제출 오류',
-          description: errorMessage,
-          duration: 9000,
-        });
+        toast({ variant: 'destructive', title: '제출 오류', description: errorMessage, duration: 9000 });
       }
     } finally {
       setIsSubmitting(false);
@@ -455,10 +408,9 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
   const onDialogClose = (isOpen: boolean) => {
       if (!isOpen) {
           form.reset();
-          if (fileInputRef.current) {
-            fileInputRef.current.value = "";
-          }
+          setSelectedFile(null);
           setFileName(null);
+          if (fileInputRef.current) fileInputRef.current.value = "";
           setAiFeedback(null);
           setShowLengthWarning(false);
           setIntervalLock({ locked: false, minutesToWait: 0 });
@@ -471,22 +423,11 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
 
     setIsDeleting(true);
     try {
-        const result = await deleteSubmission({
-            submissionId: itemToDelete.id,
-            userId: String(user.id),
-        });
-
-        toast({
-            title: "요청 완료",
-            description: result.message
-        });
+        const result = await deleteSubmission({ submissionId: itemToDelete.id, userId: String(user.id) });
+        toast({ title: "요청 완료", description: result.message });
         setItemToDelete(null);
     } catch (error: any) {
-        toast({
-            variant: "destructive",
-            title: "삭제 요청 오류",
-            description: error.message || '삭제 요청에 실패했습니다.'
-        });
+        toast({ variant: "destructive", title: "삭제 요청 오류", description: error.message || '삭제 요청에 실패했습니다.' });
     } finally {
         setIsDeleting(false);
     }
@@ -588,9 +529,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
                             <FormLabel className="sr-only">활동 내용</FormLabel>
                             <FormControl>
                               <Textarea
-                                placeholder={
-                                  areaConfig.placeholderText || "여기에 나의 실천 내용을 자세히 적어주세요. (예: 어떤 책을 읽고 무엇을 느꼈는지, 봉사활동을 통해 무엇을 배우고 실천했는지 등)"
-                                }
+                                placeholder={areaConfig.placeholderText || "여기에 나의 실천 내용을 자세히 적어주세요."}
                                 {...field}
                                 rows={3}
                               />
@@ -609,35 +548,53 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
                         ) : (showLengthWarning || aiFeedback) && (
                           <Alert variant="default" className="p-2 w-full">
                             <BrainCircuit className="h-4 w-4" />
-                            <AlertTitle className="text-xs font-semibold mb-0.5">
-                              AI 실시간 조언
-                            </AlertTitle>
-                            <AlertDescription className="text-xs">
-                              {aiFeedback}
-                            </AlertDescription>
+                            <AlertTitle className="text-xs font-semibold mb-0.5">AI 실시간 조언</AlertTitle>
+                            <AlertDescription className="text-xs">{aiFeedback}</AlertDescription>
                           </Alert>
                         )}
                       </div>
                       
                       <div>
-                        <FormLabel htmlFor="media-file-input" className="text-xs">
-                          증명 파일 (사진/영상)
-                          {areaConfig.mediaRequired && <span className="text-destructive ml-1">*필수</span>}
-                        </FormLabel>
-                        <Input
-                          id="media-file-input"
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*,video/*"
-                          onChange={handleFileChange}
-                          className="file:text-primary file:font-semibold text-xs h-9 mt-1"
-                        />
-                        <FormDescription className="text-xs mt-1">
-                          사진 {MAX_IMAGE_SIZE_MB}MB, 영상 {MAX_VIDEO_SIZE_MB}MB 이하의 파일을 올려주세요.
-                        </FormDescription>
+                        {mediaInputType === 'upload' ? (
+                          <>
+                            <FormLabel htmlFor="media-file-input" className="text-xs">
+                              증명 파일
+                              {areaConfig.mediaRequired && <span className="text-destructive ml-1">*필수</span>}
+                            </FormLabel>
+                            <Input
+                              id="media-file-input"
+                              ref={fileInputRef}
+                              type="file"
+                              accept="image/*,video/*"
+                              onChange={handleFileChange}
+                              className="file:text-primary file:font-semibold text-xs h-9 mt-1"
+                            />
+                            <FormDescription className="text-xs mt-1">사진 {MAX_IMAGE_SIZE_MB}MB, 영상 {MAX_VIDEO_SIZE_MB}MB 이하</FormDescription>
+                          </>
+                        ) : (
+                          <FormField
+                            control={form.control}
+                            name="mediaUrl"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">
+                                  증명 자료 URL (사진 또는 영상 링크)
+                                  {areaConfig.mediaRequired && <span className="text-destructive ml-1">*필수</span>}
+                                </FormLabel>
+                                <FormControl>
+                                  <Input placeholder="https://..." {...field} />
+                                </FormControl>
+                                <FormDescription className="text-xs">
+                                  사진은 '이미지 주소 복사', 영상은 유튜브 '공유' 버튼으로 얻은 링크를 붙여넣으세요.
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
                       </div>
 
-                      {fileName && (
+                      {fileName && mediaInputType === 'upload' && (
                         <div className="text-sm p-3 bg-secondary rounded-md text-secondary-foreground flex items-center gap-2">
                            <FileCheck className="h-4 w-4 text-primary" />
                            <span className="font-medium">{fileName}</span>
