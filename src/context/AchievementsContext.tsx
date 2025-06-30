@@ -151,13 +151,11 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
         const docSnap = await getDoc(achievementDocRef);
         const currentAchievements = docSnap.exists() ? docSnap.data() : {};
         
-        const currentAreaState = (currentAchievements && typeof currentAchievements[area] === 'object' && currentAchievements[area] !== null)
-          ? currentAchievements[area]
-          : { isCertified: false, progress: areaConfig.goalType === 'numeric' ? 0 : '' };
+        // This is the robust way to get the current state for the area, handling all edge cases.
+        const currentAreaState = currentAchievements?.[area] || { progress: areaConfig.goalType === 'numeric' ? 0 : '', isCertified: false };
         
         const oldProgress = currentAreaState.progress;
-
-        let newIsCertified;
+        let newIsCertified = currentAreaState.isCertified;
 
         if (areaConfig?.goalType === 'objective' && areaConfig.autoCertifyOn && typeof progress === 'string') {
             newIsCertified = areaConfig.autoCertifyOn.includes(progress);
@@ -166,9 +164,10 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
             const gradeKey = student.grade === 0 ? '6' : String(student.grade);
             const goal = areaConfig.goal?.[gradeKey] ?? 0;
             const meetsGoal = goal > 0 && progress >= goal;
-            newIsCertified = (currentAreaState.isCertified ?? false) || meetsGoal;
-        } else {
-            newIsCertified = currentAreaState.isCertified ?? false;
+            // Only set to true, don't un-certify by lowering progress
+            if (meetsGoal) {
+              newIsCertified = true;
+            }
         }
         
         const newData = {
@@ -204,35 +203,34 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
     try {
         const batch = writeBatch(db);
         const achievementDocRef = doc(db, 'achievements', username);
-        const docSnap = await getDoc(achievementDocRef);
-
         const areaConfig = challengeConfig[area];
         if (!areaConfig) {
             console.error(`Missing config for area: ${area}`);
             throw new Error(`'${area}' 영역에 대한 설정을 찾을 수 없습니다.`);
         }
 
-        const currentAreaState = docSnap.data()?.[area] || {};
-        const currentIsCertified = currentAreaState.isCertified ?? false;
-        // Preserve existing progress
-        const currentProgress = currentAreaState.progress ?? (areaConfig.goalType === 'numeric' ? 0 : '');
+        const docSnap = await getDoc(achievementDocRef);
+        const currentAchievements = docSnap.exists() ? docSnap.data() : {};
 
-        const newIsCertified = !currentIsCertified;
+        // Robustly get the current state for the area.
+        const currentAreaState = currentAchievements?.[area] || { progress: areaConfig.goalType === 'numeric' ? 0 : '', isCertified: false };
+
+        const newIsCertified = !currentAreaState.isCertified;
         
         const newData = {
-            progress: currentProgress,
+            progress: currentAreaState.progress,
             isCertified: newIsCertified,
         };
 
         batch.set(achievementDocRef, { [area]: newData }, { merge: true });
 
-        if (teacherId !== undefined && challengeConfig[area]) {
+        if (teacherId !== undefined) {
             const manualUpdateRef = doc(collection(db, 'manualUpdates'));
             batch.set(manualUpdateRef, {
                 userId: username,
                 areaName: area,
                 updateType: 'certification',
-                oldValue: currentIsCertified,
+                oldValue: currentAreaState.isCertified,
                 newValue: newIsCertified,
                 teacherId: teacherId,
                 createdAt: serverTimestamp(),
