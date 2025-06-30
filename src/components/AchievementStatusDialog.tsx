@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
   DialogClose
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -86,6 +87,12 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
   const { toast } = useToast();
 
   const areaConfig = challengeConfig?.[areaName];
+  
+  // Guard clause to ensure all necessary data is available before rendering.
+  if (!user || !areaConfig || user.grade === undefined) {
+    return null;
+  }
+
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -278,8 +285,6 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
     return () => clearTimeout(handler);
   }, [evidenceValue, fileName, areaConfig, open, initialMode, form]);
   
-  if (!user || !challengeConfig || user.grade === undefined || !areaConfig) return null;
-  
   const { koreanName, challengeName } = areaConfig;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -468,7 +473,7 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
           {initialMode === 'history' ? (
             <div className="py-4 flex-1 flex flex-col min-h-0 h-full">
               <h3 className="text-sm font-semibold mb-2 shrink-0">내 활동 목록</h3>
-              <div className="w-full rounded-md border p-2 space-y-2 flex-grow overflow-y-auto">
+ <div className="w-full rounded-md border p-2 space-y-2 flex-grow overflow-y-auto">
                 {historyLoading ? (
                   <div className="flex items-center justify-center h-full text-muted-foreground">
                     <Loader2 className="h-5 w-5 animate-spin"/>
