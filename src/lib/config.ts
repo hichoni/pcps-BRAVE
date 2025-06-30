@@ -22,6 +22,10 @@ export interface User {
 // This list now only contains teacher accounts.
 // Student accounts should be added via the admin dashboard.
 export const MOCK_USERS: User[] = [
+    { id: 1, username: 's-4-1-1', pin: '0000', name: '김민준', role: 'student', grade: 4, classNum: 1, studentNum: 1, profileAvatar: 'avatar:rocket' },
+    { id: 2, username: 's-4-1-2', pin: '0000', name: '이서연', role: 'student', grade: 4, classNum: 1, studentNum: 2, profileAvatar: 'avatar:palette' },
+    { id: 3, username: 's-5-2-5', pin: '0000', name: '박서준', role: 'student', grade: 5, classNum: 2, studentNum: 5 },
+    { id: 4, username: 's-6-3-10', pin: '0000', name: '최지우', role: 'student', grade: 6, classNum: 3, studentNum: 10 },
     { id: 99, username: 'master', pin: '1234', name: '마스터선생', role: 'teacher' },
     { id: 101, username: '인문', pin: '1234', name: '인문 선생님', role: 'teacher', areaName: 'Humanities' },
     { id: 102, username: '봉사', pin: '1234', name: '봉사 선생님', role: 'teacher', areaName: 'Volunteering' },

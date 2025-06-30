@@ -51,18 +51,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     setLoading(true);
-    setUsersLoading(true);
-
     const sessionUser = sessionStorage.getItem('user');
     if (sessionUser) {
       setUser(JSON.parse(sessionUser));
     }
-    
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    setUsersLoading(true);
     if (!db) {
       console.warn("Firebase is disabled. Using mock users.");
       setUsers(MOCK_USERS);
       setUsersLoading(false);
-      setLoading(false);
       return;
     }
 
@@ -75,12 +76,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       setUsers(usersList);
       setUsersLoading(false);
-      setLoading(false);
     }, (error) => {
-      console.error("AuthContext: Error listening to users collection.", error);
+      console.error("AuthContext: Error listening to users collection. This might be a Firestore security rule issue. Falling back to MOCK_USERS.", error);
       setUsers(MOCK_USERS); // Fallback
       setUsersLoading(false);
-      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -95,51 +94,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = useCallback(async (credentials: LoginCredentials): Promise<User | null> => {
     const { pin, username, grade, classNum, studentNum } = credentials;
     
-    if (!db) { // Fallback for local mock environment
-        const mockUser = MOCK_USERS.find(u => (u.username === username && u.pin === pin));
-        if (mockUser) {
-            setUser(mockUser);
-            sessionStorage.setItem('user', JSON.stringify(mockUser));
-            return mockUser;
+    // Use the state 'users' array, which is populated by the onSnapshot listener.
+    // This avoids an extra database query on login.
+    const targetUser = users.find(u => {
+        if (username) { // Teacher login
+            return u.role === 'teacher' && u.username === username && u.pin === pin;
+        } else { // Student login
+            return u.role === 'student' && u.grade === grade && u.classNum === classNum && u.studentNum === studentNum && u.pin === pin;
         }
-        return null;
+    });
+
+    if (targetUser) {
+      setUser(targetUser);
+      sessionStorage.setItem('user', JSON.stringify(targetUser));
+      return targetUser;
     }
 
-    let q;
-    if (username) { // Teacher login
-      q = query(collection(db, "users"), 
-        where("role", "==", "teacher"),
-        where("username", "==", username),
-        where("pin", "==", pin),
-        limit(1)
-      );
-    } else { // Student login
-      q = query(collection(db, "users"),
-        where("role", "==", "student"),
-        where("grade", "==", grade),
-        where("classNum", "==", classNum),
-        where("studentNum", "==", studentNum),
-        where("pin", "==", pin),
-        limit(1)
-      );
-    }
-
-    const querySnapshot = await getDocs(q);
-
-    if (querySnapshot.empty) {
-        console.error("Login failed. No user found with provided credentials.");
-        return null;
-    }
-
-    const targetUser = {
-      id: parseInt(querySnapshot.docs[0].id), 
-      ...querySnapshot.docs[0].data()
-    } as User;
-    
-    setUser(targetUser);
-    sessionStorage.setItem('user', JSON.stringify(targetUser));
-    return targetUser;
-  }, []);
+    console.error("Login failed. No user found with provided credentials in the loaded list.");
+    return null;
+  }, [users]);
 
   const updatePin = useCallback(async (newPin: string) => {
     if (!user) throw new Error("사용자 정보가 없습니다. 다시 로그인해주세요.");
@@ -228,15 +201,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const { grade, classNum, studentNum, name } = studentData;
     
-    const q = query(collection(db, "users"),
-      where('role', '==', 'student'),
-      where('grade', '==', Number(grade)),
-      where('classNum', '==', Number(classNum)),
-      where('studentNum', '==', Number(studentNum))
+    const studentExists = users.some(u =>
+        u.role === 'student' &&
+        Number(u.grade) === Number(grade) &&
+        Number(u.classNum) === Number(classNum) &&
+        Number(u.studentNum) === Number(studentNum)
     );
-    const existingUserSnap = await getDocs(q);
 
-    if (!existingUserSnap.empty) {
+    if (studentExists) {
       return { success: false, message: `${grade}학년 ${classNum}반 ${studentNum}번 학생은 이미 존재합니다.` };
     }
 
