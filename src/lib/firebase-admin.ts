@@ -1,14 +1,14 @@
 import admin from 'firebase-admin';
 
 // In a deployed Firebase environment (like App Hosting), the Admin SDK
-// can auto-discover credentials. This is the recommended approach.
+// can auto-discover credentials and the storage bucket.
 // No service account file or environment variables are needed.
+
+let adminApp;
 
 if (!admin.apps.length) {
   try {
-    admin.initializeApp({
-      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    });
+    adminApp = admin.initializeApp();
     console.log('Firebase Admin SDK initialized successfully using environment credentials.');
   } catch (error) {
     console.error('Firebase Admin SDK initialization error:', error);
@@ -17,9 +17,11 @@ if (!admin.apps.length) {
     // For local dev, run `gcloud auth application-default login` in your terminal.
     console.warn('The application might not have proper admin privileges. AI Vision and other admin features may fail.');
   }
+} else {
+    adminApp = admin.app();
 }
 
 const adminInstance = admin;
-const adminStorage = admin.apps.length ? admin.storage() : null;
+const adminStorage = adminApp ? adminApp.storage() : null;
 
 export { adminInstance, adminStorage };
