@@ -151,9 +151,11 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
         const docSnap = await getDoc(achievementDocRef);
         const currentAchievements = docSnap.exists() ? docSnap.data() : {};
         
-        // This is the robust way to get the current state for the area, handling all edge cases.
-        const currentAreaState = currentAchievements?.[area] || { progress: areaConfig.goalType === 'numeric' ? 0 : '', isCertified: false };
-        
+        const existingAreaState = currentAchievements?.[area];
+        const currentAreaState = (existingAreaState && typeof existingAreaState === 'object' && existingAreaState !== null)
+            ? existingAreaState as AreaState
+            : { progress: areaConfig.goalType === 'numeric' ? 0 : '', isCertified: false };
+
         const oldProgress = currentAreaState.progress;
         let newIsCertified = currentAreaState.isCertified;
 
@@ -212,8 +214,10 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
         const docSnap = await getDoc(achievementDocRef);
         const currentAchievements = docSnap.exists() ? docSnap.data() : {};
 
-        // Robustly get the current state for the area.
-        const currentAreaState = currentAchievements?.[area] || { progress: areaConfig.goalType === 'numeric' ? 0 : '', isCertified: false };
+        const existingAreaState = currentAchievements?.[area];
+        const currentAreaState = (existingAreaState && typeof existingAreaState === 'object' && existingAreaState !== null)
+            ? existingAreaState as AreaState
+            : { progress: areaConfig.goalType === 'numeric' ? 0 : '', isCertified: false };
 
         const newIsCertified = !currentAreaState.isCertified;
         
