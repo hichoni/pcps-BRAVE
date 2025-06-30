@@ -33,16 +33,7 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
 
   const [recordingState, setRecordingState] = useState<RecordingState>('initializing');
   const [videoBlobUrl, setVideoBlobUrl] = useState<string | null>(null);
-
-  const cleanupStream = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-  }, []);
+  const [supportedMimeType, setSupportedMimeType] = useState<string>('');
 
   const cleanupRecorder = useCallback(() => {
      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
@@ -59,6 +50,16 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
       setVideoBlobUrl(null);
     }
   }, [videoBlobUrl]);
+  
+  const cleanupStream = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, []);
 
   const cleanup = useCallback(() => {
     cleanupStream();
@@ -67,7 +68,7 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
   
   const initializeCamera = useCallback(async () => {
     let isCancelled = false;
-
+    
     const start = async () => {
         cleanup();
         setRecordingState('initializing');
@@ -88,7 +89,7 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
                 videoRef.current.muted = true;
-                videoRef.current.playsInline = true; // Essential for iOS
+                videoRef.current.playsInline = true;
                 videoRef.current.controls = false;
                 await videoRef.current.play();
             }
@@ -110,6 +111,7 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
 
     return () => {
         isCancelled = true;
+        cleanup();
     }
   }, [cleanup, toast]);
 
@@ -117,30 +119,28 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
     let cancelCameraInit: (() => void) | undefined;
     if (open) {
       cancelCameraInit = initializeCamera();
-    } else {
-      cleanup();
     }
     return () => {
-      cleanup();
       if (cancelCameraInit) cancelCameraInit();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, initializeCamera]);
+
 
   const startRecording = () => {
     if (!streamRef.current || mediaRecorderRef.current) return;
 
     recordedChunksRef.current = [];
-    const mimeTypes = ['video/webm; codecs=vp9,opus', 'video/webm; codecs=vp8,opus', 'video/webm', 'video/mp4'];
-    const supportedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type));
+    const mimeTypes = ['video/mp4', 'video/webm; codecs=vp9,opus', 'video/webm; codecs=vp8,opus', 'video/webm'];
+    const foundMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type));
     
-    if (!supportedMimeType) {
+    if (!foundMimeType) {
         toast({ variant: 'destructive', title: '녹화 오류', description: '이 브라우저에서 지원하는 녹화 형식을 찾을 수 없습니다.' });
         return;
     }
+    setSupportedMimeType(foundMimeType);
 
     try {
-        const recorder = new MediaRecorder(streamRef.current, { mimeType: supportedMimeType });
+        const recorder = new MediaRecorder(streamRef.current, { mimeType: foundMimeType });
         mediaRecorderRef.current = recorder;
 
         recorder.ondataavailable = (event) => {
@@ -151,13 +151,13 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
 
         recorder.onstop = () => {
             if (recordedChunksRef.current.length > 0) {
-              const blob = new Blob(recordedChunksRef.current, { type: supportedMimeType });
+              const blob = new Blob(recordedChunksRef.current, { type: foundMimeType });
               const url = URL.createObjectURL(blob);
               setVideoBlobUrl(url);
               setRecordingState('preview');
             } else {
               toast({ variant: 'destructive', title: '녹화 오류', description: '녹화된 영상 데이터가 없습니다. 다시 시도해주세요.'});
-              initializeCamera();
+              handleReset();
             }
         };
         
@@ -182,17 +182,15 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
         mediaRecorderRef.current.stop();
     }
   };
-
+  
   const handleUseVideo = () => {
-    if (!videoBlobUrl) return;
+    if (!videoBlobUrl || !supportedMimeType) return;
     fetch(videoBlobUrl)
         .then(res => res.blob())
         .then(blob => {
-            const mimeType = blob.type || 'video/webm';
-            const extension = mimeType.split(';')[0].split('/')[1] || 'webm';
-            const file = new File([blob], `recorded-video-${Date.now()}.${extension}`, { type: mimeType });
+            const extension = supportedMimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
+            const file = new File([blob], `recorded-video-${Date.now()}.${extension}`, { type: supportedMimeType });
             onVideoRecorded(file);
-            onOpenChange(false);
         })
         .catch(err => {
             console.error("Failed to create file from blob", err);
@@ -200,10 +198,10 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
         });
   };
   
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     cleanupRecorder();
     initializeCamera();
-  }
+  }, [cleanupRecorder, initializeCamera]);
 
   const renderFooter = () => {
     switch (recordingState) {
