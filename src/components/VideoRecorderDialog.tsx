@@ -33,90 +33,98 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
 
   const [recordingState, setRecordingState] = useState<RecordingState>('initializing');
   const [videoBlobUrl, setVideoBlobUrl] = useState<string | null>(null);
-
-  const cleanupStream = useCallback(() => {
+  
+  const cleanup = useCallback(() => {
+    // Stop all media tracks
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
-  }, []);
-
-  const cleanupRecorder = useCallback(() => {
+    // Stop recording if active
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-        mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stop();
     }
     mediaRecorderRef.current = null;
     recordedChunksRef.current = [];
+    
+    // Clear timeout
     if (recordingTimeoutRef.current) {
       clearTimeout(recordingTimeoutRef.current);
       recordingTimeoutRef.current = null;
     }
+    
+    // Revoke blob URL to free memory
     if (videoBlobUrl) {
       URL.revokeObjectURL(videoBlobUrl);
       setVideoBlobUrl(null);
     }
-  }, [videoBlobUrl]);
-  
-  const initializeCamera = useCallback(async () => {
-    if (!open || recordingState !== 'initializing') return;
-
-    if (!navigator.mediaDevices?.getUserMedia) {
-      toast({ variant: 'destructive', title: '카메라 미지원', description: '이 브라우저에서는 카메라 기능을 지원하지 않습니다.' });
-      setRecordingState('denied');
-      return;
-    }
-
-    cleanupRecorder();
-    cleanupStream();
     
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      if (!videoRef.current) {
-          stream.getTracks().forEach(t => t.stop());
-          return;
-      };
-
-      streamRef.current = stream;
-      videoRef.current.srcObject = stream;
-      videoRef.current.src = ''; // Clear blob src
-      videoRef.current.muted = true;
-      videoRef.current.playsInline = true;
-      videoRef.current.controls = false;
-      await videoRef.current.play();
-      
-      setRecordingState('idle');
-
-    } catch (err: any) {
-      console.error('Error accessing camera/mic:', err);
-      let description = '영상 녹화를 사용하려면 브라우저 설정에서 카메라와 마이크 권한을 허용해주세요.';
-      if (err.name === 'NotAllowedError') description = '카메라와 마이크 접근 권한이 거부되었습니다. 브라우저 설정에서 권한을 재설정해주세요.';
-      else if (err.name === 'NotFoundError') description = '사용 가능한 카메라나 마이크 장치를 찾을 수 없습니다. 장치가 연결되어 있는지 확인해주세요.';
-      
-      toast({ variant: 'destructive', title: '카메라/마이크 접근 오류', description, duration: 9000 });
-      setRecordingState('denied');
+    // Reset video element
+    if (videoRef.current) {
+        videoRef.current.srcObject = null;
+        videoRef.current.src = "";
+        videoRef.current.removeAttribute("src");
+        videoRef.current.load();
     }
-  }, [open, recordingState, cleanupRecorder, cleanupStream, toast]);
+  }, [videoBlobUrl]);
 
   useEffect(() => {
     if (open) {
-      setRecordingState('initializing');
-    } else {
-      cleanupStream();
-      cleanupRecorder();
-    }
-  }, [open, cleanupStream, cleanupRecorder]);
+      let isCancelled = false;
 
-  useEffect(() => {
-    if(recordingState === 'initializing') {
-        initializeCamera();
+      const initializeCamera = async () => {
+        setRecordingState('initializing');
+        cleanup();
+
+        if (!navigator.mediaDevices?.getUserMedia) {
+          toast({ variant: 'destructive', title: '카메라 미지원', description: '이 브라우저에서는 카메라 기능을 지원하지 않습니다.' });
+          if (!isCancelled) setRecordingState('denied');
+          return;
+        }
+        
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          if (isCancelled || !videoRef.current) {
+              stream.getTracks().forEach(t => t.stop());
+              return;
+          }
+
+          streamRef.current = stream;
+          videoRef.current.srcObject = stream;
+          videoRef.current.muted = true;
+          videoRef.current.playsInline = true;
+          videoRef.current.controls = false;
+          await videoRef.current.play();
+          
+          if (!isCancelled) setRecordingState('idle');
+
+        } catch (err: any) {
+          if (isCancelled) return;
+          
+          console.error('Error accessing camera/mic:', err);
+          let description = '영상 녹화를 사용하려면 브라우저 설정에서 카메라와 마이크 권한을 허용해주세요.';
+          if (err.name === 'NotAllowedError') description = '카메라와 마이크 접근 권한이 거부되었습니다. 브라우저 설정에서 권한을 재설정해주세요.';
+          else if (err.name === 'NotFoundError') description = '사용 가능한 카메라나 마이크 장치를 찾을 수 없습니다. 장치가 연결되어 있는지 확인해주세요.';
+          
+          toast({ variant: 'destructive', title: '카메라/마이크 접근 오류', description, duration: 9000 });
+          setRecordingState('denied');
+        }
+      };
+
+      initializeCamera();
+
+      return () => {
+        isCancelled = true;
+        cleanup();
+      };
     }
-  }, [recordingState, initializeCamera]);
+  }, [open, cleanup, toast]);
 
   const startRecording = () => {
-    if (!streamRef.current) return;
+    if (!streamRef.current || recordingState !== 'idle') return;
 
     recordedChunksRef.current = [];
-    const mimeTypes = ['video/mp4', 'video/webm; codecs=vp9,opus', 'video/webm; codecs=vp8,opus', 'video/webm'];
+    const mimeTypes = ['video/mp4; codecs="avc1.42E01E, mp4a.40.2"', 'video/webm; codecs=vp9,opus', 'video/webm; codecs=vp8,opus', 'video/webm'];
     const foundMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type)) || 'video/webm';
     
     try {
@@ -128,41 +136,38 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
                 recordedChunksRef.current.push(event.data);
             }
         };
-
-        recorder.onerror = (event) => {
-            console.error('MediaRecorder error:', event);
-            toast({ variant: 'destructive', title: '녹화 오류', description: '녹화 중 오류가 발생했습니다. 다시 시도해주세요.' });
-            setRecordingState('idle');
+        
+        recorder.onerror = (event: any) => {
+            console.error('MediaRecorder error:', event.error);
+            toast({ variant: 'destructive', title: '녹화 오류', description: `녹화 중 오류가 발생했습니다: ${event.error.message}` });
+            handleReset();
         };
 
         recorder.onstop = () => {
+            if (recordedChunksRef.current.length === 0) {
+                toast({ variant: 'destructive', title: '녹화 오류', description: '녹화된 데이터가 없습니다. 다시 시도해주세요.'});
+                handleReset();
+                return;
+            }
             try {
-                if (recordedChunksRef.current.length === 0) {
-                    toast({ variant: 'destructive', title: '녹화 오류', description: '녹화된 데이터가 없습니다. 다시 시도해주세요.'});
-                    setRecordingState('idle');
-                    return;
-                }
                 const blob = new Blob(recordedChunksRef.current, { type: foundMimeType });
                 const url = URL.createObjectURL(blob);
                 
-                cleanupStream();
-                setVideoBlobUrl(url);
-
                 if (videoRef.current) {
                   videoRef.current.srcObject = null;
                   videoRef.current.src = url;
                   videoRef.current.muted = false;
                   videoRef.current.controls = true;
-                  videoRef.current.play().catch(e => {
-                      console.error("Preview playback failed", e);
-                      toast({ variant: 'destructive', title: '미리보기 재생 실패', description: `녹화된 영상을 재생할 수 없습니다: ${e.message}` });
-                  });
+                  videoRef.current.play().catch(e => console.error("Preview playback failed", e));
                 }
+
+                setVideoBlobUrl(url);
                 setRecordingState('preview');
+
             } catch (e: any) {
                 console.error("Error in onstop handler:", e);
                 toast({ variant: 'destructive', title: '녹화 처리 오류', description: '녹화된 영상을 처리하는 중 문제가 발생했습니다.' });
-                setRecordingState('idle');
+                handleReset();
             }
         };
         
@@ -175,9 +180,9 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
             }
         }, RECORDING_DURATION_MS);
 
-    } catch (e) {
+    } catch (e: any) {
         console.error("Recording start failed", e);
-        toast({ variant: 'destructive', title: '녹화 시작 실패', description: '녹화 기능을 시작할 수 없습니다.' });
+        toast({ variant: 'destructive', title: '녹화 시작 실패', description: `녹화 기능을 시작할 수 없습니다: ${e.message}` });
         setRecordingState('idle');
     }
   };
@@ -206,9 +211,8 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
   };
   
   const handleReset = useCallback(() => {
-    cleanupRecorder();
     setRecordingState('initializing');
-  }, [cleanupRecorder]);
+  }, []);
 
   const renderFooter = () => {
     switch (recordingState) {
@@ -224,7 +228,7 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
             </div>
         );
       case 'denied':
-        return <Button onClick={() => setRecordingState('initializing')} variant="outline" className="w-full"><RefreshCcw className="mr-2" /> 권한 다시 요청하기</Button>;
+        return <Button onClick={handleReset} variant="outline" className="w-full"><RefreshCcw className="mr-2" /> 권한 다시 요청하기</Button>;
       default:
         return <Button disabled className="w-full"><Loader2 className="animate-spin mr-2" /> 준비 중...</Button>;
     }
@@ -271,4 +275,3 @@ export function VideoRecorderDialog({ open, onOpenChange, onVideoRecorded }: Vid
     </Dialog>
   );
 }
-
