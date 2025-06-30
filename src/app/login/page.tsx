@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useMemo } from 'react';
@@ -48,7 +47,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { login, users, loading: authLoading, usersLoading } = useAuth();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
+  const [submitLoading, setSubmitLoading] = useState(false);
   const [foundStudent, setFoundStudent] = useState<User | null>(null);
   const [studentNotFound, setStudentNotFound] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -122,7 +121,7 @@ export default function LoginPage() {
   }, [watchedGrade, watchedClassNum, watchedStudentNum, users, usersLoading]);
 
   const onStudentSubmit = async (data: StudentLoginFormValues) => {
-    setLoading(true);
+    setSubmitLoading(true);
     try {
       const loggedInUser = await login({
         grade: parseInt(data.grade, 10),
@@ -134,19 +133,19 @@ export default function LoginPage() {
     } catch (error) {
       handleLoginFailure();
     } finally {
-      setLoading(false);
+      setSubmitLoading(false);
     }
   };
 
   const onTeacherSubmit = async (data: TeacherLoginFormValues) => {
-    setLoading(true);
+    setSubmitLoading(true);
     try {
       const loggedInUser = await login({ username: data.username, pin: data.pin });
       handleLoginSuccess(loggedInUser);
     } catch (error) {
       handleLoginFailure();
     } finally {
-      setLoading(false);
+      setSubmitLoading(false);
     }
   };
 
@@ -174,9 +173,7 @@ export default function LoginPage() {
     });
   };
 
-  const combinedLoading = loading || usersLoading;
-
-  if (!isClient || authLoading || usersLoading) {
+  if (!isClient) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-secondary p-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -223,9 +220,10 @@ export default function LoginPage() {
                                   studentForm.setValue('studentNum', '');
                                 }}
                                 value={field.value}
+                                disabled={usersLoading}
                               >
                                 <FormControl>
-                                  <SelectTrigger><SelectValue placeholder="학년" /></SelectTrigger>
+                                  <SelectTrigger><SelectValue placeholder={usersLoading ? "로딩중..." : "학년"} /></SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
                                   {availableGrades.map(grade => (
@@ -249,7 +247,7 @@ export default function LoginPage() {
                                   studentForm.setValue('studentNum', '');
                                 }}
                                 value={field.value}
-                                disabled={!watchedGrade || availableClasses.length === 0}
+                                disabled={usersLoading || !watchedGrade || availableClasses.length === 0}
                               >
                                 <FormControl>
                                   <SelectTrigger><SelectValue placeholder="반" /></SelectTrigger>
@@ -273,7 +271,7 @@ export default function LoginPage() {
                               <Select
                                 onValueChange={field.onChange}
                                 value={field.value}
-                                disabled={!watchedClassNum || availableStudentNums.length === 0}
+                                disabled={usersLoading || !watchedClassNum || availableStudentNums.length === 0}
                               >
                                 <FormControl>
                                   <SelectTrigger><SelectValue placeholder="번호" /></SelectTrigger>
@@ -314,8 +312,8 @@ export default function LoginPage() {
                     </div>
                   </CardContent>
                   <CardFooter>
-                    <Button type="submit" className="w-full font-bold" disabled={combinedLoading}>
-                      {combinedLoading ? <Loader2 className="animate-spin" /> : <LogIn />}
+                    <Button type="submit" className="w-full font-bold" disabled={submitLoading || authLoading || usersLoading}>
+                      {submitLoading || usersLoading ? <Loader2 className="animate-spin" /> : <LogIn />}
                       로그인
                     </Button>
                   </CardFooter>
@@ -337,8 +335,8 @@ export default function LoginPage() {
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button type="submit" className="w-full font-bold" disabled={combinedLoading}>
-                    {combinedLoading ? <Loader2 className="animate-spin" /> : <LogIn />}
+                  <Button type="submit" className="w-full font-bold" disabled={submitLoading || authLoading}>
+                    {submitLoading ? <Loader2 className="animate-spin" /> : <LogIn />}
                     로그인
                   </Button>
                 </CardFooter>
