@@ -3,9 +3,9 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, MOCK_USERS, AreaName, AchievementsState, DEFAULT_AREAS_CONFIG } from '@/lib/config';
+import { User, MOCK_USERS, AchievementsState } from '@/lib/config';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, setDoc, query, where, writeBatch, deleteDoc, updateDoc, addDoc, getDoc, limit } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, query, where, writeBatch, deleteDoc, updateDoc, getDoc, limit, onSnapshot } from 'firebase/firestore';
 import { updateProfileAvatar as updateProfileAvatarFlow } from '@/ai/flows/update-profile-avatar';
 
 
@@ -38,8 +38,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper function to avoid circular dependency
-// Note: This now generates an empty object. The AchievementsContext is responsible for populating it based on the ChallengeConfig.
 const generateInitialStateForUser = (): AchievementsState => {
     return {} as AchievementsState;
 }
@@ -50,85 +48,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [usersLoading, setUsersLoading] = useState(true);
   const router = useRouter();
-  
-  const fetchUsers = useCallback(async (): Promise<User[]> => {
+
+  useEffect(() => {
+    setLoading(true);
     setUsersLoading(true);
+
+    const sessionUser = sessionStorage.getItem('user');
+    if (sessionUser) {
+      setUser(JSON.parse(sessionUser));
+    }
+    
     if (!db) {
       console.warn("Firebase is disabled. Using mock users.");
       setUsers(MOCK_USERS);
       setUsersLoading(false);
-      return MOCK_USERS;
+      setLoading(false);
+      return;
     }
-    try {
-      const usersCollectionRef = collection(db, "users");
-      const usersSnapshot = await getDocs(usersCollectionRef);
-      const usersList = usersSnapshot.docs.map(doc => ({
+
+    const usersCollectionRef = collection(db, "users");
+    const unsubscribe = onSnapshot(usersCollectionRef, (snapshot) => {
+      const usersList = snapshot.docs.map(doc => ({
         id: parseInt(doc.id, 10),
         ...(doc.data() as Omit<User, 'id'>),
-      }));
+      })).sort((a,b) => a.id - b.id);
+      
       setUsers(usersList);
-      return usersList;
-    } catch(error) {
-        console.error("AuthContext: Error fetching users from Firestore. This might be a connection issue or Firestore is not enabled.", error);
-        console.warn("AuthContext: Falling back to mock user data.");
-        setUsers(MOCK_USERS);
-        return MOCK_USERS;
-    } finally {
       setUsersLoading(false);
-    }
+      setLoading(false);
+    }, (error) => {
+      console.error("AuthContext: Error listening to users collection.", error);
+      setUsers(MOCK_USERS); // Fallback
+      setUsersLoading(false);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
-
-  useEffect(() => {
-    const initializeAuthAndCleanup = async () => {
-        setLoading(true);
-
-        if (db) {
-            try {
-                // --- Robust Seeding Logic ---
-                // Seed initial data ONLY if the users collection is completely empty.
-                const usersQuery = query(collection(db, "users"), limit(1));
-                const usersSnapshot = await getDocs(usersQuery);
-                if (usersSnapshot.empty) {
-                    console.log("Users collection is empty. Seeding initial teacher data...");
-                    const seedBatch = writeBatch(db);
-                    // MOCK_USERS now only contains teachers, so this is safe.
-                    for (const userToSeed of MOCK_USERS) {
-                        const userDocRef = doc(db, "users", String(userToSeed.id));
-                        seedBatch.set(userDocRef, userToSeed);
-                    }
-                    // Seed config as well
-                    const configDocRef = doc(db, 'config/challengeConfig');
-                    const configDocSnap = await getDoc(configDocRef);
-                     if (!configDocSnap.exists()) {
-                        seedBatch.set(configDocRef, DEFAULT_AREAS_CONFIG);
-                     }
-                    
-                    await seedBatch.commit();
-                    console.log("Initial data seeding complete.");
-                }
-            } catch (error) {
-                 console.error("AuthContext: Error during cleanup or seeding.", error);
-            }
-        }
-
-        // --- Continue with normal startup ---
-        const sessionUser = sessionStorage.getItem('user');
-        if (sessionUser) {
-            setUser(JSON.parse(sessionUser));
-        }
-        await fetchUsers(); // Fetch the now-clean user list
-        setLoading(false);
-    };
-
-    initializeAuthAndCleanup();
-  }, [fetchUsers]);
-  
-  const ensureUsersLoaded = useCallback(async (): Promise<User[]> => {
-    if (users.length > 0 && !usersLoading) {
-        return users;
-    }
-    return fetchUsers();
-  }, [users, fetchUsers, usersLoading]);
 
   const logout = useCallback(() => {
     setUser(null);
@@ -138,39 +94,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = useCallback(async (credentials: LoginCredentials): Promise<User | null> => {
     const { pin, username, grade, classNum, studentNum } = credentials;
-    // Always fetch the latest user data directly from the source for maximum reliability
-    const currentUsers = await fetchUsers();
     
-    let targetUser: User | undefined;
+    if (!db) { // Fallback for local mock environment
+        const mockUser = MOCK_USERS.find(u => (u.username === username && u.pin === pin));
+        if (mockUser) {
+            setUser(mockUser);
+            sessionStorage.setItem('user', JSON.stringify(mockUser));
+            return mockUser;
+        }
+        return null;
+    }
 
+    let q;
     if (username) { // Teacher login
-      console.log(`Attempting teacher login for username: "${username}"`);
-      targetUser = currentUsers.find(u => 
-        u.role === 'teacher' && 
-        u.username === username && 
-        String(u.pin) === String(pin)
+      q = query(collection(db, "users"), 
+        where("role", "==", "teacher"),
+        where("username", "==", username),
+        where("pin", "==", pin),
+        limit(1)
       );
-    } else if (grade !== undefined && classNum !== undefined && studentNum !== undefined) { // Student login
-      console.log(`Attempting student login for ${grade}-${classNum}-${studentNum}`);
-      targetUser = currentUsers.find(u =>
-        u.role === 'student' &&
-        Number(u.grade) === Number(grade) &&
-        Number(u.classNum) === Number(classNum) &&
-        Number(u.studentNum) === Number(studentNum) &&
-        String(u.pin) === String(pin)
+    } else { // Student login
+      q = query(collection(db, "users"),
+        where("role", "==", "student"),
+        where("grade", "==", grade),
+        where("classNum", "==", classNum),
+        where("studentNum", "==", studentNum),
+        where("pin", "==", pin),
+        limit(1)
       );
     }
-    
-    if (targetUser) {
-      console.log("Login successful for user:", targetUser.name);
-      setUser(targetUser);
-      sessionStorage.setItem('user', JSON.stringify(targetUser));
-      return targetUser;
+
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+        console.error("Login failed. No user found with provided credentials.");
+        return null;
     }
+
+    const targetUser = {
+      id: parseInt(querySnapshot.docs[0].id), 
+      ...querySnapshot.docs[0].data()
+    } as User;
     
-    console.error("Login failed. No user found with provided credentials.");
-    return null;
-  }, [fetchUsers]);
+    setUser(targetUser);
+    sessionStorage.setItem('user', JSON.stringify(targetUser));
+    return targetUser;
+  }, []);
 
   const updatePin = useCallback(async (newPin: string) => {
     if (!user) throw new Error("사용자 정보가 없습니다. 다시 로그인해주세요.");
@@ -178,11 +147,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const userDocRef = doc(db, "users", String(user.id));
     try {
-      await setDoc(userDocRef, { pin: newPin }, { merge: true });
+      await updateDoc(userDocRef, { pin: newPin });
       
       const updatedUser = { ...user, pin: newPin };
       setUser(updatedUser);
-      setUsers(prevUsers => prevUsers.map(u => (u.id === user.id ? updatedUser : u)));
       sessionStorage.setItem('user', JSON.stringify(updatedUser));
     } catch (error) {
       console.error("PIN 업데이트 실패 (Firestore):", error);
@@ -199,7 +167,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         const updatedUser = { ...user, profileAvatar: avatar };
         setUser(updatedUser);
-        setUsers(prevUsers => prevUsers.map(u => (u.id === user.id ? updatedUser : u)));
         sessionStorage.setItem('user', JSON.stringify(updatedUser));
     } catch (error) {
         console.error("프로필 아바타 업데이트 실패:", error);
@@ -209,34 +176,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const resetPin = useCallback(async (username: string) => {
     if (!db) throw new Error("데이터베이스에 연결되지 않았습니다. 설정을 확인해주세요.");
-
-    const currentUsers = await ensureUsersLoaded();
-    const targetUser = currentUsers.find(u => u.username === username);
-
+    
+    const targetUser = users.find(u => u.username === username);
     if (!targetUser) throw new Error(`사용자 '${username}'를 찾을 수 없습니다.`);
 
     const userDocRef = doc(db, "users", String(targetUser.id));
     try {
-        await setDoc(userDocRef, { pin: '0000' }, { merge: true });
-        
-        const updatedUser = { ...targetUser, pin: '0000' };
-        setUsers(prevUsers => prevUsers.map(u => u.id === updatedUser.id ? updatedUser : u));
-
-        if (user && user.id === updatedUser.id) {
-            setUser(updatedUser);
-            sessionStorage.setItem('user', JSON.stringify(updatedUser));
-        }
+        await updateDoc(userDocRef, { pin: '0000' });
     } catch (error) {
         console.error(`PIN 초기화 실패 (Firestore) - 사용자: ${username}:`, error);
         throw new Error("데이터베이스 저장에 실패하여 PIN을 초기화할 수 없습니다.");
     }
-  }, [user, ensureUsersLoaded]);
+  }, [users]);
 
   const deleteUser = useCallback(async (username: string) => {
     if (!db) throw new Error("데이터베이스에 연결되지 않았습니다. 설정을 확인해주세요.");
 
-    const currentUsers = await ensureUsersLoaded();
-    const targetUser = currentUsers.find(u => u.username === username);
+    const targetUser = users.find(u => u.username === username);
     if (!targetUser) {
       console.log(`User with username ${username} not found for deletion.`);
       return;
@@ -257,8 +213,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
 
         await batch.commit();
-
-        setUsers(prevUsers => prevUsers.filter(u => u.username !== username));
         
         if (user && user.username === username) {
             logout();
@@ -267,26 +221,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error("Failed to delete user and achievements from Firestore", e);
         throw e;
     }
-  }, [user, logout, ensureUsersLoaded]);
+  }, [user, users, logout]);
 
   const addUser = useCallback(async (studentData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>): Promise<{ success: boolean; message: string }> => {
     if (!db) return { success: false, message: "데이터베이스에 연결되지 않았습니다. 설정을 확인해주세요." };
 
     const { grade, classNum, studentNum, name } = studentData;
-    const currentUsers = await ensureUsersLoaded();
-
-    const studentExists = currentUsers.some(u =>
-      u.role === 'student' &&
-      Number(u.grade) === Number(grade) &&
-      Number(u.classNum) === Number(classNum) &&
-      Number(u.studentNum) === Number(studentNum)
+    
+    const q = query(collection(db, "users"),
+      where('role', '==', 'student'),
+      where('grade', '==', Number(grade)),
+      where('classNum', '==', Number(classNum)),
+      where('studentNum', '==', Number(studentNum))
     );
+    const existingUserSnap = await getDocs(q);
 
-    if (studentExists) {
+    if (!existingUserSnap.empty) {
       return { success: false, message: `${grade}학년 ${classNum}반 ${studentNum}번 학생은 이미 존재합니다.` };
     }
 
-    const newId = (currentUsers.length > 0 ? Math.max(...currentUsers.map(u => u.id)) : 0) + 1;
+    const maxId = users.length > 0 ? Math.max(...users.map(u => u.id)) : 0;
+    const newId = maxId + 1;
     const newUsername = `s-${grade}-${classNum}-${studentNum}`;
 
     const newUser: User = {
@@ -311,20 +266,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         await batch.commit();
 
-        setUsers(prev => [...prev, newUser]);
         return { success: true, message: `${name} 학생이 추가되었습니다.` };
     } catch (e) {
         console.error("Failed to add user and achievements to Firestore", e);
         return { success: false, message: '데이터베이스 저장에 실패했습니다.' };
     }
-  }, [ensureUsersLoaded]);
+  }, [users]);
 
   const updateUser = useCallback(async (userId: number, studentData: Partial<Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>>): Promise<{ success: boolean; message: string }> => {
     if (!db) return { success: false, message: "데이터베이스에 연결되지 않았습니다." };
 
-    const currentUsers = await ensureUsersLoaded();
-    const targetUser = currentUsers.find(u => u.id === userId);
-
+    const targetUser = users.find(u => u.id === userId);
     if (!targetUser) {
         return { success: false, message: "수정할 학생을 찾을 수 없습니다." };
     }
@@ -332,7 +284,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const updatedUserData = { ...targetUser, ...studentData };
     
     if (studentData.grade || studentData.classNum || studentData.studentNum) {
-        const studentExists = currentUsers.some(u =>
+        const studentExists = users.some(u =>
           u.id !== userId &&
           u.role === 'student' &&
           Number(u.grade) === Number(updatedUserData.grade) &&
@@ -349,10 +301,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const newUsername = `s-${updatedUserData.grade}-${updatedUserData.classNum}-${updatedUserData.studentNum}`;
     const usernameChanged = oldUsername !== newUsername;
 
-    const finalUserData = {
-        ...updatedUserData,
-        username: newUsername
-    };
+    const finalUserData = { ...updatedUserData, username: newUsername };
 
     try {
         const batch = writeBatch(db);
@@ -374,7 +323,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         await batch.commit();
 
-        setUsers(prev => prev.map(u => u.id === userId ? finalUserData : u));
         if (user && user.id === userId) {
             setUser(finalUserData);
             sessionStorage.setItem('user', JSON.stringify(finalUserData));
@@ -385,7 +333,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error("Failed to update user", e);
         return { success: false, message: "학생 정보 수정에 실패했습니다." };
     }
-  }, [ensureUsersLoaded, user]);
+  }, [users, user]);
 
   const bulkAddUsers = useCallback(async (studentsData: Pick<User, 'grade' | 'classNum' | 'studentNum' | 'name'>[]): Promise<{ successCount: number; failCount: number; errors: string[] }> => {
     let successCount = 0;
@@ -397,10 +345,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { successCount: 0, failCount: studentsData.length, errors: ["데이터베이스에 연결되지 않았습니다. 설정을 확인해주세요."] };
     }
 
-    const currentUsers = await ensureUsersLoaded();
-    let lastId = (currentUsers.length > 0 ? Math.max(...currentUsers.map(u => u.id)) : 0);
+    let lastId = (users.length > 0 ? Math.max(...users.map(u => u.id)) : 0);
     const batch = writeBatch(db);
-    const usersInThisOperation = [...currentUsers];
+    const usersInThisOperation = [...users];
 
     studentsData.forEach((student, index) => {
       const { grade, classNum, studentNum, name } = student;
@@ -441,7 +388,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (newUsers.length > 0) {
       try {
         await batch.commit();
-        setUsers(prev => [...prev, ...newUsers].sort((a,b) => a.id - b.id));
       } catch(e) {
         console.error("Failed to bulk add users and achievements to Firestore", e);
         return { successCount: 0, failCount: studentsData.length, errors: ['데이터베이스에 일괄 등록하는 데 실패했습니다.'] };
@@ -449,7 +395,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     
     return { successCount, failCount, errors };
-  }, [ensureUsersLoaded]);
+  }, [users]);
 
   const bulkDeleteUsers = useCallback(async (options: { grade?: number }): Promise<{ deletedCount: number }> => {
     if (!db) {
@@ -473,8 +419,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { deletedCount: 0 };
       }
 
-      // Firestore allows querying for up to 30 items in a 'in' query.
-      // We process deletions in chunks to stay within limits and manage batch sizes.
       const CHUNK_SIZE = 30; 
       let deletedCount = 0;
 
@@ -482,7 +426,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userIdChunk = userIdsToDelete.slice(i, i + CHUNK_SIZE);
         const batch = writeBatch(db);
 
-        // Delete user docs
         const userDocsQuery = query(collection(db, "users"), where('username', 'in', userIdChunk));
         const userDocsSnapshot = await getDocs(userDocsQuery);
         userDocsSnapshot.forEach(userDoc => {
@@ -490,12 +433,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           deletedCount++;
         });
 
-        // Delete achievement docs
         userIdChunk.forEach(username => {
           batch.delete(doc(db, "achievements", username));
         });
 
-        // Delete submission docs
         const submissionsQuery = query(collection(db, "challengeSubmissions"), where('userId', 'in', userIdChunk));
         const submissionsSnapshot = await getDocs(submissionsQuery);
         submissionsSnapshot.forEach(submissionDoc => {
@@ -505,7 +446,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await batch.commit();
       }
       
-      await fetchUsers();
       setUsersLoading(false);
       return { deletedCount };
 
@@ -514,7 +454,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUsersLoading(false);
       throw new Error("학생 일괄 삭제 중 오류가 발생했습니다.");
     }
-  }, [fetchUsers]);
+  }, []);
 
 
   return (
