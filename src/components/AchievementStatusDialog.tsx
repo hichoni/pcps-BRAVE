@@ -88,11 +88,6 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
 
   const areaConfig = challengeConfig?.[areaName];
   
-  // Guard clause to ensure all necessary data is available before rendering.
-  if (!user || !areaConfig || user.grade === undefined) {
-    return null;
-  }
-
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -285,6 +280,10 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
     return () => clearTimeout(handler);
   }, [evidenceValue, fileName, areaConfig, open, initialMode, form]);
   
+  if (!user || !areaConfig) {
+      return null;
+  }
+
   const { koreanName, challengeName } = areaConfig;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -467,13 +466,14 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
         >
           <DialogHeader className="p-6 pb-4 border-b shrink-0">
             <DialogTitle className="font-headline text-2xl">{dialogTitle}</DialogTitle>
+            <DialogDescription>{areaConfig.requirements}</DialogDescription>
           </DialogHeader>
           
           <div className="flex-1 overflow-y-auto px-6 min-h-0">
           {initialMode === 'history' ? (
             <div className="py-4 flex-1 flex flex-col min-h-0 h-full">
               <h3 className="text-sm font-semibold mb-2 shrink-0">내 활동 목록</h3>
- <div className="w-full rounded-md border p-2 space-y-2 flex-grow overflow-y-auto">
+                <div className="w-full rounded-md border p-2 space-y-2 flex-grow overflow-y-auto">
                 {historyLoading ? (
                   <div className="flex items-center justify-center h-full text-muted-foreground">
                     <Loader2 className="h-5 w-5 animate-spin"/>
