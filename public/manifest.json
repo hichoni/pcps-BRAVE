@@ -1,23 +1,8 @@
 {
   "name": "풍천풍서초등학교 학교장 인증제",
-  "short_name": "학교장 인증제",
-  "description": "도전! 꿈 성취 학교장 인증제를 통해 나의 성장을 기록하고 인증받아보세요.",
-  "icons": [
-    {
-      "src": "/icon-main.png?v=2",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-main.png?v=2",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ],
+  "short_name": "학교장인증제",
   "start_url": "/login",
   "display": "standalone",
-  "background_color": "#f2f5f8",
-  "theme_color": "#4d94db"
+  "background_color": "#ffffff",
+  "theme_color": "#4A90E2"
 }

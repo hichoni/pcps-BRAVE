@@ -19,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   // PWA 캐시 문제를 방지하기 위한 간단한 버전 번호
-  const PWA_VERSION = "1.0.2";
+  const PWA_VERSION = "1.0.3";
 
   return (
     <html lang="ko">
@@ -32,7 +32,6 @@ export default function RootLayout({
         />
         {/* PWA 캐시 문제를 완화하기 위해 수동으로 버전이 명시된 링크를 추가합니다. */}
         <link rel="manifest" href={`/manifest.json?v=${PWA_VERSION}`} />
-        <link rel="apple-touch-icon" href={`/icon-main.png?v=${PWA_VERSION}`} />
       </head>
       <body className={cn('font-body antialiased min-h-screen bg-background')}>
         <Providers>
