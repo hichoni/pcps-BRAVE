@@ -205,10 +205,26 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
         const batch = writeBatch(db);
         const achievementDocRef = doc(db, 'achievements', username);
         const docSnap = await getDoc(achievementDocRef);
-        const currentIsCertified = docSnap.exists() ? (docSnap.data()?.[area]?.isCertified ?? false) : false;
+
+        const areaConfig = challengeConfig[area];
+        if (!areaConfig) {
+            console.error(`Missing config for area: ${area}`);
+            throw new Error(`'${area}' 영역에 대한 설정을 찾을 수 없습니다.`);
+        }
+
+        const currentAreaState = docSnap.data()?.[area] || {};
+        const currentIsCertified = currentAreaState.isCertified ?? false;
+        // Preserve existing progress
+        const currentProgress = currentAreaState.progress ?? (areaConfig.goalType === 'numeric' ? 0 : '');
+
         const newIsCertified = !currentIsCertified;
         
-        batch.set(achievementDocRef, { [area]: { isCertified: newIsCertified } }, { merge: true });
+        const newData = {
+            progress: currentProgress,
+            isCertified: newIsCertified,
+        };
+
+        batch.set(achievementDocRef, { [area]: newData }, { merge: true });
 
         if (teacherId !== undefined && challengeConfig[area]) {
             const manualUpdateRef = doc(collection(db, 'manualUpdates'));
