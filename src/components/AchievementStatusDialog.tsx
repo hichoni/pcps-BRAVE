@@ -451,7 +451,15 @@ export function AchievementStatusDialog({ areaName, open, onOpenChange, initialM
     <>
     <AlertDialog onOpenChange={(open) => { if (!open && itemToDelete) setItemToDelete(null); }}>
       <Dialog open={open} onOpenChange={onDialogClose}>
-        <DialogContent className="sm:max-w-lg h-[90vh] flex flex-col p-0">
+        <DialogContent
+          className="sm:max-w-lg h-[90vh] flex flex-col p-0"
+          onInteractOutside={(e) => {
+            e.preventDefault();
+          }}
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+          }}
+        >
           <DialogHeader className="p-6 pb-4 border-b shrink-0">
             <DialogTitle className="font-headline text-2xl">{dialogTitle}</DialogTitle>
           </DialogHeader>
