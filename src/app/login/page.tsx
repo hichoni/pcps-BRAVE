@@ -15,7 +15,7 @@ import { Loader2, LogIn, User as UserIcon, ShieldCheck } from 'lucide-react';
 import Image from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { User } from '@/lib/config';
+import { User, MOCK_USERS } from '@/lib/config';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 const studentLoginSchema = z.object({
@@ -69,7 +69,9 @@ export default function LoginPage() {
   const watchedClassNum = studentForm.watch('classNum');
   const watchedStudentNum = studentForm.watch('studentNum');
 
-  const studentUsers = useMemo(() => users.filter(u => u.role === 'student'), [users]);
+  // Use MOCK_USERS to populate dropdowns immediately, ensuring the UI is always responsive.
+  // The actual, secure login logic still uses the real-time database check.
+  const studentUsers = useMemo(() => MOCK_USERS.filter(u => u.role === 'student'), []);
 
   const availableGrades = useMemo(() => {
     return [...new Set(studentUsers.map(u => u.grade))].sort((a, b) => (a ?? 0) - (b ?? 0));
@@ -90,7 +92,7 @@ export default function LoginPage() {
     return [...new Set(studentsInClass.map(u => u.studentNum))].sort((a, b) => (a ?? 0) - (b ?? 0));
   }, [studentUsers, watchedGrade, watchedClassNum]);
 
-
+  // This effect uses the live `users` data (when available) to show the student's name
   useEffect(() => {
     const findStudent = () => {
         if (watchedGrade && watchedClassNum && watchedStudentNum) {
@@ -98,16 +100,16 @@ export default function LoginPage() {
           const classNum = parseInt(watchedClassNum, 10);
           const studentNum = parseInt(watchedStudentNum, 10);
           if (!isNaN(grade) && !isNaN(classNum) && !isNaN(studentNum)) {
-            if (!usersLoading) {
-                const student = users.find(u =>
-                  u.role === 'student' &&
-                  u.grade === grade &&
-                  u.classNum === classNum &&
-                  u.studentNum === studentNum
-                );
-                setFoundStudent(student || null);
-                setStudentNotFound(!student);
-            }
+            // Prefer the live user list if it's loaded, otherwise fallback to mocks
+            const userList = users.length > 0 ? users : MOCK_USERS;
+            const student = userList.find(u =>
+              u.role === 'student' &&
+              u.grade === grade &&
+              u.classNum === classNum &&
+              u.studentNum === studentNum
+            );
+            setFoundStudent(student || null);
+            setStudentNotFound(!student);
           } else {
             setFoundStudent(null);
             setStudentNotFound(false);
@@ -118,7 +120,7 @@ export default function LoginPage() {
         }
     };
     findStudent();
-  }, [watchedGrade, watchedClassNum, watchedStudentNum, users, usersLoading]);
+  }, [watchedGrade, watchedClassNum, watchedStudentNum, users, MOCK_USERS]);
 
   const onStudentSubmit = async (data: StudentLoginFormValues) => {
     setSubmitLoading(true);
@@ -220,7 +222,7 @@ export default function LoginPage() {
                                   studentForm.setValue('studentNum', '');
                                 }}
                                 value={field.value}
-                                disabled={usersLoading}
+                                disabled={usersLoading && users.length === 0}
                               >
                                 <FormControl>
                                   <SelectTrigger><SelectValue placeholder={usersLoading ? "로딩중..." : "학년"} /></SelectTrigger>
