@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { AreaName, AchievementsState, CertificateStatus, CERTIFICATE_THRESHOLDS, User } from '@/lib/config';
+import { AreaName, AchievementsState, CertificateStatus, CERTIFICATE_THRESHOLDS, User, AreaState } from '@/lib/config';
 import { db } from '@/lib/firebase';
 import { collection, doc, setDoc, getDoc, onSnapshot, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { useChallengeConfig } from './ChallengeConfigContext';
@@ -146,16 +146,25 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
         const batch = writeBatch(db);
         const achievementDocRef = doc(db, 'achievements', username);
         const areaConfig = challengeConfig[area];
+        if (!areaConfig) throw new Error(`'${area}' 영역에 대한 설정을 찾을 수 없습니다.`);
+
         const student = users.find(u => u.username === username);
 
         const docSnap = await getDoc(achievementDocRef);
         const currentAchievements = docSnap.exists() ? docSnap.data() : {};
         
-        const existingAreaState = currentAchievements?.[area];
-        const currentAreaState = (existingAreaState && typeof existingAreaState === 'object' && existingAreaState !== null)
-            ? existingAreaState as AreaState
-            : { progress: areaConfig.goalType === 'numeric' ? 0 : '', isCertified: false };
+        const defaultAreaState = { progress: areaConfig.goalType === 'numeric' ? 0 : '', isCertified: false };
+        const userAreaState = currentAchievements?.[area];
 
+        // Robust check for malformed data
+        const currentAreaState = (
+            userAreaState &&
+            typeof userAreaState === 'object' &&
+            userAreaState !== null &&
+            'progress' in userAreaState &&
+            'isCertified' in userAreaState
+        ) ? (userAreaState as AreaState) : defaultAreaState;
+        
         const oldProgress = currentAreaState.progress;
         let newIsCertified = currentAreaState.isCertified;
 
@@ -214,10 +223,17 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
         const docSnap = await getDoc(achievementDocRef);
         const currentAchievements = docSnap.exists() ? docSnap.data() : {};
 
-        const existingAreaState = currentAchievements?.[area];
-        const currentAreaState = (existingAreaState && typeof existingAreaState === 'object' && existingAreaState !== null)
-            ? existingAreaState as AreaState
-            : { progress: areaConfig.goalType === 'numeric' ? 0 : '', isCertified: false };
+        const defaultAreaState = { progress: areaConfig.goalType === 'numeric' ? 0 : '', isCertified: false };
+        const userAreaState = currentAchievements?.[area];
+        
+        // Robust check for malformed data
+        const currentAreaState = (
+            userAreaState &&
+            typeof userAreaState === 'object' &&
+            userAreaState !== null &&
+            'progress' in userAreaState &&
+            'isCertified' in userAreaState
+        ) ? (userAreaState as AreaState) : defaultAreaState;
 
         const newIsCertified = !currentAreaState.isCertified;
         
