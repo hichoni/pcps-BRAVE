@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from 'react';
@@ -41,7 +40,8 @@ export function Header() {
     <header className="py-6 border-b border-border mb-12 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-4">
             <Image
-              src="/icon-main.png?v=2"
+              src="https://placehold.co/72x72.png"
+              data-ai-hint="school logo"
               alt="풍천풍서초등학교 로고"
               width={72}
               height={72}
