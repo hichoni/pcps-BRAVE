@@ -9,13 +9,14 @@ import { useAchievements } from '@/context/AchievementsContext';
 import { useChallengeConfig } from '@/context/ChallengeConfigContext';
 import { User, CertificateStatus, STATUS_CONFIG } from '@/lib/config';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Loader2, ArrowLeft, BarChart as BarChartIcon, PieChart as PieChartIcon, LineChart as LineChartIcon } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from "@/components/ui/chart"
-import { Bar, BarChart, XAxis, YAxis, CartesianGrid, Pie, PieChart, Line, LineChart } from "recharts"
+import { Bar, BarChart, XAxis, YAxis, CartesianGrid, Pie, PieChart, Line, LineChart, Cell } from "recharts"
 import { collection, query, where, getDocs, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { subDays, format, parseISO } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 const pieChartConfig = {
   students: {
@@ -161,19 +162,62 @@ export default function StatsPage() {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <Card>
+        <Card className="flex flex-col">
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><PieChartIcon/> 전체 학생 인증 등급 분포</CardTitle>
             <CardDescription>전체 학생들의 금/은/동장 획득 현황입니다.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <ChartContainer config={pieChartConfig} className="mx-auto aspect-square max-h-[350px]">
+          <CardContent className="flex-1 pb-0">
+            <ChartContainer
+              config={pieChartConfig}
+              className="mx-auto aspect-square max-h-[250px]"
+            >
               <PieChart>
-                <ChartTooltip content={<ChartTooltipContent nameKey="students" hideLabel />} />
-                <Pie data={pieChartData} dataKey="students" nameKey="status" />
+                <ChartTooltip
+                  cursor={false}
+                  content={<ChartTooltipContent hideLabel />}
+                />
+                <Pie
+                  data={pieChartData}
+                  dataKey="students"
+                  nameKey="status"
+                  innerRadius={60}
+                  strokeWidth={5}
+                >
+                  {pieChartData.map((entry) => (
+                    <Cell
+                      key={`cell-${entry.status}`}
+                      fill={entry.fill}
+                      className="stroke-background hover:opacity-80"
+                    />
+                  ))}
+                </Pie>
               </PieChart>
             </ChartContainer>
           </CardContent>
+          <CardFooter className="flex-col gap-2 text-sm pt-4">
+            <div className="w-full grid grid-cols-2 gap-x-8 gap-y-2">
+              {pieChartData.map((entry) => {
+                const statusInfo = STATUS_CONFIG[entry.status as CertificateStatus];
+                if (!statusInfo) return null;
+                
+                return (
+                  <div key={entry.status} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: entry.fill }}
+                      />
+                      <span className="text-muted-foreground">{statusInfo.label}</span>
+                    </div>
+                    <span className="font-bold tabular-nums">
+                      {entry.students}명
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </CardFooter>
         </Card>
 
         <Card>
