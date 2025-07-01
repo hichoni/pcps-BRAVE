@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Loader2, Users, Undo, LogOut, Settings, Plus, Minus, Check, Trash2, PlusCircle, Upload, Search, Edit, MailCheck, GalleryThumbnails, Bug } from 'lucide-react';
+import { Loader2, Users, Undo, LogOut, Settings, Plus, Minus, Check, Trash2, PlusCircle, Upload, Search, Edit, MailCheck, GalleryThumbnails, Bug, BarChart } from 'lucide-react';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
 import { EditStudentDialog } from '@/components/EditStudentDialog';
 import { BulkAddStudentsDialog } from '@/components/BulkAddStudentsDialog';
@@ -225,6 +225,12 @@ export default function AdminPage() {
         <h1 className="text-2xl sm:text-3xl font-bold font-headline text-primary flex items-center gap-2"><Users/> 학생 성취 현황 관리</h1>
         <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap justify-end">
           <span className="font-semibold text-sm sm:text-base whitespace-nowrap">{user.name} 선생님</span>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/admin/stats">
+                <BarChart className="h-4 w-4 sm:mr-2"/>
+                <span className="hidden sm:inline">참여 현황</span>
+            </Link>
+          </Button>
           <Button asChild variant="outline" size="sm">
             <Link href="/gallery">
                 <GalleryThumbnails className="h-4 w-4 sm:mr-2"/>
