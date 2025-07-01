@@ -6,66 +6,79 @@ import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Loader2 } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
-
-interface Encouragement {
-    message: string;
-    createdAt: Timestamp;
-}
+import { generateWelcomeMessage } from '@/ai/flows/generate-welcome-message';
 
 export function WelcomeMessage() {
   const { user, loading: authLoading } = useAuth();
-  const [encouragement, setEncouragement] = useState<Encouragement | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [displayMessage, setDisplayMessage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!user || !db) {
-        setLoading(false);
-        return;
+    if (authLoading || !user) {
+      if (!authLoading) setIsLoading(false);
+      return;
     }
 
+    setIsLoading(true);
+
     const userStateRef = doc(db, 'userDynamicState', user.username);
-    const unsubscribe = onSnapshot(userStateRef, (docSnap) => {
+    const unsubscribe = onSnapshot(userStateRef, async (docSnap) => {
+      let encouragementMessage: string | null = null;
       if (docSnap.exists()) {
         const data = docSnap.data();
         if (data.encouragement) {
           const now = new Date();
           const messageDate = (data.encouragement.createdAt as Timestamp).toDate();
           if ((now.getTime() - messageDate.getTime()) < 24 * 60 * 60 * 1000) {
-            setEncouragement(data.encouragement as Encouragement);
-          } else {
-            setEncouragement(null);
+            encouragementMessage = data.encouragement.message;
           }
-        } else {
-            setEncouragement(null);
         }
-      } else {
-        setEncouragement(null);
       }
-      setLoading(false);
+      
+      if (encouragementMessage) {
+        setDisplayMessage(encouragementMessage);
+        setIsLoading(false);
+      } else {
+        // No active encouragement, generate a welcome message
+        try {
+          const result = await generateWelcomeMessage({ studentName: user.name, userId: user.username });
+          setDisplayMessage(result.message);
+        } catch (e) {
+          console.error("Failed to generate welcome message:", e);
+          setDisplayMessage(`${user.name}님, 환영합니다! 오늘도 즐거운 도전을 응원해요.`);
+        } finally {
+          setIsLoading(false);
+        }
+      }
     }, (error) => {
-        console.error("Error fetching welcome message:", error);
-        setLoading(false);
+        console.error("Error fetching welcome message state:", error);
+        setDisplayMessage(`${user.name}님, 환영합니다! 오늘도 즐거운 도전을 응원해요.`);
+        setIsLoading(false);
     });
 
     return () => unsubscribe();
   }, [user, authLoading]);
 
-  if (loading) {
+  if (authLoading && isLoading) {
     return <Skeleton className="h-full w-full min-h-[140px]" />;
   }
-  
+
   return (
     <Card className="h-full flex flex-col">
         <CardHeader className="flex-row items-center gap-3 space-y-0 pb-2">
             <Sparkles className="w-6 h-6 text-primary"/>
-            <CardTitle className="text-xl font-headline">AI의 응원 메시지</CardTitle>
+            <CardTitle className="text-xl font-headline">AI 꿈-코치의 한마디</CardTitle>
         </CardHeader>
         <CardContent className="flex-grow flex items-center justify-center p-4">
-            {encouragement ? (
-                 <p className="text-base text-center text-primary/90 font-semibold">"{encouragement.message}"</p>
+            {isLoading ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="animate-spin h-4 w-4" />
+                    <span>메시지를 생성 중입니다...</span>
+                </div>
+            ) : displayMessage ? (
+                 <p className="text-base text-center text-primary/90 font-semibold">"{displayMessage}"</p>
             ) : (
                 <p className="text-base text-center text-muted-foreground">
                     {user?.name}님, 환영합니다!
