@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo } from 'react';
@@ -189,8 +190,7 @@ export default function LoginPage() {
         <Card className="w-full max-w-sm shadow-lg border">
           <CardHeader className="text-center pt-6 pb-4">
             <Image
-              src="https://placehold.co/80x80.png"
-              data-ai-hint="school logo"
+              src="/icon-main.png"
               alt="풍천풍서초등학교 로고"
               width={80}
               height={80}
