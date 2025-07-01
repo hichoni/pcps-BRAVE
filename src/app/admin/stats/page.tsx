@@ -246,7 +246,7 @@ export default function StatsPage() {
                     cursor={false}
                     content={<ChartTooltipContent hideLabel />}
                   />
-                  <Bar dataKey="count" radius={5} />
+                  <Bar dataKey="count" fill="var(--color-count)" radius={5} />
                 </BarChart>
               </ChartContainer>
           </CardContent>
