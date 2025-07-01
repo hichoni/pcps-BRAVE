@@ -7,11 +7,10 @@ import { Providers } from '@/components/Providers';
 export const metadata: Metadata = {
   title: '풍천풍서초등학교 학교장 인증제',
   description: '도전! 꿈 성취 학교장 인증제를 통해 나의 성장을 기록하고 인증받아보세요.',
-  themeColor: 'hsl(221 27% 40%)',
 };
 
 export const viewport: Viewport = {
-  themeColor: 'hsl(221 27% 40%)',
+  // themeColor is now handled by a direct meta tag for better compatibility
 };
 
 export default function RootLayout({
@@ -20,11 +19,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   // PWA 캐시 문제를 방지하기 위한 간단한 버전 번호
-  const PWA_VERSION = "1.0.3";
+  const PWA_VERSION = "1.0.4";
 
   return (
     <html lang="ko">
       <head>
+        <meta name="theme-color" content="#4A5E8A" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
