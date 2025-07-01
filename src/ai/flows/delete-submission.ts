@@ -2,9 +2,10 @@
 'use server';
 /**
  * @fileOverview A flow to handle a deletion request for a challenge submission.
- * - If the requester is a teacher, the submission is deleted immediately.
- * - If the requester is a student, the submission's status is changed to 'pending_deletion'
- *   to be reviewed by a teacher.
+ * - If the requester is a teacher:
+ *   - If the submission is 'approved', its status is changed to 'rejected' to hide it, and progress is reverted.
+ *   - Otherwise, the submission is deleted immediately.
+ * - If the requester is a student, the submission's status is changed to 'pending_deletion'.
  */
 
 import { ai } from '@/ai/genkit';
@@ -78,11 +79,12 @@ const deleteSubmissionFlow = ai.defineFlow(
         }
     }
     
-    // --- Teacher Logic: Immediate Deletion ---
+    // --- Teacher Logic: Hide or Delete ---
     if (requesterData.role === 'teacher') {
         const configDocRef = doc(db, 'config', 'challengeConfig');
         const configDocSnap = await getDoc(configDocRef);
         const challengeConfig = configDocSnap.exists() ? configDocSnap.data() : null;
+        let originalStatus = '';
         let submissionDataForStorage: any;
 
         try {
@@ -92,50 +94,58 @@ const deleteSubmissionFlow = ai.defineFlow(
                 
                 const submissionData = submissionSnap.data();
                 submissionDataForStorage = submissionData;
+                originalStatus = submissionData.status;
 
-                if (submissionData.status === 'approved' && challengeConfig) {
-                  const areaConfig = challengeConfig[submissionData.areaName];
-                  
-                  if (areaConfig && areaConfig.goalType === 'numeric') {
-                    const achievementDocRef = doc(db, 'achievements', submissionData.userId);
-                    const achievementDocSnap = await transaction.get(achievementDocRef);
-                    
-                    let achievements = {};
-                    if (achievementDocSnap.exists()) {
-                        const data = achievementDocSnap.data();
-                        if (typeof data === 'object' && data !== null) {
-                            achievements = data;
+                // If approved, change status to rejected and revert progress
+                if (originalStatus === 'approved') {
+                    if (challengeConfig) {
+                        const areaConfig = challengeConfig[submissionData.areaName];
+                        
+                        if (areaConfig && areaConfig.goalType === 'numeric') {
+                          const achievementDocRef = doc(db, 'achievements', submissionData.userId);
+                          const achievementDocSnap = await transaction.get(achievementDocRef);
+                          
+                          let achievements = {};
+                          if (achievementDocSnap.exists()) {
+                              const data = achievementDocSnap.data();
+                              if (typeof data === 'object' && data !== null) {
+                                  achievements = data;
+                              }
+                          }
+      
+                          let currentAreaState = { progress: 0, isCertified: false };
+                          if (achievements[submissionData.areaName] && typeof achievements[submissionData.areaName] === 'object' && achievements[submissionData.areaName] !== null) {
+                              currentAreaState = {
+                                  progress: Number(achievements[submissionData.areaName].progress) || 0,
+                                  isCertified: achievements[submissionData.areaName].isCertified === true,
+                              };
+                          }
+                          
+                          const newProgress = Math.max(0, currentAreaState.progress - 1);
+                          
+                          const newAreaState = {
+                              progress: newProgress,
+                              isCertified: currentAreaState.isCertified, // Keep certified status as is, only progress changes
+                          };
+                          
+                          transaction.set(achievementDocRef, { 
+                              [submissionData.areaName]: newAreaState
+                          }, { merge: true });
                         }
                     }
-
-                    let currentAreaState = { progress: 0, isCertified: false };
-                    if (achievements[submissionData.areaName] && typeof achievements[submissionData.areaName] === 'object' && achievements[submissionData.areaName] !== null) {
-                        currentAreaState = {
-                            progress: Number(achievements[submissionData.areaName].progress) || 0,
-                            isCertified: achievements[submissionData.areaName].isCertified === true,
-                        };
-                    }
-                    
-                    const newProgress = Math.max(0, currentAreaState.progress - 1);
-                    
-                    const newAreaState = {
-                        progress: newProgress,
-                        isCertified: currentAreaState.isCertified,
-                    };
-                    
-                    transaction.set(achievementDocRef, { 
-                        [submissionData.areaName]: newAreaState
-                    }, { merge: true });
-                  }
+                    transaction.update(submissionRef, { status: 'rejected' });
+                } else {
+                    // For any other status, delete permanently
+                    transaction.delete(submissionRef);
                 }
-                transaction.delete(submissionRef);
             });
         } catch (error: any) {
-            console.error("게시글 삭제 트랜잭션 실패 (교사):", error);
-            throw new Error(error.message || "게시글을 삭제하고 점수를 조정하는 데 실패했습니다.");
+            console.error("게시글 처리 트랜잭션 실패 (교사):", error);
+            throw new Error(error.message || "게시글을 처리하는 데 실패했습니다.");
         }
-
-        if (submissionDataForStorage?.mediaUrl && adminStorage) {
+        
+        // Only delete from storage if it was a permanent deletion
+        if (originalStatus !== 'approved' && submissionDataForStorage?.mediaUrl && adminStorage) {
           try {
             const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
             if (!bucketName) {
@@ -152,7 +162,12 @@ const deleteSubmissionFlow = ai.defineFlow(
             console.error("저장소 파일 삭제 실패:", error);
           }
         }
-        return { success: true, message: "게시글이 성공적으로 삭제되었습니다." };
+        
+        if (originalStatus === 'approved') {
+            return { success: true, message: "게시글이 '반려' 상태로 변경되어 숨김 처리되었습니다. 학생의 진행도도 조정되었습니다." };
+        } else {
+            return { success: true, message: "게시글이 영구적으로 삭제되었습니다." };
+        }
     }
 
     throw new Error("오류: 이 작업을 수행할 권한이 없습니다.");

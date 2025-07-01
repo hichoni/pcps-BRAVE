@@ -79,6 +79,7 @@ function GalleryCard({ submission, user, author, onSubmissionDeleted, onSubmissi
   const canManage = user && (isOwner || user.role === 'teacher');
   const isPending = submission.status === 'pending_deletion' || submission.status === 'pending_review';
   const isRejected = submission.status === 'rejected';
+  const isApproved = submission.status === 'approved';
 
   const handleManualApprove = async () => {
     if (!user || user.role !== 'teacher') return;
@@ -104,11 +105,18 @@ function GalleryCard({ submission, user, author, onSubmissionDeleted, onSubmissi
     try {
       const result = await deleteSubmission({ submissionId: submission.id, userId: String(user.id) });
       toast({ title: '처리 완료', description: result.message });
+
       if (user.role === 'teacher') {
-        onSubmissionDeleted(submission.id);
+        if (submission.status === 'approved') {
+          onSubmissionUpdated({ id: submission.id, status: 'rejected' });
+        } else {
+          onSubmissionDeleted(submission.id);
+        }
+      } else if (user.role === 'student') {
+        onSubmissionUpdated({ id: submission.id, status: 'pending_deletion' });
       }
     } catch (error: any) {
-      toast({ variant: 'destructive', title: '처리 오류', description: error.message || '게시글 삭제/요청 중 오류가 발생했습니다.' });
+      toast({ variant: 'destructive', title: '처리 오류', description: error.message || '게시글 처리 중 오류가 발생했습니다.' });
     } finally {
         setIsDeleting(false);
     }
@@ -189,19 +197,39 @@ function GalleryCard({ submission, user, author, onSubmissionDeleted, onSubmissi
                         <AlertDialogContent>
                             <AlertDialogHeader>
                             <AlertDialogTitle>
-                                {user.role === 'teacher' ? "정말로 삭제하시겠습니까?" : "정말로 삭제를 요청하시겠습니까?"}
+                                {user.role === 'student'
+                                    ? "정말로 삭제를 요청하시겠습니까?"
+                                    : isApproved
+                                    ? "게시글을 '반려' 상태로 변경하시겠습니까?"
+                                    : "정말로 영구 삭제하시겠습니까?"
+                                }
                             </AlertDialogTitle>
                             <AlertDialogDescription>
-                                {user.role === 'teacher' 
-                                    ? "이 게시글을 삭제하면 되돌릴 수 없습니다. 갤러리에서 영구적으로 사라지며, 학생의 관련 성취도도 함께 조정됩니다." 
-                                    : "이 게시물의 삭제를 요청합니다. 요청이 승인되면, 게시물과 관련 진행도가 영구적으로 삭제되며 되돌릴 수 없습니다."
+                                {user.role === 'student'
+                                    ? "이 게시물의 삭제를 요청합니다. 요청이 승인되면, 게시물과 관련 진행도가 영구적으로 삭제되며 되돌릴 수 없습니다."
+                                    : isApproved
+                                    ? "승인된 게시글을 '반려' 상태로 변경하여 숨깁니다. 학생의 관련 성취도도 함께 조정됩니다. 이 게시물은 나중에 다시 승인할 수 있습니다."
+                                    : "이 게시글을 영구적으로 삭제하면 되돌릴 수 없습니다."
                                 }
                             </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                             <AlertDialogCancel disabled={isDeleting}>취소</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : (user.role === 'teacher' ? '삭제' : '삭제 요청')}
+                            <AlertDialogAction 
+                                onClick={handleDelete} 
+                                disabled={isDeleting} 
+                                className={cn(
+                                    user.role === 'teacher' && isApproved 
+                                    ? 'bg-amber-600 text-white hover:bg-amber-700' 
+                                    : 'bg-destructive hover:bg-destructive/90'
+                                )}
+                            >
+                                {isDeleting 
+                                    ? <Loader2 className="h-4 w-4 animate-spin" /> 
+                                    : user.role === 'teacher' 
+                                        ? (isApproved ? "반려로 변경" : "영구 삭제")
+                                        : "삭제 요청"
+                                }
                             </AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
