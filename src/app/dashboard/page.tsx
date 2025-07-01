@@ -16,6 +16,7 @@ import { KeyRound, ShieldAlert, GalleryThumbnails, Info, Bug } from 'lucide-reac
 import { ChangePinDialog } from '@/components/ChangePinDialog';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { WelcomeMessage } from '@/components/WelcomeMessage';
 
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
@@ -47,7 +48,10 @@ export default function Dashboard() {
       
       {loading && (
         <div className="mt-8">
-          <Skeleton className="h-20 w-full mb-8" />
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
+            <div className="lg:col-span-2"><Skeleton className="h-40 w-full" /></div>
+            <div className="lg:col-span-3"><Skeleton className="h-40 w-full" /></div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
             <Skeleton className="h-40 w-full" />
             <Skeleton className="h-40 w-full" />
@@ -63,15 +67,24 @@ export default function Dashboard() {
       
       {!loading && user && (
         <>
-          {announcement?.enabled && announcement.text && (
-            <Alert className="mb-8">
-                <Info className="h-4 w-4" />
-                <AlertTitle className="font-bold">안내사항</AlertTitle>
-                <AlertDescription className="whitespace-pre-wrap">
-                  {announcement.text}
-                </AlertDescription>
-            </Alert>
-          )}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
+            <div className="lg:col-span-2">
+                <WelcomeMessage />
+            </div>
+            
+            <div className="lg:col-span-3">
+              {announcement?.enabled && announcement.text && (
+                <Alert className="h-full">
+                    <Info className="h-4 w-4" />
+                    <AlertTitle className="font-bold">안내사항</AlertTitle>
+                    <AlertDescription className="whitespace-pre-wrap">
+                      {announcement.text}
+                    </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          </div>
+
 
           <main>
             {user.pin === '0000' && (

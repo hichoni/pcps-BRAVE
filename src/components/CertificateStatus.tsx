@@ -1,7 +1,6 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
 import { useAchievements } from '@/context/AchievementsContext';
 import { useAuth } from '@/context/AuthContext';
 import { STATUS_CONFIG, CERTIFICATE_THRESHOLDS } from '@/lib/config';
@@ -9,43 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Skeleton } from './ui/skeleton';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
-import { Award, Gem, Medal, Sparkles } from 'lucide-react';
-import { db } from '@/lib/firebase';
-import { doc, onSnapshot, Timestamp } from 'firebase/firestore';
-import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { Award, Gem, Medal, ShieldOff } from 'lucide-react';
 
-interface Encouragement {
-    message: string;
-    createdAt: Timestamp;
-}
 
 export function CertificateStatus() {
   const { user, loading: authLoading } = useAuth();
   const { getAchievements, certificateStatus, loading: achievementsLoading } = useAchievements();
-  const [encouragement, setEncouragement] = useState<Encouragement | null>(null);
-
-  useEffect(() => {
-    if (!user || !db) return;
-
-    const userStateRef = doc(db, 'userDynamicState', user.username);
-    const unsubscribe = onSnapshot(userStateRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data.encouragement) {
-          // Only show recent messages (e.g., within last 24 hours)
-          const now = new Date();
-          const messageDate = (data.encouragement.createdAt as Timestamp).toDate();
-          if ((now.getTime() - messageDate.getTime()) < 24 * 60 * 60 * 1000) {
-            setEncouragement(data.encouragement as Encouragement);
-          } else {
-            setEncouragement(null);
-          }
-        }
-      }
-    });
-
-    return () => unsubscribe();
-  }, [user]);
 
   if (authLoading || achievementsLoading || !user) {
     return <Skeleton className="h-40 w-full" />;
@@ -82,15 +50,6 @@ export function CertificateStatus() {
             <CardTitle className="font-headline text-lg sm:text-xl">나의 도전 현황</CardTitle>
           </CardHeader>
           <CardContent className="text-center flex-grow flex flex-col items-center justify-center p-4 pt-0">
-            {encouragement && (
-                <Alert variant="default" className="mb-4 text-left border-primary/20 bg-primary/5">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    <AlertTitle className="font-bold text-primary">선생님의 응원 메시지</AlertTitle>
-                    <AlertDescription className="text-primary/90">
-                        {encouragement.message}
-                    </AlertDescription>
-                </Alert>
-            )}
             <div className="flex flex-col items-center gap-2">
               <statusInfo.icon className={cn("w-16 h-16 transition-all duration-500", statusInfo.color)} />
               {currentStatus !== 'Unranked' && (
