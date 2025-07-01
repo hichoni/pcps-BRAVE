@@ -9,8 +9,9 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, doc, getDoc } from 'firebase/firestore';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { type AreaState } from '@/lib/config';
 
 // --- Tools for the Flow ---
 
@@ -97,6 +98,54 @@ const getSpecialDayInfoTool = ai.defineTool(
   }
 );
 
+const getAchievementSummaryTool = ai.defineTool(
+  {
+    name: 'getAchievementSummary',
+    description: "Fetches a student's achievement summary, including which areas are certified, in progress, or not yet started.",
+    inputSchema: z.object({
+      userId: z.string().describe("The student's unique username."),
+    }),
+    outputSchema: z.object({
+        certifiedAreas: z.array(z.string()).describe("A list of Korean names for areas the student has certified."),
+        inProgressAreas: z.array(z.string()).describe("A list of Korean names for areas the student has started but not yet certified."),
+        untouchedAreas: z.array(z.string()).describe("A list of Korean names for areas the student has not started at all."),
+    }),
+  },
+  async ({ userId }) => {
+    const certifiedAreas: string[] = [];
+    const inProgressAreas: string[] = [];
+    const untouchedAreas: string[] = [];
+    
+    if (!db) return { certifiedAreas, inProgressAreas, untouchedAreas };
+
+    const configDocRef = doc(db, 'config', 'challengeConfig');
+    const configDocSnap = await getDoc(configDocRef);
+    if (!configDocSnap.exists()) return { certifiedAreas, inProgressAreas, untouchedAreas };
+    const challengeConfig = configDocSnap.data();
+
+    const achievementDocRef = doc(db, 'achievements', userId);
+    const achievementDocSnap = await getDoc(achievementDocRef);
+    const achievements = achievementDocSnap.exists() ? achievementDocSnap.data() : {};
+
+    for (const areaId in challengeConfig) {
+        const areaConfig = challengeConfig[areaId];
+        const areaState = achievements[areaId] as AreaState | undefined;
+        const koreanName = areaConfig.koreanName || areaId;
+
+        if (areaState?.isCertified) {
+            certifiedAreas.push(koreanName);
+        } else if (areaState && areaState.progress && (typeof areaState.progress === 'number' ? areaState.progress > 0 : areaState.progress !== '')) {
+            inProgressAreas.push(koreanName);
+        } else {
+            untouchedAreas.push(koreanName);
+        }
+    }
+
+    return { certifiedAreas, inProgressAreas, untouchedAreas };
+  }
+);
+
+
 // --- Flow Definition ---
 
 const WelcomeMessageInputSchema = z.object({
@@ -118,34 +167,31 @@ const prompt = ai.definePrompt({
   name: 'generateWelcomeMessagePrompt',
   input: { schema: WelcomeMessageInputSchema },
   output: { schema: WelcomeMessageOutputSchema },
-  tools: [getRecentActivityTool, getSpecialDayInfoTool],
-  prompt: `You are a friendly and encouraging AI coach for elementary school students. Your name is '꿈-코치'. Your task is to generate a personalized welcome message for a student named {{{studentName}}}. Your entire response MUST be in Korean.
+  tools: [getRecentActivityTool, getSpecialDayInfoTool, getAchievementSummaryTool],
+  prompt: `You are '꿈-코치', a friendly and encouraging AI coach for elementary school students. Your task is to generate a personalized, single-sentence welcome message for a student named {{{studentName}}}. Your entire response MUST be in Korean.
 
-Follow these steps to craft your message:
-1.  Address the student by name.
-2.  Use the 'getRecentActivity' tool to check if the student was active yesterday or today.
-3.  Use the 'getSpecialDayInfo' tool to check if today is a special day.
-4.  Combine this information to create a single, encouraging sentence.
+Follow these steps to craft your message. Use the first rule that applies:
 
-Here are some scenarios and example messages:
+1.  **Special Day Check:** Use the 'getSpecialDayInfo' tool. If today is a special day, generate a message related to it.
+    *   Example: "{{{studentName}}} 학생, 반가워요! 오늘은 '환경의 날'이네요. '탄소 줄임 실천'에 도전하며 환경을 생각해보는 건 어때요?"
 
-*   **If today is a special day:**
-    *   (Example from tool: dayName='환경의 날', suggestion='탄소 줄임 실천')
-    *   "{{{studentName}}} 학생, 반가워요! 오늘은 '환경의 날'이네요. '탄소 줄임 실천'에 도전하며 환경을 생각해보는 건 어때요?"
+2.  **New Challenge Suggestion:** Use the 'getAchievementSummary' tool.
+    *   If there are any 'untouched' areas, pick one and encourage the student to try it to become well-rounded.
+    *   Example: "모든 영역을 정복해서 학교장 인증의 주인공이 되어보는 건 어때요? '봉사' 영역이 {{{studentName}}} 학생을 기다리고 있어요!"
+    *   If there are no 'untouched' areas but there are 'in-progress' areas, encourage them to finish one.
+    *   Example: "와, {{{studentName}}} 학생! '인문' 영역 인증까지 얼마 남지 않았네요! 조금만 더 힘내서 마무리해봐요!"
 
-*   **If the student was NOT active yesterday and today is NOT a special day:**
-    *   (Example from tool: didSubmitYesterday=false)
-    *   "{{{studentName}}} 학생, 어서 와요! 어제는 푹 쉬었나요? 오늘은 새로운 도전을 시작하기 좋은 날이에요!"
+3.  **Recent Activity Check:** Use the 'getRecentActivity' tool.
+    *   If the student submitted something *today*, praise their diligence.
+    *   Example: "{{{studentName}}} 학생, 오늘 벌써 도전을 시작했군요! 정말 부지런해요. 계속 화이팅!"
+    *   If the student submitted something *yesterday*, praise their consistency.
+    *   Example: "어제 정말 멋졌어요, {{{studentName}}} 학생! 오늘도 그 열정을 이어가 볼까요?"
 
-*   **If the student WAS active yesterday and today is NOT a special day:**
-     *   (Example from tool: didSubmitYesterday=true)
-    *   "{{{studentName}}} 학생, 어제 정말 멋졌어요! 오늘도 그 열정을 이어가 볼까요?"
+4.  **Default Welcome:** If none of the above apply (e.g., student was inactive), give a general, warm welcome.
+    *   Example: "좋은 아침, {{{studentName}}} 학생! 오늘은 어떤 멋진 도전을 시작해볼까요?"
+    *   Another Example: "어제보다 한 뼘 더 성장할 오늘, {{{studentName}}} 학생을 응원해요!"
 
-*   **If the student was active TODAY:**
-     *   (Example from tool: didSubmitToday=true)
-    *   "{{{studentName}}} 학생, 오늘 벌써 도전을 시작했군요! 정말 부지런해요. 계속 화이팅!"
-
-Keep the tone very friendly, positive, and motivating. Make it a short, single sentence if possible. Do not add any extra commentary.`,
+Keep the tone very friendly, positive, and motivating. Always address the student by name.`,
 });
 
 const generateWelcomeMessageFlow = ai.defineFlow(
