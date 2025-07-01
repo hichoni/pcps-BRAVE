@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -10,13 +9,17 @@ import { useChallengeConfig } from '@/context/ChallengeConfigContext';
 import { User, CertificateStatus, STATUS_CONFIG } from '@/lib/config';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Loader2, ArrowLeft, BarChart as BarChartIcon, PieChart as PieChartIcon, LineChart as LineChartIcon } from 'lucide-react';
+import { Loader2, ArrowLeft, BarChart as BarChartIcon, PieChart as PieChartIcon, LineChart as LineChartIcon, Calendar as CalendarIcon } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from "@/components/ui/chart"
 import { Bar, BarChart, XAxis, YAxis, CartesianGrid, Pie, PieChart, Line, LineChart, Cell } from "recharts"
 import { collection, query, where, getDocs, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { subDays, format, parseISO } from 'date-fns';
+import { subDays, format, eachDayOfInterval, startOfDay, endOfDay } from 'date-fns';
+import { ko } from 'date-fns/locale';
+import { DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 
 const pieChartConfig = {
   students: {
@@ -62,6 +65,11 @@ export default function StatsPage() {
 
   const [submissionData, setSubmissionData] = useState<any[]>([]);
   const [submissionsLoading, setSubmissionsLoading] = useState(true);
+  const [date, setDate] = useState<DateRange | undefined>({
+    from: subDays(new Date(), 29),
+    to: new Date(),
+  });
+
 
   useEffect(() => {
     if (!authLoading && user?.role !== 'teacher') {
@@ -70,16 +78,20 @@ export default function StatsPage() {
   }, [user, authLoading, router]);
 
   useEffect(() => {
-    if (!db) {
+    if (!db || !date?.from) {
         setSubmissionsLoading(false);
         return;
     };
     const fetchSubmissions = async () => {
       setSubmissionsLoading(true);
-      const thirtyDaysAgo = subDays(new Date(), 30);
+
+      const startDate = startOfDay(date.from!);
+      const endDate = endOfDay(date.to || date.from!);
+      
       const q = query(
         collection(db, "challengeSubmissions"),
-        where("createdAt", ">=", Timestamp.fromDate(thirtyDaysAgo)),
+        where("createdAt", ">=", Timestamp.fromDate(startDate)),
+        where("createdAt", "<=", Timestamp.fromDate(endDate)),
         orderBy("createdAt", "asc")
       );
 
@@ -89,22 +101,25 @@ export default function StatsPage() {
 
         querySnapshot.forEach(doc => {
           const data = doc.data();
-          const date = (data.createdAt as Timestamp).toDate();
-          const formattedDate = format(date, 'yyyy-MM-dd');
+          const submissionDate = (data.createdAt as Timestamp).toDate();
+          const formattedDate = format(submissionDate, 'yyyy-MM-dd');
           submissionsByDay[formattedDate] = (submissionsByDay[formattedDate] || 0) + 1;
         });
 
-        const chartData = [];
-        for (let i = 0; i < 30; i++) {
-          const date = subDays(new Date(), i);
-          const formattedDate = format(date, 'yyyy-MM-dd');
-          chartData.push({
-            date: format(parseISO(formattedDate), 'M/d'),
-            submissions: submissionsByDay[formattedDate] || 0,
-          });
-        }
+        const intervalDays = eachDayOfInterval({
+          start: startDate,
+          end: endDate,
+        });
 
-        setSubmissionData(chartData.reverse());
+        const chartData = intervalDays.map(day => {
+          const formattedDate = format(day, 'yyyy-MM-dd');
+          return {
+            date: format(day, 'M/d'),
+            submissions: submissionsByDay[formattedDate] || 0,
+          };
+        });
+
+        setSubmissionData(chartData);
       } catch (error) {
         console.error("Error fetching submission data for chart:", error);
       } finally {
@@ -113,7 +128,7 @@ export default function StatsPage() {
     };
 
     fetchSubmissions();
-  }, []);
+  }, [date]);
 
   if (authLoading || usersLoading || configLoading || !user || !challengeConfig) {
     return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
@@ -255,8 +270,47 @@ export default function StatsPage() {
 
        <Card className="mt-8">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><LineChartIcon/> 일별 활동 제출 수</CardTitle>
-            <CardDescription>최근 30일간 제출된 전체 활동 수의 변화입니다.</CardDescription>
+            <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-2">
+                <div>
+                    <CardTitle className="flex items-center gap-2"><LineChartIcon/> 일별 활동 제출 수</CardTitle>
+                    <CardDescription>선택한 기간 동안 제출된 전체 활동 수의 변화입니다.</CardDescription>
+                </div>
+                <Popover>
+                    <PopoverTrigger asChild>
+                    <Button
+                        variant={"outline"}
+                        className={cn(
+                        "w-full sm:w-[280px] justify-start text-left font-normal",
+                        !date && "text-muted-foreground"
+                        )}
+                    >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {date?.from ? (
+                        date.to ? (
+                            <>
+                            {format(date.from, "yyyy/MM/dd")} - {format(date.to, "yyyy/MM/dd")}
+                            </>
+                        ) : (
+                            format(date.from, "yyyy/MM/dd")
+                        )
+                        ) : (
+                        <span>날짜를 선택하세요</span>
+                        )}
+                    </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={date?.from}
+                        selected={date}
+                        onSelect={setDate}
+                        numberOfMonths={2}
+                        locale={ko}
+                    />
+                    </PopoverContent>
+                </Popover>
+            </div>
           </CardHeader>
           <CardContent>
             {submissionsLoading ? (
