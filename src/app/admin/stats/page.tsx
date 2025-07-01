@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo } from 'react';
@@ -9,7 +10,7 @@ import { useChallengeConfig } from '@/context/ChallengeConfigContext';
 import { User, CertificateStatus, STATUS_CONFIG } from '@/lib/config';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Loader2, ArrowLeft, BarChart as BarChartIcon, PieChart as PieChartIcon, LineChart as LineChartIcon, Calendar as CalendarIcon, Percent } from 'lucide-react';
+import { Loader2, ArrowLeft, BarChart as BarChartIcon, PieChart as PieChartIcon, LineChart as LineChartIcon, Calendar as CalendarIcon, Users } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from "@/components/ui/chart"
 import { Bar, BarChart, XAxis, YAxis, CartesianGrid, Pie, PieChart, Line, LineChart, Cell } from "recharts"
 import { collection, query, where, getDocs, Timestamp, orderBy, DocumentData } from 'firebase/firestore';
@@ -60,9 +61,9 @@ const lineChartConfig = {
   },
 } satisfies ChartConfig
 
-const participationChartConfig = {
-    rate: {
-        label: "참여율 (%)",
+const participationCountChartConfig = {
+    count: {
+        label: "참여 학생 수 (명)",
         color: "hsl(var(--chart-2))",
     },
 } satisfies ChartConfig;
@@ -140,8 +141,6 @@ export default function StatsPage() {
     });
   }, [allStudentUsers, gradeFilter, classFilter]);
   
-  const totalStudentsCount = filteredStudents.length;
-
   const filteredSubmissions = useMemo(() => {
     const filteredUsernames = new Set(filteredStudents.map(u => u.username));
     return timeRangeSubmissions.filter(sub => filteredUsernames.has(sub.userId));
@@ -204,9 +203,9 @@ export default function StatsPage() {
       }));
   }, [date, filteredSubmissions]);
   
-  // Data for Participation Rate Chart
-  const participationRateData = useMemo(() => {
-    if (!date?.from || totalStudentsCount === 0) return { daily: [], weekly: [], monthly: [] };
+  // Data for Participation Count Chart
+  const participationCountData = useMemo(() => {
+    if (!date?.from) return { daily: [], weekly: [], monthly: [] };
 
     const startDate = startOfDay(date.from);
     const endDate = endOfDay(date.to || date.from);
@@ -223,7 +222,7 @@ export default function StatsPage() {
         const activeCount = dailyActiveUsers.get(dayKey)?.size || 0;
         return {
             date: format(day, 'M/d'),
-            rate: parseFloat(((activeCount / totalStudentsCount) * 100).toFixed(1)),
+            count: activeCount,
         };
     });
 
@@ -238,7 +237,7 @@ export default function StatsPage() {
         const activeCount = weeklyActiveUsers.get(format(weekStart, 'yyyy-MM-dd'))?.size || 0;
         return {
             week: `${format(weekStart, 'M/d')}주`,
-            rate: parseFloat(((activeCount / totalStudentsCount) * 100).toFixed(1)),
+            count: activeCount,
         };
     });
 
@@ -253,13 +252,13 @@ export default function StatsPage() {
         const activeCount = monthlyActiveUsers.get(format(monthStart, 'yyyy-MM-dd'))?.size || 0;
         return {
             month: format(monthStart, 'yy년 M월'),
-            rate: parseFloat(((activeCount / totalStudentsCount) * 100).toFixed(1)),
+            count: activeCount,
         };
     });
 
     return { daily, weekly, monthly };
 
-  }, [date, filteredSubmissions, totalStudentsCount]);
+  }, [date, filteredSubmissions]);
 
   if (authLoading || usersLoading || configLoading || !user || !challengeConfig) {
     return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
@@ -465,48 +464,48 @@ export default function StatsPage() {
 
             <Card className="mt-8">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Percent /> 학생 참여율</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Users /> 학생 참여 수</CardTitle>
                 <CardDescription>
-                  선택한 기간과 조건에 해당하는 전체 학생 중, 활동을 1회 이상 제출한 학생의 비율입니다.
+                  선택한 기간과 조건에 해당하는 활동을 1회 이상 제출한 학생의 수입니다.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Tabs defaultValue="daily" className="w-full">
                   <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="daily">일별 참여율</TabsTrigger>
-                    <TabsTrigger value="weekly">주별 참여율</TabsTrigger>
-                    <TabsTrigger value="monthly">월별 참여율</TabsTrigger>
+                    <TabsTrigger value="daily">일별 참여 수</TabsTrigger>
+                    <TabsTrigger value="weekly">주별 참여 수</TabsTrigger>
+                    <TabsTrigger value="monthly">월별 참여 수</TabsTrigger>
                   </TabsList>
                   <TabsContent value="daily" className="pt-4">
-                    <ChartContainer config={participationChartConfig} className="w-full h-[400px]">
-                      <BarChart data={participationRateData.daily}>
+                    <ChartContainer config={participationCountChartConfig} className="w-full h-[400px]">
+                      <BarChart data={participationCountData.daily}>
                         <CartesianGrid vertical={false} />
                         <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
-                        <YAxis domain={[0, 100]} unit="%" />
+                        <YAxis allowDecimals={false} unit="명" />
                         <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                        <Bar dataKey="rate" fill="var(--color-rate)" radius={4} />
+                        <Bar dataKey="count" fill="var(--color-count)" radius={4} />
                       </BarChart>
                     </ChartContainer>
                   </TabsContent>
                   <TabsContent value="weekly" className="pt-4">
-                    <ChartContainer config={participationChartConfig} className="w-full h-[400px]">
-                        <BarChart data={participationRateData.weekly}>
+                    <ChartContainer config={participationCountChartConfig} className="w-full h-[400px]">
+                        <BarChart data={participationCountData.weekly}>
                           <CartesianGrid vertical={false} />
                           <XAxis dataKey="week" tickLine={false} axisLine={false} tickMargin={8} />
-                          <YAxis domain={[0, 100]} unit="%" />
+                          <YAxis allowDecimals={false} unit="명" />
                           <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                          <Bar dataKey="rate" fill="var(--color-rate)" radius={4} />
+                          <Bar dataKey="count" fill="var(--color-count)" radius={4} />
                         </BarChart>
                       </ChartContainer>
                   </TabsContent>
                   <TabsContent value="monthly" className="pt-4">
-                     <ChartContainer config={participationChartConfig} className="w-full h-[400px]">
-                        <BarChart data={participationRateData.monthly}>
+                     <ChartContainer config={participationCountChartConfig} className="w-full h-[400px]">
+                        <BarChart data={participationCountData.monthly}>
                           <CartesianGrid vertical={false} />
                           <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
-                          <YAxis domain={[0, 100]} unit="%" />
+                          <YAxis allowDecimals={false} unit="명" />
                           <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                          <Bar dataKey="rate" fill="var(--color-rate)" radius={4} />
+                          <Bar dataKey="count" fill="var(--color-count)" radius={4} />
                         </BarChart>
                       </ChartContainer>
                   </TabsContent>
