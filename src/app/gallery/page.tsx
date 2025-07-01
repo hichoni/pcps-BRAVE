@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { useAuth, User } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, orderBy, query, Timestamp, limit, startAfter, QueryDocumentSnapshot, where } from 'firebase/firestore';
-import { Loader2, ArrowLeft, User as UserIcon, Calendar as CalendarIcon, GalleryThumbnails, Trash2, Heart, Search, Edit, Link as LinkIcon } from 'lucide-react';
+import { Loader2, ArrowLeft, User as UserIcon, Calendar as CalendarIcon, GalleryThumbnails, Trash2, Heart, Search, Edit, Link as LinkIcon, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserAvatar } from '@/components/UserAvatar';
@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { deleteSubmission } from '@/ai/flows/delete-submission';
 import { toggleLike } from '@/ai/flows/toggle-like';
+import { reviewSubmission } from '@/ai/flows/review-submission';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -61,7 +62,7 @@ const getYoutubeId = (url: string | undefined): string | null => {
     return (match && match[2].length === 11) ? match[2] : null;
 };
 
-function GalleryCard({ submission, user, author, onSubmissionDeleted, onSubmissionUpdated, statusInfo }: { submission: Submission; user: User | null; author: User | null, onSubmissionDeleted: (id: string) => void, onSubmissionUpdated: (updatedSubmission: {id: string; evidence: string}) => void, statusInfo: typeof STATUS_CONFIG[keyof typeof STATUS_CONFIG] }) {
+function GalleryCard({ submission, user, author, onSubmissionDeleted, onSubmissionUpdated, statusInfo }: { submission: Submission; user: User | null; author: User | null, onSubmissionDeleted: (id: string) => void, onSubmissionUpdated: (updatedSubmission: Partial<Submission> & { id: string }) => void, statusInfo: typeof STATUS_CONFIG[keyof typeof STATUS_CONFIG] }) {
   const { challengeConfig } = useChallengeConfig();
   const { toast } = useToast();
   const AreaIcon = challengeConfig?.[submission.areaName]?.icon || UserIcon;
@@ -72,10 +73,30 @@ function GalleryCard({ submission, user, author, onSubmissionDeleted, onSubmissi
   const [isLiked, setIsLiked] = useState(user ? submission.likes.includes(user.username) : false);
   const [likeCount, setLikeCount] = useState(submission.likes.length);
   const [isEditing, setIsEditing] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
   
   const isOwner = user?.username === submission.userId;
   const canManage = user && (isOwner || user.role === 'teacher');
   const isPending = submission.status === 'pending_deletion' || submission.status === 'pending_review';
+  const isRejected = submission.status === 'rejected';
+
+  const handleManualApprove = async () => {
+    if (!user || user.role !== 'teacher') return;
+    setIsApproving(true);
+    try {
+      const result = await reviewSubmission({
+        submissionId: submission.id,
+        isApproved: true,
+        teacherId: String(user.id),
+      });
+      toast({ title: '승인 완료', description: result.message });
+      onSubmissionUpdated({ id: submission.id, status: 'approved' });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: '승인 처리 오류', description: error.message });
+    } finally {
+      setIsApproving(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!user) return;
@@ -139,7 +160,7 @@ function GalleryCard({ submission, user, author, onSubmissionDeleted, onSubmissi
          <div className="flex flex-col items-end gap-2">
              {user?.role === 'teacher' && (
                 <div className="flex items-center gap-1">
-                    <Badge variant={submission.status === 'approved' ? 'default' : 'destructive'} className="capitalize text-xs">
+                    <Badge variant={submission.status === 'approved' ? 'default' : (submission.status === 'rejected' ? 'destructive' : 'secondary')} className="capitalize text-xs">
                         {submission.status.replace('_', ' ')}
                     </Badge>
                     <Badge variant={submission.showInGallery ? 'secondary' : 'outline'} className="text-xs">
@@ -149,6 +170,11 @@ function GalleryCard({ submission, user, author, onSubmissionDeleted, onSubmissi
             )}
             {canManage && (
                 <div className="flex items-center -mr-2">
+                    {user.role === 'teacher' && isRejected && (
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-green-600" onClick={handleManualApprove} disabled={isApproving} title="수동으로 승인하기">
+                            {isApproving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                        </Button>
+                    )}
                     {user.role === 'teacher' && (
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => setIsEditing(true)}>
                             <Edit className="h-4 w-4" />
@@ -367,8 +393,8 @@ export default function GalleryPage() {
     setSubmissions(prev => prev.filter(s => s.id !== deletedId));
   }, []);
   
-  const handleSubmissionUpdated = useCallback((updatedSubmission: {id: string; evidence: string}) => {
-    setSubmissions(prev => prev.map(s => s.id === updatedSubmission.id ? { ...s, evidence: updatedSubmission.evidence } : s));
+  const handleSubmissionUpdated = useCallback((updatedSubmission: Partial<Submission> & { id: string }) => {
+    setSubmissions(prev => prev.map(s => s.id === updatedSubmission.id ? { ...s, ...updatedSubmission } : s));
   }, []);
 
   const allStudentUsers = users.filter(u => u.role === 'student');
