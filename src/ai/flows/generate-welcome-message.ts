@@ -98,6 +98,11 @@ const getSpecialDayInfoTool = ai.defineTool(
   }
 );
 
+const AreaSummarySchema = z.object({
+    areaName: z.string().describe("The Korean name of the area (e.g., '인문')."),
+    challengeName: z.string().describe("The name of the challenge in that area (e.g., '독서 마라톤')."),
+});
+
 const getAchievementSummaryTool = ai.defineTool(
   {
     name: 'getAchievementSummary',
@@ -106,15 +111,15 @@ const getAchievementSummaryTool = ai.defineTool(
       userId: z.string().describe("The student's unique username."),
     }),
     outputSchema: z.object({
-        certifiedAreas: z.array(z.string()).describe("A list of Korean names for areas the student has certified."),
-        inProgressAreas: z.array(z.string()).describe("A list of Korean names for areas the student has started but not yet certified."),
-        untouchedAreas: z.array(z.string()).describe("A list of Korean names for areas the student has not started at all."),
+        certifiedAreas: z.array(AreaSummarySchema).describe("A list of areas the student has certified."),
+        inProgressAreas: z.array(AreaSummarySchema).describe("A list of areas the student has started but not yet certified."),
+        untouchedAreas: z.array(AreaSummarySchema).describe("A list of areas the student has not started at all."),
     }),
   },
   async ({ userId }) => {
-    const certifiedAreas: string[] = [];
-    const inProgressAreas: string[] = [];
-    const untouchedAreas: string[] = [];
+    const certifiedAreas: z.infer<typeof AreaSummarySchema>[] = [];
+    const inProgressAreas: z.infer<typeof AreaSummarySchema>[] = [];
+    const untouchedAreas: z.infer<typeof AreaSummarySchema>[] = [];
     
     if (!db) return { certifiedAreas, inProgressAreas, untouchedAreas };
 
@@ -130,14 +135,17 @@ const getAchievementSummaryTool = ai.defineTool(
     for (const areaId in challengeConfig) {
         const areaConfig = challengeConfig[areaId];
         const areaState = achievements[areaId] as AreaState | undefined;
-        const koreanName = areaConfig.koreanName || areaId;
+        const summary = {
+            areaName: areaConfig.koreanName || areaId,
+            challengeName: areaConfig.challengeName || areaId,
+        };
 
         if (areaState?.isCertified) {
-            certifiedAreas.push(koreanName);
+            certifiedAreas.push(summary);
         } else if (areaState && areaState.progress && (typeof areaState.progress === 'number' ? areaState.progress > 0 : areaState.progress !== '')) {
-            inProgressAreas.push(koreanName);
+            inProgressAreas.push(summary);
         } else {
-            untouchedAreas.push(koreanName);
+            untouchedAreas.push(summary);
         }
     }
 
@@ -177,11 +185,11 @@ Follow these steps to craft your message. Use the first rule that applies:
     *   Example: "오늘은 바로 '세계 책의 날'! {{{studentName}}} 학생의 두뇌를 말랑하게 해줄 '독서 마라톤' 어때요?"
 
 2.  **New Challenge Suggestion:** Use the 'getAchievementSummary' tool.
-    *   If there are any 'untouched' areas, pick one and encourage the student to try it in a fun way.
-    *   Example: "도전 지도에 아직 탐험하지 않은 '봉사' 영역이 반짝이고 있어요! {{{studentName}}} 학생의 발자국을 남겨보는 건 어때요?"
-    *   Example: "이런, '체육' 영역이 {{{studentName}}} 학생의 도전을 기다리다 심심해하고 있어요! 가서 놀아주는 건 어때요?"
-    *   If there are no 'untouched' areas but there are 'in-progress' areas, encourage them to finish one.
-    *   Example: "와, {{{studentName}}} 학생! '인문' 영역 정복이 코앞이에요! 마지막 한 걸음만 더 내딛어 볼까요? 으쌰!"
+    *   If there are any 'untouched' areas, pick one of the challenges (using its 'challengeName') and encourage the student to try it in a fun way.
+    *   Example: "아직 도전하지 않은 '탄소 줄임 실천'이 {{{studentName}}} 학생을 기다리고 있어요! 한 번 시작해볼까요?"
+    *   Example: "이런, '타자의 달인 인증'이 {{{studentName}}} 학생의 도전을 기다리다 심심해하고 있어요! 가서 놀아주는 건 어때요?"
+    *   If there are no 'untouched' areas but there are 'in-progress' areas, encourage them to finish one of the challenges (using its 'challengeName').
+    *   Example: "와, {{{studentName}}} 학생! '독서 마라톤' 완주가 코앞이에요! 마지막 한 걸음만 더 내딛어 볼까요? 으쌰!"
 
 3.  **Recent Activity Check:** Use the 'getRecentActivity' tool.
     *   If the student submitted something *today*, praise their diligence with excitement.
@@ -192,7 +200,7 @@ Follow these steps to craft your message. Use the first rule that applies:
 
 4.  **Default Welcome (Inactive):** If none of the above apply, give a creative and fun welcome.
     *   Example: "똑똑, {{{studentName}}} 학생의 잠자고 있던 도전 세포를 깨울 시간이에요! 오늘 뭐부터 해볼까요?"
-    *   Example: "오늘의 도전 예보: 전국적으로 '도전'하기 좋은 날씨! 특히 '체육' 영역에 도전 시 성공 확률 맑음!"
+    *   Example: "오늘의 도전 예보: 전국적으로 '도전'하기 좋은 날씨! 특히 '건강 체력 인증'에 도전 시 성공 확률 맑음!"
     *   Example: "좋은 아침, {{{studentName}}} 학생! 오늘의 미션: 어제보다 1% 더 성장하기! 준비됐나요?"
 
 Keep the tone very friendly, positive, and motivating. Always address the student by name.`,
