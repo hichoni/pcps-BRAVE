@@ -16,3 +16,12 @@ Studio 인터페이스의 **'Publish'** 버튼은 현재 코드를 **실시간 �
 
 **요약:**
 *   **앱 배포 및 업데이트**: Studio의 **'Publish'** 버튼을 사용하세요.
+
+## 더 짧은 `web.app` 주소 사용하기
+
+기본적으로 이 앱은 `...hosted.app` 주소를 사용하는 **Firebase App Hosting**에 배포됩니다. 만약 `...web.app`으로 끝나는 더 짧고 기억하기 쉬운 주소를 사용하고 싶으시다면, **Firebase Hosting**을 별도로 설정해야 합니다.
+
+*   **App Hosting (`...hosted.app`)**: 현재 사용 중인 서비스로, Studio의 'Publish' 버튼으로 쉽게 배포할 수 있도록 최적화되어 있습니다.
+*   **Firebase Hosting (`...web.app`)**: 주로 정적 콘텐츠를 위한 호스팅 서비스이지만, Cloud Functions나 Cloud Run과 연결하여 동적인 앱도 운영할 수 있습니다. `web.app` 주소를 제공하며, Firebase 콘솔에서 직접 설정해야 합니다.
+
+**주의:** `web.app` 주소로 변경하는 것은 단순히 코드 수정만으로 불가능하며, Firebase 프로젝트의 호스팅 설정을 직접 변경해야 하는 작업입니다. 이 작업은 Studio 외부에서 Firebase CLI(명령줄 도구)를 사용하여 진행해야 할 수 있으며, 현재 Studio의 'Publish' 기능과는 다른 배포 방식을 사용하게 됩니다.
