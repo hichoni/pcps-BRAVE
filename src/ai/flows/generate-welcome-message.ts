@@ -186,10 +186,12 @@ Follow these steps to craft your message. Use the first rule that applies:
 
 2.  **New Challenge Suggestion:** Use the 'getAchievementSummary' tool.
     *   If there are any 'untouched' areas, pick one of the challenges (using its 'challengeName') and encourage the student to try it in a fun way.
-    *   Example: "아직 도전하지 않은 '탄소 줄임 실천'이 {{{studentName}}} 학생을 기다리고 있어요! 한 번 시작해볼까요? 🌱"
-    *   Example: "이런, '타자의 달인 인증'이 {{{studentName}}} 학생의 도전을 기다리다 심심해하고 있어요! ⌨️ 가서 놀아주는 건 어때요?"
+        *   Example: "아직 도전하지 않은 '탄소 줄임 실천'이 {{{studentName}}} 학생을 기다리고 있어요! 한 번 시작해볼까요? 🌱"
+        *   Example: "이런, '타자의 달인 인증'이 {{{studentName}}} 학생의 도전을 기다리다 심심해하고 있어요! ⌨️ 가서 놀아주는 건 어때요?"
     *   If there are no 'untouched' areas but there are 'in-progress' areas, encourage them to finish one of the challenges (using its 'challengeName').
-    *   Example: "와, {{{studentName}}} 학생! '독서 마라톤' 완주가 코앞이에요! 마지막 한 걸음만 더 내딛어 볼까요? 🏃‍♂️💨 으쌰!"
+        *   Example: "와, {{{studentName}}} 학생! '독서 마라톤' 완주가 코앞이에요! 마지막 한 걸음만 더 내딛어 볼까요? 🏃‍♂️💨 으쌰!"
+    *   If all challenge areas are 'certified', congratulate them on their incredible achievement of completing everything.
+        *   Example: "모든 도전을 완료하다니, 정말 대단해요, {{{studentName}}} 학생! 당신은 진정한 챔피언이에요! 🏆"
 
 3.  **Recent Activity Check:** Use the 'getRecentActivity' tool.
     *   If the student submitted something *today*, praise their diligence with excitement.
@@ -198,12 +200,11 @@ Follow these steps to craft your message. Use the first rule that applies:
     *   If the student submitted something *yesterday*, praise their consistency.
     *   Example: "어제의 열정이 식지 않았네요, {{{studentName}}} 학생! 그 기세로 오늘도 달려볼까요? 🏄"
 
-4.  **Default Welcome (Inactive):** If none of the above apply, give a creative and fun welcome.
-    *   Example: "똑똑, {{{studentName}}} 학생의 잠자고 있던 도전 세포를 깨울 시간이에요! 오늘 뭐부터 해볼까요? ⏰"
-    *   Example: "오늘의 도전 예보: 전국적으로 '도전'하기 좋은 날씨! ☀️ 특히 '건강 체력 인증'에 도전 시 성공 확률 맑음! 💯"
-    *   Example: "좋은 아침, {{{studentName}}} 학생! 오늘의 미션: 어제보다 1% 더 성장하기! 준비됐나요? 💪"
+4.  **Default Welcome (Inactive):** If none of the above apply, give a creative and fun welcome that STILL suggests a specific, actionable challenge. Use the 'getAchievementSummary' tool to pick ANY challenge.
+    *   Example: "똑똑, {{{studentName}}} 학생의 잠자고 있던 도전 세포를 깨울 시간이에요! 오늘 '건강 체력 인증'부터 시작해볼까요? ⏰"
+    *   Example: "오늘의 도전 예보: 전국적으로 '도전'하기 좋은 날씨! ☀️ 특히 '독서 마라톤'에 도전 시 성공 확률 맑음! 💯"
 
-Keep the tone very friendly, positive, and motivating. Always address the student by name.`,
+**IMPORTANT RULE:** Your message must always suggest a specific action or be a specific celebration. **Do not** use vague, non-specific encouragement like "오늘 무엇을 해볼까요?" or "어떤 도전을 할지 기대돼요!". Always give a concrete suggestion based on the tool results. Your message must be actionable and specific.`,
 });
 
 const generateWelcomeMessageFlow = ai.defineFlow(
