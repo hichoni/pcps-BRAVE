@@ -66,21 +66,21 @@ export function WelcomeMessage() {
   }
 
   return (
-    <Card className="h-full flex flex-col">
+    <Card className="h-full flex flex-col bg-primary text-primary-foreground">
         <CardHeader className="flex-row items-center gap-3 space-y-0 pb-2">
-            <Sparkles className="w-6 h-6 text-primary"/>
+            <Sparkles className="w-6 h-6 text-primary-foreground"/>
             <CardTitle className="text-xl font-headline">AI 꿈-코치의 한마디</CardTitle>
         </CardHeader>
         <CardContent className="flex-grow flex items-center justify-center p-4">
             {isLoading ? (
-                <div className="flex items-center gap-2 text-muted-foreground">
+                <div className="flex items-center gap-2 text-primary-foreground/80">
                     <Loader2 className="animate-spin h-4 w-4" />
                     <span>메시지를 생성 중입니다...</span>
                 </div>
             ) : displayMessage ? (
-                 <p className="text-base text-center text-primary/90 font-semibold">"{displayMessage}"</p>
+                 <p className="text-base text-center text-primary-foreground font-semibold">"{displayMessage}"</p>
             ) : (
-                <p className="text-base text-center text-muted-foreground">
+                <p className="text-base text-center text-primary-foreground/80">
                     {user?.name}님, 환영합니다!
                     <br/>
                     오늘도 즐거운 도전을 응원해요.
