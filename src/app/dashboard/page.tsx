@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -48,9 +47,9 @@ export default function Dashboard() {
       
       {loading && (
         <div className="mt-8">
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
-            <div className="lg:col-span-2"><Skeleton className="h-40 w-full" /></div>
-            <div className="lg:col-span-3"><Skeleton className="h-40 w-full" /></div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <div><Skeleton className="h-40 w-full" /></div>
+            <div><Skeleton className="h-40 w-full" /></div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
             <Skeleton className="h-40 w-full" />
@@ -67,12 +66,12 @@ export default function Dashboard() {
       
       {!loading && user && (
         <>
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
-            <div className="lg:col-span-2">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <div>
                 <WelcomeMessage />
             </div>
             
-            <div className="lg:col-span-3">
+            <div>
               {announcement?.enabled && announcement.text && (
                 <Alert className="h-full">
                     <Info className="h-4 w-4" />
