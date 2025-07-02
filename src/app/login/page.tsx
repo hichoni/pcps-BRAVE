@@ -12,12 +12,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, LogIn, User as UserIcon, ShieldCheck, Download } from 'lucide-react';
+import { Loader2, LogIn, User as UserIcon, ShieldCheck, Download, AlertCircle, Share2 } from 'lucide-react';
 import Image from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { User } from '@/lib/config';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const studentLoginSchema = z.object({
   grade: z.string().min(1, { message: '학년을 선택해주세요.' }),
@@ -56,11 +57,15 @@ export default function LoginPage() {
   // New state for PWA install prompt
   const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
   const [isStandalone, setIsStandalone] = useState(false);
+  const [isIos, setIsIos] = useState(false);
+
 
   useEffect(() => {
     setIsClient(true);
     
-    // Check if running as a PWA
+    const isIosDevice = /iPhone|iPad|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    setIsIos(isIosDevice);
+
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setIsStandalone(true);
     }
@@ -236,14 +241,23 @@ export default function LoginPage() {
             <CardDescription>계정 정보를 입력해주세요.</CardDescription>
           </CardHeader>
           
-          {isClient && installPrompt && !isStandalone && (
-            <div className="px-6 pb-4">
-              <Button onClick={handleInstallClick} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
-                <Download className="mr-2"/>
-                앱으로 설치하고 편하게 사용하기
-              </Button>
-            </div>
-          )}
+          <div className="px-6 pb-4 space-y-3">
+              {isClient && !isStandalone && installPrompt && (
+                <Button onClick={handleInstallClick} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+                  <Download className="mr-2"/>
+                  앱으로 설치하고 편하게 사용하기
+                </Button>
+              )}
+              {isClient && !isStandalone && isIos && !installPrompt && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>iPhone/iPad 설치 안내</AlertTitle>
+                  <AlertDescription>
+                    하단 공유 버튼 <Share2 className="inline h-4 w-4 align-text-bottom mx-0.5" /> 을 누른 후 '홈 화면에 추가'를 선택하세요.
+                  </AlertDescription>
+                </Alert>
+              )}
+          </div>
 
           <Tabs defaultValue="student" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
