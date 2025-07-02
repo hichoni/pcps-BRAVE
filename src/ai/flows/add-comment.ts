@@ -23,11 +23,11 @@ const AddCommentOutputSchema = z.object({
       userId: z.string(),
       userName: z.string(),
       comment: z.string(),
-      createdAt: z.date(),
+      createdAt: z.string(), // Changed to string to avoid serialization issues
   }),
 });
 
-export async function addComment(input: AddCommentInput): Promise<AddCommentOutput> {
+export async function addComment(input: AddCommentInput): Promise<any> {
   return addCommentFlow(input);
 }
 
@@ -59,7 +59,7 @@ const addCommentFlow = ai.defineFlow(
             success: true, 
             newComment: { 
                 ...commentData, 
-                createdAt: commentData.createdAt.toDate() 
+                createdAt: commentData.createdAt.toDate().toISOString() // Return as ISO string
             } 
         };
     } catch (error: any) {

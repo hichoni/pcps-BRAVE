@@ -75,7 +75,12 @@ export function CommentDialog({ open, onOpenChange, submission, onCommentAdded }
       
       if (result.success) {
         toast({ title: '성공', description: '댓글이 성공적으로 등록되었습니다.' });
-        onCommentAdded(result.newComment);
+        // Convert string date from server back to Date object for client-side consistency
+        const newCommentWithDate: Comment = {
+          ...result.newComment,
+          createdAt: new Date(result.newComment.createdAt),
+        };
+        onCommentAdded(newCommentWithDate);
         onOpenChange(false);
       }
     } catch (error: any) {
