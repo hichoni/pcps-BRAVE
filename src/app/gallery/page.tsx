@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { useAuth, User } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, orderBy, query, Timestamp, limit, startAfter, QueryDocumentSnapshot, where } from 'firebase/firestore';
-import { Loader2, ArrowLeft, User as UserIcon, Calendar as CalendarIcon, GalleryThumbnails, Trash2, Heart, Search, Edit, Link as LinkIcon, CheckCircle2 } from 'lucide-react';
+import { Loader2, ArrowLeft, User as UserIcon, Calendar as CalendarIcon, GalleryThumbnails, Trash2, Heart, Search, Edit, Link as LinkIcon, CheckCircle2, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserAvatar } from '@/components/UserAvatar';
@@ -24,9 +24,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EditSubmissionDialog } from '@/components/EditSubmissionDialog';
-import { SubmissionStatus, CertificateStatus, STATUS_CONFIG } from '@/lib/config';
+import { SubmissionStatus, CertificateStatus, STATUS_CONFIG, type Comment } from '@/lib/config';
 import { Badge } from '@/components/ui/badge';
 import { useAchievements } from '@/context/AchievementsContext';
+import { Separator } from '@/components/ui/separator';
+import { CommentDialog } from '@/components/CommentDialog';
 
 
 interface Submission {
@@ -42,6 +44,7 @@ interface Submission {
   mediaUrl?: string;
   mediaType?: string;
   likes: string[];
+  comments: Comment[];
   showInGallery: boolean;
 }
 
@@ -62,7 +65,7 @@ const getYoutubeId = (url: string | undefined): string | null => {
     return (match && match[2].length === 11) ? match[2] : null;
 };
 
-function GalleryCard({ submission, user, author, onSubmissionDeleted, onSubmissionUpdated, statusInfo }: { submission: Submission; user: User | null; author: User | null, onSubmissionDeleted: (id: string) => void, onSubmissionUpdated: (updatedSubmission: Partial<Submission> & { id: string }) => void, statusInfo: typeof STATUS_CONFIG[keyof typeof STATUS_CONFIG] }) {
+function GalleryCard({ submission, user, author, onSubmissionDeleted, onSubmissionUpdated, statusInfo, userMap }: { submission: Submission; user: User | null; author: User | null, onSubmissionDeleted: (id: string) => void, onSubmissionUpdated: (updatedSubmission: Partial<Submission> & { id: string }) => void, statusInfo: typeof STATUS_CONFIG[keyof typeof STATUS_CONFIG], userMap: Map<string, User> }) {
   const { challengeConfig } = useChallengeConfig();
   const { toast } = useToast();
   const AreaIcon = challengeConfig?.[submission.areaName]?.icon || UserIcon;
@@ -74,6 +77,7 @@ function GalleryCard({ submission, user, author, onSubmissionDeleted, onSubmissi
   const [likeCount, setLikeCount] = useState(submission.likes.length);
   const [isEditing, setIsEditing] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
+  const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(false);
   
   const isOwner = user?.username === submission.userId;
   const canManage = user && (isOwner || user.role === 'teacher');
@@ -144,6 +148,10 @@ function GalleryCard({ submission, user, author, onSubmissionDeleted, onSubmissi
     } finally {
       setIsLiking(false);
     }
+  };
+  
+  const handleCommentAdded = (newComment: Comment) => {
+    onSubmissionUpdated({ id: submission.id, comments: [...(submission.comments || []), newComment] });
   };
 
   return (
@@ -286,8 +294,30 @@ function GalleryCard({ submission, user, author, onSubmissionDeleted, onSubmissi
         <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">
             {submission.evidence}
         </p>
+
+        {submission.comments && submission.comments.length > 0 && (
+            <div className="space-y-3 pt-4 border-t">
+                {submission.comments.slice(-2).map((comment, index) => {
+                    const commenter = userMap.get(comment.userId) || { name: comment.userName };
+                    return (
+                        <div key={index} className="flex items-start gap-2 text-sm">
+                            <UserAvatar user={commenter} className="h-6 w-6 mt-1" />
+                            <div className="flex-grow bg-secondary p-2 rounded-md">
+                                <p className="font-bold text-xs">{maskName(comment.userName)}</p>
+                                <p className="text-foreground/90 break-words">{comment.comment}</p>
+                            </div>
+                        </div>
+                    );
+                })}
+                {submission.comments.length > 2 && (
+                    <Button variant="link" size="sm" className="p-0 h-auto text-xs">
+                        댓글 {submission.comments.length - 2}개 더 보기
+                    </Button>
+                )}
+            </div>
+        )}
       </CardContent>
-      <CardFooter className="flex justify-start items-center p-4 pt-0">
+      <CardFooter className="flex justify-start items-center p-4 pt-0 gap-1">
         <Button
           variant="ghost"
           size="sm"
@@ -298,6 +328,16 @@ function GalleryCard({ submission, user, author, onSubmissionDeleted, onSubmissi
           <Heart className={cn("h-5 w-5 transition-all", isLiked ? 'text-rose-500 fill-rose-500' : 'text-muted-foreground')} />
           <span className="font-semibold text-sm">{likeCount}</span>
         </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsCommentDialogOpen(true)}
+          disabled={!user}
+          className="flex items-center gap-1.5 text-muted-foreground hover:text-primary px-2"
+        >
+          <MessageSquare className="h-5 w-5" />
+          <span className="font-semibold text-sm">댓글</span>
+        </Button>
       </CardFooter>
     </Card>
     <EditSubmissionDialog
@@ -305,6 +345,17 @@ function GalleryCard({ submission, user, author, onSubmissionDeleted, onSubmissi
         onOpenChange={setIsEditing}
         submission={submission}
         onSubmissionUpdated={onSubmissionUpdated}
+    />
+    <CommentDialog 
+        open={isCommentDialogOpen}
+        onOpenChange={setIsCommentDialogOpen}
+        submission={{
+            id: submission.id,
+            userName: submission.userName,
+            challengeName: submission.challengeName,
+            evidence: submission.evidence,
+        }}
+        onCommentAdded={handleCommentAdded}
     />
     </>
   );
@@ -348,11 +399,16 @@ export default function GalleryPage() {
         const querySnapshot = await getDocs(q);
         const fetchedSubmissions = querySnapshot.docs.map(doc => {
           const data = doc.data();
+          const commentsData = data.comments || [];
           return {
             id: doc.id,
             ...data,
             createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
             likes: data.likes || [],
+            comments: commentsData.map((c: any) => ({
+                ...c,
+                createdAt: (c.createdAt as Timestamp)?.toDate() || new Date(),
+            })),
             showInGallery: data.showInGallery === true,
           } as Submission;
         });
@@ -395,11 +451,16 @@ export default function GalleryPage() {
         const querySnapshot = await getDocs(q);
         const newSubmissions = querySnapshot.docs.map(doc => {
              const data = doc.data();
+             const commentsData = data.comments || [];
              return {
                 id: doc.id,
                 ...data,
                 createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
                 likes: data.likes || [],
+                comments: commentsData.map((c: any) => ({
+                    ...c,
+                    createdAt: (c.createdAt as Timestamp)?.toDate() || new Date(),
+                })),
                 showInGallery: data.showInGallery === true,
             } as Submission;
         });
@@ -546,7 +607,7 @@ export default function GalleryPage() {
               {filteredSubmissions.map(sub => {
                 const author = userMap.get(sub.userId) || null;
                 const statusInfo = STATUS_CONFIG[certificateStatus(sub.userId)];
-                return <GalleryCard key={sub.id} submission={sub} user={user} author={author} onSubmissionDeleted={handleSubmissionDeleted} onSubmissionUpdated={handleSubmissionUpdated} statusInfo={statusInfo} />
+                return <GalleryCard key={sub.id} submission={sub} user={user} author={author} onSubmissionDeleted={handleSubmissionDeleted} onSubmissionUpdated={handleSubmissionUpdated} statusInfo={statusInfo} userMap={userMap} />
               })}
             </div>
             {hasMore && (

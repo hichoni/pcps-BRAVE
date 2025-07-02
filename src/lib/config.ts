@@ -1,5 +1,5 @@
 
-import { BookOpen, HeartHandshake, Bike, Palette, Laptop, Award, Medal, Gem, ShieldOff, BrainCircuit, ExternalLink, UploadCloud, FileCheck, FileX, History, Keyboard, Link } from 'lucide-react';
+import { BookOpen, HeartHandshake, Bike, Palette, Laptop, Award, Medal, Gem, ShieldOff, BrainCircuit, ExternalLink, UploadCloud, FileCheck, FileX, History, Keyboard, Link, MessageSquare } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export type AreaName = string;
@@ -110,6 +110,7 @@ export const ICONS: Record<string, LucideIcon> = {
     FileX,
     History,
     Link,
+    MessageSquare,
 };
 
 export const DEFAULT_AREAS_CONFIG: Record<AreaName, StoredAreaConfig> = {
@@ -327,4 +328,38 @@ export interface UpdateFeedbackInput {
 export interface UpdateFeedbackOutput {
     success: boolean;
     message: string;
+}
+
+// --- Types for Comment Flows ---
+
+// For generate-comment-suggestions.ts
+export interface GenerateCommentSuggestionsInput {
+  commenterName: string;
+  submissionChallengeName: string;
+  submissionEvidence: string;
+  submissionAuthorName: string;
+}
+
+export interface GenerateCommentSuggestionsOutput {
+  suggestions: string[];
+}
+
+// For add-comment.ts
+export interface Comment {
+  userId: string;
+  userName: string;
+  comment: string;
+  createdAt: Date;
+}
+
+export interface AddCommentInput {
+  submissionId: string;
+  userId: string; // commenter's username
+  userName: string; // commenter's name
+  comment: string;
+}
+
+export interface AddCommentOutput {
+  success: boolean;
+  newComment: Comment;
 }
