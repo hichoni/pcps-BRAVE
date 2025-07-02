@@ -1,10 +1,10 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, Timestamp } from 'firebase/firestore';
+import { doc, onSnapshot, Timestamp, setDoc } from 'firebase/firestore';
+import { isToday } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
@@ -24,33 +24,52 @@ export function WelcomeMessage() {
     setIsLoading(true);
 
     const userStateRef = doc(db, 'userDynamicState', user.username);
+
+    // Using onSnapshot to react to changes (e.g., new encouragement message)
     const unsubscribe = onSnapshot(userStateRef, async (docSnap) => {
-      let encouragementMessage: string | null = null;
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data.encouragement) {
-          const now = new Date();
-          const messageDate = (data.encouragement.createdAt as Timestamp).toDate();
-          if ((now.getTime() - messageDate.getTime()) < 24 * 60 * 60 * 1000) {
-            encouragementMessage = data.encouragement.message;
-          }
+      const data = docSnap.exists() ? docSnap.data() : {};
+      
+      // 1. Check for high-priority, fresh encouragement message
+      if (data.encouragement) {
+        const messageDate = (data.encouragement.createdAt as Timestamp).toDate();
+        // Show encouragement if it's from today
+        if (isToday(messageDate)) {
+          setDisplayMessage(data.encouragement.message);
+          setIsLoading(false);
+          return; // High-priority message shown, we're done.
         }
       }
       
-      if (encouragementMessage) {
-        setDisplayMessage(encouragementMessage);
-        setIsLoading(false);
-      } else {
-        // No active encouragement, generate a welcome message
-        try {
-          const result = await generateWelcomeMessage({ studentName: user.name, userId: user.username });
-          setDisplayMessage(result.message);
-        } catch (e) {
-          console.error("Failed to generate welcome message:", e);
-          setDisplayMessage(`${user.name}님, 환영합니다! 오늘도 즐거운 도전을 응원해요.`);
-        } finally {
+      // 2. Check for existing welcome message for today
+      if (data.welcomeMessage) {
+        const messageDate = (data.welcomeMessage.createdAt as Timestamp).toDate();
+        if (isToday(messageDate)) {
+          setDisplayMessage(data.welcomeMessage.message);
           setIsLoading(false);
+          return; // Welcome message for today already exists
         }
+      }
+
+      // 3. Generate a new welcome message if none of the above are met
+      try {
+        const result = await generateWelcomeMessage({ studentName: user.name, userId: user.username });
+        const newMessage = result.message;
+        setDisplayMessage(newMessage);
+        
+        // Save the newly generated message to Firestore so it's not generated again today
+        await setDoc(userStateRef, {
+          welcomeMessage: {
+            message: newMessage,
+            createdAt: Timestamp.now(),
+          }
+        }, { merge: true });
+
+      } catch (e) {
+        console.error("Failed to generate welcome message:", e);
+        const fallbackMessage = `${user.name}님, 환영합니다! 오늘도 즐거운 도전을 응원해요.`;
+        setDisplayMessage(fallbackMessage);
+      } finally {
+        setIsLoading(false);
       }
     }, (error) => {
         console.error("Error fetching welcome message state:", error);
