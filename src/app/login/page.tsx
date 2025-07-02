@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, LogIn, User as UserIcon, ShieldCheck } from 'lucide-react';
+import { Loader2, LogIn, User as UserIcon, ShieldCheck, Download } from 'lucide-react';
 import Image from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -53,9 +53,44 @@ export default function LoginPage() {
   const [studentNotFound, setStudentNotFound] = useState(false);
   const [isClient, setIsClient] = useState(false);
 
+  // New state for PWA install prompt
+  const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
+  const [isStandalone, setIsStandalone] = useState(false);
+
   useEffect(() => {
     setIsClient(true);
+    
+    // Check if running as a PWA
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsStandalone(true);
+    }
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
   }, []);
+  
+  const handleInstallClick = () => {
+    if (!installPrompt) return;
+    
+    (installPrompt as any).prompt();
+    (installPrompt as any).userChoice.then((choiceResult: { outcome: string }) => {
+      if (choiceResult.outcome === 'accepted') {
+        toast({ title: "앱 설치 완료", description: "이제 홈 화면에서 바로 접속할 수 있어요!" });
+      } else {
+        toast({ title: "설치 취소됨", description: "나중에 언제든지 다시 설치할 수 있습니다.", duration: 3000 });
+      }
+      setInstallPrompt(null);
+    });
+  };
+
 
   const studentForm = useForm<StudentLoginFormValues>({
     resolver: zodResolver(studentLoginSchema),
@@ -200,6 +235,16 @@ export default function LoginPage() {
             <CardTitle className="font-headline text-2xl text-primary">학교장 인증제 로그인</CardTitle>
             <CardDescription>계정 정보를 입력해주세요.</CardDescription>
           </CardHeader>
+          
+          {isClient && installPrompt && !isStandalone && (
+            <div className="px-6 pb-4">
+              <Button onClick={handleInstallClick} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+                <Download className="mr-2"/>
+                앱으로 설치하고 편하게 사용하기
+              </Button>
+            </div>
+          )}
+
           <Tabs defaultValue="student" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="student"><UserIcon className="mr-2"/> 학생</TabsTrigger>
