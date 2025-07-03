@@ -1,4 +1,3 @@
-
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { cn } from '@/lib/utils';
@@ -24,6 +23,7 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <head>
+        <link rel="icon" href="/icon-main.png" type="image/png" />
         <meta name="theme-color" content="#4A5E8A" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
