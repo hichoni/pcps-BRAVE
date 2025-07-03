@@ -6,6 +6,10 @@ import { Providers } from '@/components/Providers';
 export const metadata: Metadata = {
   title: '풍천풍서초등학교 학교장 인증제',
   description: '도전! 꿈 성취 학교장 인증제를 통해 나의 성장을 기록하고 인증받아보세요.',
+  icons: {
+    icon: '/icon-main.png',
+    apple: '/icon-main.png',
+  }
 };
 
 export const viewport: Viewport = {
@@ -23,7 +27,6 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <head>
-        <link rel="icon" href="/icon-main.png" type="image/png" />
         <meta name="theme-color" content="#4A5E8A" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
