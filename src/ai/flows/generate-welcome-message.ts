@@ -10,7 +10,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp, doc, getDoc } from 'firebase/firestore';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { format, subDays, startOfDay, endOfDay, eachDayOfInterval, startOfWeek, eachWeekOfInterval, startOfMonth, eachMonthOfInterval } from 'date-fns';
 import { type AreaState } from '@/lib/config';
 
 // --- Tools for the Flow ---
@@ -225,3 +225,5 @@ const generateWelcomeMessageFlow = ai.defineFlow(
     return output;
   }
 );
+
+    
