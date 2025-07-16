@@ -1,0 +1,86 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+  
+    // Helper function to check if a user is a teacher
+    function isTeacher(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.role == 'teacher';
+    }
+
+    // `users` collection rules
+    match /users/{userId} {
+      // Allow any authenticated user to read user profiles (for names, avatars etc.)
+      allow read: if request.auth != null;
+      
+      // Allow a user to update their own pin or profileAvatar
+      allow update: if request.auth.uid == userId && (
+                      request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['pin', 'profileAvatar'])
+                    );
+
+      // Allow teachers to create, update, or delete any user document
+      allow create, delete: if isTeacher(request.auth.uid);
+      allow update: if isTeacher(request.auth.uid);
+    }
+    
+    // `achievements` collection rules
+    match /achievements/{username} {
+        // A student can read their own achievements. A teacher can read any achievements.
+        allow read: if request.auth.uid == username || isTeacher(request.auth.uid);
+        
+        // Only a teacher can update achievement data.
+        allow write: if isTeacher(request.auth.uid);
+    }
+
+    // `challengeSubmissions` collection rules
+    match /challengeSubmissions/{submissionId} {
+        // Any authenticated user can read submissions (for the gallery)
+        allow read: if request.auth != null;
+        
+        // A user can create a submission only for themselves
+        allow create: if request.auth.uid == request.resource.data.userId;
+
+        // A user can only update their own submission to add a 'like', 'comment' or request deletion.
+        // A teacher can update any submission (approve, reject, edit evidence)
+        allow update: if (request.auth.uid == resource.data.userId && (
+                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'comments']) ||
+                          (request.resource.data.status == 'pending_deletion' && resource.data.status != 'pending_deletion')
+                        )) || isTeacher(request.auth.uid);
+                        
+        // Only teachers can delete submissions directly. (Students use the 'pending_deletion' status update)
+        allow delete: if isTeacher(request.auth.uid);
+    }
+    
+    // `config` collection rules
+    match /config/{configId} {
+        // Anyone can read the config. Only teachers can write/update it.
+        allow read: if true;
+        allow write: if isTeacher(request.auth.uid);
+    }
+
+    // `feedback` collection rules
+    match /feedback/{feedbackId} {
+        // Teachers can read all feedback. Students can only read their own.
+        allow read: if isTeacher(request.auth.uid) || request.auth.uid == resource.data.userId;
+        
+        // Students can create their own feedback.
+        allow create: if request.auth.uid == request.resource.data.userId;
+        
+        // Only teachers can update feedback (e.g., add a reply, change status)
+        allow update: if isTeacher(request.auth.uid);
+    }
+    
+    // `userDynamicState` for welcome messages etc.
+    match /userDynamicState/{userId} {
+      // User can only access their own state document.
+      allow read, write: if request.auth.uid == userId;
+    }
+
+    // Manual updates log can only be written by teachers (via server-side logic)
+    // and should not be readable or writeable by clients directly.
+    match /manualUpdates/{updateId} {
+      allow read, write: if false; 
+    }
+  }
+}
