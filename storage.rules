@@ -1,0 +1,21 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // 프로필 사진 규칙
+    // 사용자는 자신의 프로필 폴더에만 쓸 수 있습니다.
+    // /profile/{userId}/{fileName}
+    match /profile/{userId}/{fileName} {
+      allow read: if request.auth != null; // 로그인한 사용자는 누구나 프로필 사진을 볼 수 있음
+      allow write: if request.auth != null && request.auth.uid == userId; // 자기 자신만 프로필 사진을 업로드/수정/삭제할 수 있음
+    }
+
+    // 증거 자료 규칙
+    // 사용자는 자신의 증거 자료 폴더에만 쓸 수 있습니다.
+    // /evidence/{userId}/{fileName}
+    match /evidence/{userId}/{fileName} {
+       allow read: if request.auth != null; // 로그인한 사용자는 누구나 증거 자료를 볼 수 있음
+       allow write: if request.auth != null && request.auth.uid == userId; // 자기 자신만 증거 자료를 업로드할 수 있음
+    }
+  }
+}
